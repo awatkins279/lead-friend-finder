@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
+import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
 import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
 
@@ -42,6 +43,11 @@ const AppPeopleRoute = AppPeopleRouteImport.update({
   path: '/people',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAccountsRoute = AppAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppListsIndexRoute = AppListsIndexRouteImport.update({
   id: '/lists/',
   path: '/lists/',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/accounts': typeof AppAccountsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/accounts': typeof AppAccountsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/accounts': typeof AppAccountsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/accounts'
     | '/app/people'
     | '/app/saved'
     | '/app/lists/$listId'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/accounts'
     | '/app/people'
     | '/app/saved'
     | '/app/lists/$listId'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/app/accounts'
     | '/app/people'
     | '/app/saved'
     | '/app/lists/$listId'
@@ -154,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeopleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/accounts': {
+      id: '/app/accounts'
+      path: '/accounts'
+      fullPath: '/app/accounts'
+      preLoaderRoute: typeof AppAccountsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/lists/': {
       id: '/app/lists/'
       path: '/lists'
@@ -172,6 +191,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAccountsRoute: typeof AppAccountsRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
   AppListsListIdRoute: typeof AppListsListIdRoute
@@ -179,6 +199,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAccountsRoute: AppAccountsRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,
   AppListsListIdRoute: AppListsListIdRoute,
@@ -195,3 +216,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
