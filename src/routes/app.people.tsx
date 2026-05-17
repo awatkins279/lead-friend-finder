@@ -163,6 +163,11 @@ function PeoplePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {picked.size > 0 && (
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <ListPlus className="mr-2 h-4 w-4" /> Add {picked.size} to list
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={saveSearch}>
             <Save className="mr-2 h-4 w-4" /> Save search
           </Button>
