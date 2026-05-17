@@ -267,7 +267,9 @@ function ListDetailPage() {
             {rows.map((r) => {
               const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
               const isBusy = busy.has(r.lead_id);
-              const emailCount = r.emails?.length ?? 0;
+              const eff = effectiveEmails(r);
+              const emailCount = eff.length;
+              const isLegacy = (!r.emails || r.emails.length === 0) && eff.length > 0;
               return (
                 <Card
                   key={r.lead_id}
