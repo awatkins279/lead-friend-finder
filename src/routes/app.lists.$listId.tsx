@@ -16,20 +16,29 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
-  head: () => ({ meta: [{ title: "List — Outreach" }] }),
+  head: () => ({ meta: [{ title: "Campaign — Outreach" }] }),
 });
+
+type EmailInSequence = {
+  step: number;
+  subject: string;
+  body: string;
+  cta: string;
+  send_after_days: number;
+};
 
 type Row = {
   lead_id: string;
   score: number | null;
   status: string;
-  email_subject: string | null;
-  email_body: string | null;
+  emails: EmailInSequence[] | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
@@ -51,23 +60,28 @@ type Row = {
   } | null;
 };
 
+type ListRow = CampaignConfig & { id: string };
+
 function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
   const enrichFn = useServerFn(enrichLead);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Row | null>(null);
+  const [configOpen, setConfigOpen] = useState(false);
 
-  const { data: list } = useQuery({
+  const { data: list, refetch: refetchList } = useQuery({
     queryKey: ["list", listId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lists")
-        .select("id, name, description")
+        .select(
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions",
+        )
         .eq("id", listId)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as ListRow | null;
     },
   });
 
@@ -77,7 +91,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("list_leads")
         .select(
-          "lead_id, score, status, email_subject, email_body, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
+          "lead_id, score, status, emails, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
         )
         .eq("list_id", listId)
         .order("score", { ascending: false, nullsFirst: false });
@@ -86,13 +100,28 @@ function ListDetailPage() {
     },
   });
 
+  const isConfigured = !!(list?.what_selling && list?.sender_name);
+
+  // Auto-open config the first time a user lands on a brand-new list
+  useEffect(() => {
+    if (list && !isConfigured && !configOpen) {
+      setConfigOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list?.id]);
+
   const runOne = async (leadId: string) => {
+    if (!isConfigured) {
+      toast.error("Set up the campaign first");
+      setConfigOpen(true);
+      return;
+    }
     setBusy((p) => new Set(p).add(leadId));
     try {
       await enrichFn({ data: { listId, leadId } });
       qc.invalidateQueries({ queryKey: ["list-leads", listId] });
     } catch (e: any) {
-      toast.error(e.message ?? "Failed to enrich");
+      toast.error(e.message ?? "Failed to generate");
     } finally {
       setBusy((p) => {
         const n = new Set(p);
@@ -103,16 +132,15 @@ function ListDetailPage() {
   };
 
   const runAll = async () => {
-    const pending = (rows ?? []).filter((r) => r.status !== "enriched");
-    if (pending.length === 0) {
-      toast.info("All leads already researched");
+    if (!isConfigured) {
+      toast.error("Set up the campaign first");
+      setConfigOpen(true);
       return;
     }
-    toast.info(`Researching ${pending.length} leads…`);
-    // Run sequentially to avoid rate-limits
-    for (const r of pending) {
-      await runOne(r.lead_id);
-    }
+    const pending = (rows ?? []).filter((r) => r.status !== "enriched");
+    if (pending.length === 0) return toast.info("All prospects already have sequences");
+    toast.info(`Generating sequences for ${pending.length} prospects…`);
+    for (const r of pending) await runOne(r.lead_id);
     toast.success("Done");
   };
 
@@ -126,54 +154,103 @@ function ListDetailPage() {
     else refetch();
   };
 
-  const saveEmail = async (leadId: string, subject: string, body: string) => {
-    const { error } = await supabase
-      .from("list_leads")
-      .update({ email_subject: subject, email_body: body })
-      .eq("list_id", listId)
-      .eq("lead_id", leadId);
-    if (error) toast.error(error.message);
-    else toast.success("Saved");
-  };
+  const cfgInitial: CampaignConfig = list
+    ? {
+        name: list.name ?? "",
+        description: list.description,
+        sender_name: list.sender_name,
+        sender_title: list.sender_title,
+        sender_company: list.sender_company,
+        what_selling: list.what_selling,
+        key_selling_points: list.key_selling_points,
+        num_emails: list.num_emails ?? 4,
+        word_count: list.word_count ?? 150,
+        personalization_level: list.personalization_level ?? "high",
+        cta_type: list.cta_type ?? "auto",
+        extra_instructions: list.extra_instructions,
+      }
+    : {
+        name: "",
+        description: null,
+        sender_name: null,
+        sender_title: null,
+        sender_company: null,
+        what_selling: null,
+        key_selling_points: null,
+        num_emails: 4,
+        word_count: 150,
+        personalization_level: "high",
+        cta_type: "auto",
+        extra_instructions: null,
+      };
+
+  const enrichedCount = (rows ?? []).filter((r) => r.status === "enriched").length;
 
   return (
     <div className="flex h-screen flex-col">
       <header className="border-b bg-background px-8 py-5">
         <Link to="/app/lists" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> All lists
+          <ArrowLeft className="h-3.5 w-3.5" /> All campaigns
         </Link>
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">{list?.name ?? "Loading…"}</h1>
-            {list?.description && (
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{list.description}</p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              {(rows ?? []).length} leads · {(rows ?? []).filter((r) => r.status === "enriched").length} researched
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>{(rows ?? []).length} prospects</span>
+              <span>·</span>
+              <span>{enrichedCount} researched</span>
+              {isConfigured && (
+                <>
+                  <span>·</span>
+                  <span>{list?.num_emails} emails</span>
+                  <span>·</span>
+                  <span>~{list?.word_count} words</span>
+                  <span>·</span>
+                  <span>{list?.personalization_level} personalization</span>
+                </>
+              )}
+            </div>
           </div>
-          <Button onClick={runAll} disabled={!rows || rows.length === 0}>
-            <Sparkles className="mr-2 h-4 w-4" /> Research all
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={() => setConfigOpen(true)}>
+              <Settings2 className="mr-2 h-4 w-4" /> Campaign config
+            </Button>
+            <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured}>
+              <Sparkles className="mr-2 h-4 w-4" /> Generate all sequences
+            </Button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-8">
+        {!isConfigured && list && (
+          <Card className="mb-4 flex items-center gap-3 border-amber-500/40 bg-amber-50/40 p-4 dark:bg-amber-950/20">
+            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium">Campaign not configured</p>
+              <p className="text-muted-foreground">
+                Set up sender info + what you're selling so the AI knows what to write.
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setConfigOpen(true)}>Configure</Button>
+          </Card>
+        )}
+
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : !rows || rows.length === 0 ? (
           <Card className="p-12 text-center">
             <p className="text-sm text-muted-foreground">
-              No leads in this list yet. Add some from{" "}
+              No prospects yet. Add some from{" "}
               <Link to="/app/people" className="underline">People Search</Link>.
             </p>
           </Card>
         ) : (
           <div className="space-y-2">
             {rows.map((r) => {
-              const name =
-                [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
+              const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
               const isBusy = busy.has(r.lead_id);
+              const emailCount = r.emails?.length ?? 0;
               return (
                 <Card
                   key={r.lead_id}
@@ -198,16 +275,18 @@ function ListDetailPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{name}</span>
-                      {r.status === "enriched" && (
-                        <Badge variant="secondary" className="text-[10px]">researched</Badge>
+                      {emailCount > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {emailCount} email sequence
+                        </Badge>
                       )}
                     </div>
                     <div className="truncate text-sm text-muted-foreground">
                       {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
                     </div>
-                    {r.email_subject && (
+                    {r.emails?.[0]?.subject && (
                       <div className="mt-1 truncate text-xs text-muted-foreground">
-                        ✉ {r.email_subject}
+                        ✉ {r.emails[0].subject}
                       </div>
                     )}
                   </div>
@@ -223,7 +302,7 @@ function ListDetailPage() {
                       ) : (
                         <>
                           <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                          {r.status === "enriched" ? "Re-run" : "Research"}
+                          {r.status === "enriched" ? "Regenerate" : "Generate"}
                         </>
                       )}
                     </Button>
@@ -238,40 +317,73 @@ function ListDetailPage() {
         )}
       </div>
 
-      <LeadDrawer row={open} onClose={() => setOpen(null)} onSave={saveEmail} />
+      <LeadDrawer
+        listId={listId}
+        row={open}
+        onClose={() => setOpen(null)}
+        onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
+      />
+
+      {list && (
+        <CampaignConfigDialog
+          listId={listId}
+          initial={cfgInitial}
+          open={configOpen}
+          onOpenChange={setConfigOpen}
+          onSaved={() => refetchList()}
+        />
+      )}
     </div>
   );
 }
 
 function LeadDrawer({
+  listId,
   row,
   onClose,
-  onSave,
+  onChanged,
 }: {
+  listId: string;
   row: Row | null;
   onClose: () => void;
-  onSave: (leadId: string, subject: string, body: string) => void;
+  onChanged: () => void;
 }) {
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [emails, setEmails] = useState<EmailInSequence[]>([]);
+  const [activeStep, setActiveStep] = useState("1");
 
   useEffect(() => {
-    setSubject(row?.email_subject ?? "");
-    setBody(row?.email_body ?? "");
-  }, [row?.lead_id, row?.email_subject, row?.email_body]);
+    setEmails(row?.emails ?? []);
+    setActiveStep("1");
+  }, [row?.lead_id, row?.emails]);
+
+  const updateEmail = (idx: number, patch: Partial<EmailInSequence>) => {
+    setEmails((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
+  };
+
+  const saveEmails = async () => {
+    if (!row) return;
+    const { error } = await supabase
+      .from("list_leads")
+      .update({
+        emails,
+        email_subject: emails[0]?.subject ?? "",
+        email_body: emails[0]?.body ?? "",
+      })
+      .eq("list_id", listId)
+      .eq("lead_id", row.lead_id);
+    if (error) return toast.error(error.message);
+    toast.success("Saved");
+    onChanged();
+  };
 
   return (
     <Sheet
       open={!!row}
       onOpenChange={(o) => {
-        if (!o) {
-          onClose();
-          setSubject("");
-          setBody("");
-        }
+        if (!o) onClose();
       }}
     >
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
         {row && (
           <>
             <SheetHeader>
@@ -329,56 +441,64 @@ function LeadDrawer({
                 </div>
               )}
 
-              {row.research?.talking_points && row.research.talking_points.length > 0 && (
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Talking points
-                  </div>
-                  <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-                    {row.research.talking_points.map((p, i) => (
-                      <li key={i}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {(row.email_subject || row.email_body) && (
+              {emails.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Personalized email
+                      Email sequence ({emails.length})
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
-                        toast.success("Copied");
-                      }}
-                    >
-                      <Copy className="mr-1.5 h-3 w-3" /> Copy
-                    </Button>
+                    <Button size="sm" onClick={saveEmails}>Save changes</Button>
                   </div>
-                  <Input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Subject"
-                  />
-                  <Textarea
-                    rows={12}
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    placeholder="Email body"
-                  />
-                  <Button size="sm" onClick={() => onSave(row.lead_id, subject, body)}>
-                    Save changes
-                  </Button>
-                </div>
-              )}
 
-              {row.status !== "enriched" && (
+                  <Tabs value={activeStep} onValueChange={setActiveStep}>
+                    <TabsList className="w-full justify-start overflow-x-auto">
+                      {emails.map((e) => (
+                        <TabsTrigger key={e.step} value={String(e.step)}>
+                          Email {e.step}
+                          {e.send_after_days > 0 && (
+                            <span className="ml-1.5 text-[10px] text-muted-foreground">
+                              +{e.send_after_days}d
+                            </span>
+                          )}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                    {emails.map((e, idx) => (
+                      <TabsContent key={e.step} value={String(e.step)} className="space-y-3 pt-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            CTA: {e.cta || "—"}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`Subject: ${e.subject}\n\n${e.body}`);
+                              toast.success("Copied");
+                            }}
+                          >
+                            <Copy className="mr-1.5 h-3 w-3" /> Copy
+                          </Button>
+                        </div>
+                        <Input
+                          value={e.subject}
+                          onChange={(ev) => updateEmail(idx, { subject: ev.target.value })}
+                          placeholder="Subject"
+                        />
+                        <Textarea
+                          rows={14}
+                          value={e.body}
+                          onChange={(ev) => updateEmail(idx, { body: ev.target.value })}
+                          placeholder="Email body"
+                          className="font-mono text-xs"
+                        />
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </div>
+              ) : (
                 <Card className="p-4 text-center text-sm text-muted-foreground">
-                  Click <strong>Research</strong> to score this lead and generate a personalized email.
+                  Click <strong>Generate</strong> to research this prospect and create a personalized email sequence.
                 </Card>
               )}
             </div>

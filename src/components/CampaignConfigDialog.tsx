@@ -1,0 +1,244 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Sparkles } from "lucide-react";
+import { toast } from "sonner";
+
+export type CampaignConfig = {
+  name: string;
+  description: string | null;
+  sender_name: string | null;
+  sender_title: string | null;
+  sender_company: string | null;
+  what_selling: string | null;
+  key_selling_points: string | null;
+  num_emails: number;
+  word_count: number;
+  personalization_level: string;
+  cta_type: string;
+  extra_instructions: string | null;
+};
+
+export function CampaignConfigDialog({
+  listId,
+  initial,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  listId: string;
+  initial: CampaignConfig;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [cfg, setCfg] = useState<CampaignConfig>(initial);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) setCfg(initial);
+  }, [open, initial]);
+
+  const update = <K extends keyof CampaignConfig>(k: K, v: CampaignConfig[K]) =>
+    setCfg((c) => ({ ...c, [k]: v }));
+
+  const save = async () => {
+    if (!cfg.name.trim()) return toast.error("Campaign name required");
+    if (!cfg.sender_name?.trim()) return toast.error("Your name required");
+    if (!cfg.what_selling?.trim()) return toast.error("What you're selling required");
+    setSaving(true);
+    const { error } = await supabase
+      .from("lists")
+      .update({
+        name: cfg.name.trim(),
+        description: cfg.description,
+        sender_name: cfg.sender_name,
+        sender_title: cfg.sender_title,
+        sender_company: cfg.sender_company,
+        what_selling: cfg.what_selling,
+        key_selling_points: cfg.key_selling_points,
+        num_emails: cfg.num_emails,
+        word_count: cfg.word_count,
+        personalization_level: cfg.personalization_level,
+        cta_type: cfg.cta_type,
+        extra_instructions: cfg.extra_instructions,
+      })
+      .eq("id", listId);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Campaign saved");
+    onSaved();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> Email generator config
+          </DialogTitle>
+          <DialogDescription>
+            Set up your campaign once — every prospect's sequence is generated against this context.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Campaign name">
+              <Input value={cfg.name} onChange={(e) => update("name", e.target.value)} />
+            </Field>
+            <Field label="Your name">
+              <Input
+                value={cfg.sender_name ?? ""}
+                onChange={(e) => update("sender_name", e.target.value)}
+                placeholder="Jane Smith"
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="What you're selling"
+            hint="High-level context. The AI uses this as the north star but takes creative control over angle, hook, and copy."
+          >
+            <Textarea
+              rows={3}
+              value={cfg.what_selling ?? ""}
+              onChange={(e) => update("what_selling", e.target.value)}
+              placeholder="AI-powered contact center solutions that cut operating costs by up to 50%…"
+            />
+          </Field>
+
+          <Field label="Key selling points / ICP notes (optional)">
+            <Textarea
+              rows={3}
+              value={cfg.key_selling_points ?? ""}
+              onChange={(e) => update("key_selling_points", e.target.value)}
+              placeholder="Any mid-market to enterprise company with 200-5000+ employees that…"
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Emails in sequence">
+              <Select
+                value={String(cfg.num_emails)}
+                onValueChange={(v) => update("num_emails", parseInt(v))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} email{n > 1 ? "s" : ""}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Target word count per email">
+              <Input
+                type="number"
+                value={cfg.word_count}
+                onChange={(e) => update("word_count", parseInt(e.target.value) || 150)}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Personalization level">
+              <Select
+                value={cfg.personalization_level}
+                onValueChange={(v) => update("personalization_level", v)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low — mostly merge fields</SelectItem>
+                  <SelectItem value="medium">Medium — role + industry refs</SelectItem>
+                  <SelectItem value="high">High — hand-written feel</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="CTA type" hint="AI picks the best CTA per email when set to Auto.">
+              <Select value={cfg.cta_type} onValueChange={(v) => update("cta_type", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Let AI choose per email</SelectItem>
+                  <SelectItem value="meeting">Always ask for meeting</SelectItem>
+                  <SelectItem value="reply">Always ask for reply</SelectItem>
+                  <SelectItem value="resource">Always offer a resource</SelectItem>
+                  <SelectItem value="question">Always end with a question</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Your title">
+              <Input
+                value={cfg.sender_title ?? ""}
+                onChange={(e) => update("sender_title", e.target.value)}
+                placeholder="President"
+              />
+            </Field>
+            <Field label="Your company">
+              <Input
+                value={cfg.sender_company ?? ""}
+                onChange={(e) => update("sender_company", e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="Extra instructions to the AI (optional)"
+            hint="Free-form. Voice samples, things to avoid, specific angles, etc. Layered ON TOP of prospect intel."
+          >
+            <Textarea
+              rows={4}
+              value={cfg.extra_instructions ?? ""}
+              onChange={(e) => update("extra_instructions", e.target.value)}
+              placeholder="Friendly, conversational tone. First email CTA should be like: 'if you could save 50% on your call center costs…'"
+            />
+          </Field>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save campaign"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium">{label}</Label>
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {children}
+    </div>
+  );
+}
