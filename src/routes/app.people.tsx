@@ -34,8 +34,11 @@ import {
   Phone,
   Globe,
   Save,
+  ListPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AddToListDialog } from "@/components/AddToListDialog";
 
 export const Route = createFileRoute("/app/people")({
   component: PeoplePage,
@@ -85,6 +88,8 @@ function PeoplePage() {
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Lead | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => setPage(0), [filters]);
 
@@ -158,6 +163,11 @@ function PeoplePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {picked.size > 0 && (
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <ListPlus className="mr-2 h-4 w-4" /> Add {picked.size} to list
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={saveSearch}>
             <Save className="mr-2 h-4 w-4" /> Save search
           </Button>
@@ -255,6 +265,19 @@ function PeoplePage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={rows.length > 0 && rows.every((r) => picked.has(r.id))}
+                        onCheckedChange={(v) => {
+                          setPicked((prev) => {
+                            const next = new Set(prev);
+                            if (v) rows.forEach((r) => next.add(r.id));
+                            else rows.forEach((r) => next.delete(r.id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Company</TableHead>
@@ -265,13 +288,13 @@ function PeoplePage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
                         Loading…
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
                         No leads match your filters.
                       </TableCell>
                     </TableRow>
@@ -282,6 +305,19 @@ function PeoplePage() {
                         className="cursor-pointer"
                         onClick={() => setSelected(r)}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={picked.has(r.id)}
+                            onCheckedChange={(v) => {
+                              setPicked((prev) => {
+                                const next = new Set(prev);
+                                if (v) next.add(r.id);
+                                else next.delete(r.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
                         </TableCell>
@@ -334,6 +370,13 @@ function PeoplePage() {
           </div>
         </section>
       </div>
+
+      <AddToListDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        leadIds={Array.from(picked)}
+        onAdded={() => setPicked(new Set())}
+      />
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
