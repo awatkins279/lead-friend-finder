@@ -296,16 +296,21 @@ function ListDetailPage() {
                       <span className="font-medium">{name}</span>
                       {emailCount > 0 && (
                         <Badge variant="secondary" className="text-[10px]">
-                          {emailCount} email sequence
+                          {emailCount} email{emailCount > 1 ? " sequence" : ""}
+                        </Badge>
+                      )}
+                      {isLegacy && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Regenerate for full sequence
                         </Badge>
                       )}
                     </div>
                     <div className="truncate text-sm text-muted-foreground">
                       {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
                     </div>
-                    {r.emails?.[0]?.subject && (
+                    {eff[0]?.subject && (
                       <div className="mt-1 truncate text-xs text-muted-foreground">
-                        ✉ {r.emails[0].subject}
+                        ✉ {eff[0].subject}
                       </div>
                     )}
                   </div>
