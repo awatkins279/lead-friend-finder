@@ -18,7 +18,7 @@ import {
 import { List as ListIcon, Plus, Users, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/app/lists")({
+export const Route = createFileRoute("/app/lists/")({
   component: ListsPage,
   head: () => ({ meta: [{ title: "Lists — Outreach" }] }),
 });
