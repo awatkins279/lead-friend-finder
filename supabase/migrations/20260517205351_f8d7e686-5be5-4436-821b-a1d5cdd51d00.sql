@@ -1,0 +1,1 @@
+ALTER TABLE public.list_leads ADD CONSTRAINT list_leads_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id) ON DELETE CASCADE;
