@@ -142,7 +142,7 @@ function PeoplePage() {
     const { error } = await supabase.from("saved_searches").insert({
       user_id: session.user.id,
       name,
-      filters: filters as unknown as Record<string, unknown>,
+      filters: filters as any,
     });
     if (error) toast.error(error.message);
     else toast.success("Saved");
