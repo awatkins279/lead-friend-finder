@@ -94,6 +94,7 @@ export type Database = {
           created_at: string
           email_body: string | null
           email_subject: string | null
+          emails: Json | null
           lead_id: string
           list_id: string
           research: Json | null
@@ -105,6 +106,7 @@ export type Database = {
           created_at?: string
           email_body?: string | null
           email_subject?: string | null
+          emails?: Json | null
           lead_id: string
           list_id: string
           research?: Json | null
@@ -116,6 +118,7 @@ export type Database = {
           created_at?: string
           email_body?: string | null
           email_subject?: string | null
+          emails?: Json | null
           lead_id?: string
           list_id?: string
           research?: Json | null
@@ -143,27 +146,57 @@ export type Database = {
       lists: {
         Row: {
           created_at: string
+          cta_type: string
           description: string | null
+          extra_instructions: string | null
           id: string
+          key_selling_points: string | null
           name: string
+          num_emails: number
+          personalization_level: string
+          sender_company: string | null
+          sender_name: string | null
+          sender_title: string | null
           updated_at: string
           user_id: string
+          what_selling: string | null
+          word_count: number
         }
         Insert: {
           created_at?: string
+          cta_type?: string
           description?: string | null
+          extra_instructions?: string | null
           id?: string
+          key_selling_points?: string | null
           name: string
+          num_emails?: number
+          personalization_level?: string
+          sender_company?: string | null
+          sender_name?: string | null
+          sender_title?: string | null
           updated_at?: string
           user_id: string
+          what_selling?: string | null
+          word_count?: number
         }
         Update: {
           created_at?: string
+          cta_type?: string
           description?: string | null
+          extra_instructions?: string | null
           id?: string
+          key_selling_points?: string | null
           name?: string
+          num_emails?: number
+          personalization_level?: string
+          sender_company?: string | null
+          sender_name?: string | null
+          sender_title?: string | null
           updated_at?: string
           user_id?: string
+          what_selling?: string | null
+          word_count?: number
         }
         Relationships: []
       }
