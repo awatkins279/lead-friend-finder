@@ -34,8 +34,11 @@ import {
   Phone,
   Globe,
   Save,
+  ListPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AddToListDialog } from "@/components/AddToListDialog";
 
 export const Route = createFileRoute("/app/people")({
   component: PeoplePage,
