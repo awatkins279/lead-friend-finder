@@ -255,15 +255,10 @@ function LeadDrawer({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
-  // sync when row changes
-  useState(() => {});
-  if (row && (subject === "" && body === "") && (row.email_subject || row.email_body)) {
-    // initialize on first open of a row
-    setTimeout(() => {
-      setSubject(row.email_subject ?? "");
-      setBody(row.email_body ?? "");
-    }, 0);
-  }
+  useEffect(() => {
+    setSubject(row?.email_subject ?? "");
+    setBody(row?.email_body ?? "");
+  }, [row?.lead_id, row?.email_subject, row?.email_body]);
 
   return (
     <Sheet
