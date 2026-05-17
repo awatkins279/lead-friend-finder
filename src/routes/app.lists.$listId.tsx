@@ -39,6 +39,8 @@ type Row = {
   score: number | null;
   status: string;
   emails: EmailInSequence[] | null;
+  email_subject: string | null;
+  email_body: string | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
@@ -59,6 +61,21 @@ type Row = {
     country: string | null;
   } | null;
 };
+
+// Older enriched rows only have email_subject/email_body (single email). Surface as a 1-step sequence.
+function effectiveEmails(r: Row): EmailInSequence[] {
+  if (r.emails && r.emails.length > 0) return r.emails;
+  if (r.email_subject || r.email_body) {
+    return [{
+      step: 1,
+      subject: r.email_subject ?? "",
+      body: r.email_body ?? "",
+      cta: "",
+      send_after_days: 0,
+    }];
+  }
+  return [];
+}
 
 type ListRow = CampaignConfig & { id: string };
 
