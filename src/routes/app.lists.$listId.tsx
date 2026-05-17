@@ -39,6 +39,8 @@ type Row = {
   score: number | null;
   status: string;
   emails: EmailInSequence[] | null;
+  email_subject: string | null;
+  email_body: string | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
@@ -59,6 +61,21 @@ type Row = {
     country: string | null;
   } | null;
 };
+
+// Older enriched rows only have email_subject/email_body (single email). Surface as a 1-step sequence.
+function effectiveEmails(r: Row): EmailInSequence[] {
+  if (r.emails && r.emails.length > 0) return r.emails;
+  if (r.email_subject || r.email_body) {
+    return [{
+      step: 1,
+      subject: r.email_subject ?? "",
+      body: r.email_body ?? "",
+      cta: "",
+      send_after_days: 0,
+    }];
+  }
+  return [];
+}
 
 type ListRow = CampaignConfig & { id: string };
 
@@ -90,8 +107,8 @@ function ListDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("list_leads")
-        .select(
-          "lead_id, score, status, emails, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
+    .select(
+          "lead_id, score, status, emails, email_subject, email_body, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
         )
         .eq("list_id", listId)
         .order("score", { ascending: false, nullsFirst: false });
@@ -250,7 +267,9 @@ function ListDetailPage() {
             {rows.map((r) => {
               const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
               const isBusy = busy.has(r.lead_id);
-              const emailCount = r.emails?.length ?? 0;
+              const eff = effectiveEmails(r);
+              const emailCount = eff.length;
+              const isLegacy = (!r.emails || r.emails.length === 0) && eff.length > 0;
               return (
                 <Card
                   key={r.lead_id}
@@ -277,16 +296,21 @@ function ListDetailPage() {
                       <span className="font-medium">{name}</span>
                       {emailCount > 0 && (
                         <Badge variant="secondary" className="text-[10px]">
-                          {emailCount} email sequence
+                          {emailCount} email{emailCount > 1 ? " sequence" : ""}
+                        </Badge>
+                      )}
+                      {isLegacy && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Regenerate for full sequence
                         </Badge>
                       )}
                     </div>
                     <div className="truncate text-sm text-muted-foreground">
                       {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
                     </div>
-                    {r.emails?.[0]?.subject && (
+                    {eff[0]?.subject && (
                       <div className="mt-1 truncate text-xs text-muted-foreground">
-                        ✉ {r.emails[0].subject}
+                        ✉ {eff[0].subject}
                       </div>
                     )}
                   </div>
@@ -352,9 +376,9 @@ function LeadDrawer({
   const [activeStep, setActiveStep] = useState("1");
 
   useEffect(() => {
-    setEmails(row?.emails ?? []);
+    setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
-  }, [row?.lead_id, row?.emails]);
+  }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body]);
 
   const updateEmail = (idx: number, patch: Partial<EmailInSequence>) => {
     setEmails((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
