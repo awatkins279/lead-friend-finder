@@ -154,9 +154,12 @@ function ListDetailPage() {
       setConfigOpen(true);
       return;
     }
-    const pending = (rows ?? []).filter((r) => r.status !== "enriched");
-    if (pending.length === 0) return toast.info("All prospects already have sequences");
-    toast.info(`Generating sequences for ${pending.length} prospects…`);
+    const target = list?.num_emails ?? 4;
+    const pending = (rows ?? []).filter(
+      (r) => r.status !== "enriched" || (r.emails?.length ?? 0) < target,
+    );
+    if (pending.length === 0) return toast.info("All prospects already have full sequences");
+    toast.info(`Generating ${target}-email sequences for ${pending.length} prospects…`);
     for (const r of pending) await runOne(r.lead_id);
     toast.success("Done");
   };
