@@ -88,6 +88,8 @@ function PeoplePage() {
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Lead | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => setPage(0), [filters]);
 
