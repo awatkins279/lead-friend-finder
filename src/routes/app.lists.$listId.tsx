@@ -376,9 +376,9 @@ function LeadDrawer({
   const [activeStep, setActiveStep] = useState("1");
 
   useEffect(() => {
-    setEmails(row?.emails ?? []);
+    setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
-  }, [row?.lead_id, row?.emails]);
+  }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body]);
 
   const updateEmail = (idx: number, patch: Partial<EmailInSequence>) => {
     setEmails((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
