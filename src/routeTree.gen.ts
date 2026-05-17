@@ -14,7 +14,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
-import { Route as AppListsRouteImport } from './routes/app.lists'
+import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
 import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -42,44 +42,44 @@ const AppPeopleRoute = AppPeopleRouteImport.update({
   path: '/people',
   getParentRoute: () => AppRoute,
 } as any)
-const AppListsRoute = AppListsRouteImport.update({
-  id: '/lists',
-  path: '/lists',
+const AppListsIndexRoute = AppListsIndexRouteImport.update({
+  id: '/lists/',
+  path: '/lists/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppListsListIdRoute = AppListsListIdRouteImport.update({
-  id: '/$listId',
-  path: '/$listId',
-  getParentRoute: () => AppListsRoute,
+  id: '/lists/$listId',
+  path: '/lists/$listId',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/app/lists': typeof AppListsRouteWithChildren
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/lists/': typeof AppListsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/app/lists': typeof AppListsRouteWithChildren
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/lists': typeof AppListsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
-  '/app/lists': typeof AppListsRouteWithChildren
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/lists/': typeof AppListsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -87,28 +87,28 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
-    | '/app/lists'
     | '/app/people'
     | '/app/saved'
     | '/app/lists/$listId'
+    | '/app/lists/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/app'
     | '/login'
-    | '/app/lists'
     | '/app/people'
     | '/app/saved'
     | '/app/lists/$listId'
+    | '/app/lists'
   id:
     | '__root__'
     | '/'
     | '/app'
     | '/login'
-    | '/app/lists'
     | '/app/people'
     | '/app/saved'
     | '/app/lists/$listId'
+    | '/app/lists/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -154,45 +154,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeopleRouteImport
       parentRoute: typeof AppRoute
     }
-    '/app/lists': {
-      id: '/app/lists'
+    '/app/lists/': {
+      id: '/app/lists/'
       path: '/lists'
-      fullPath: '/app/lists'
-      preLoaderRoute: typeof AppListsRouteImport
+      fullPath: '/app/lists/'
+      preLoaderRoute: typeof AppListsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/lists/$listId': {
       id: '/app/lists/$listId'
-      path: '/$listId'
+      path: '/lists/$listId'
       fullPath: '/app/lists/$listId'
       preLoaderRoute: typeof AppListsListIdRouteImport
-      parentRoute: typeof AppListsRoute
+      parentRoute: typeof AppRoute
     }
   }
 }
 
-interface AppListsRouteChildren {
-  AppListsListIdRoute: typeof AppListsListIdRoute
-}
-
-const AppListsRouteChildren: AppListsRouteChildren = {
-  AppListsListIdRoute: AppListsListIdRoute,
-}
-
-const AppListsRouteWithChildren = AppListsRoute._addFileChildren(
-  AppListsRouteChildren,
-)
-
 interface AppRouteChildren {
-  AppListsRoute: typeof AppListsRouteWithChildren
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
+  AppListsListIdRoute: typeof AppListsListIdRoute
+  AppListsIndexRoute: typeof AppListsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppListsRoute: AppListsRouteWithChildren,
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,
+  AppListsListIdRoute: AppListsListIdRoute,
+  AppListsIndexRoute: AppListsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -205,3 +195,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
