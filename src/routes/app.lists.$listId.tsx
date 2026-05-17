@@ -352,9 +352,7 @@ function LeadDrawer({
                       size="sm"
                       variant="ghost"
                       onClick={() => {
-                        navigator.clipboard.writeText(
-                          `Subject: ${subject || row.email_subject}\n\n${body || row.email_body}`,
-                        );
+                        navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
                         toast.success("Copied");
                       }}
                     >
@@ -362,22 +360,17 @@ function LeadDrawer({
                     </Button>
                   </div>
                   <Input
-                    value={subject || row.email_subject || ""}
+                    value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     placeholder="Subject"
                   />
                   <Textarea
                     rows={12}
-                    value={body || row.email_body || ""}
+                    value={body}
                     onChange={(e) => setBody(e.target.value)}
                     placeholder="Email body"
                   />
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      onSave(row.lead_id, subject || row.email_subject || "", body || row.email_body || "")
-                    }
-                  >
+                  <Button size="sm" onClick={() => onSave(row.lead_id, subject, body)}>
                     Save changes
                   </Button>
                 </div>
