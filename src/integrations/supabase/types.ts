@@ -125,6 +125,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "list_leads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "list_leads_list_id_fkey"
             columns: ["list_id"]
             isOneToOne: false
