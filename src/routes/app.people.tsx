@@ -265,6 +265,19 @@ function PeoplePage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={rows.length > 0 && rows.every((r) => picked.has(r.id))}
+                        onCheckedChange={(v) => {
+                          setPicked((prev) => {
+                            const next = new Set(prev);
+                            if (v) rows.forEach((r) => next.add(r.id));
+                            else rows.forEach((r) => next.delete(r.id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Company</TableHead>
@@ -275,13 +288,13 @@ function PeoplePage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
                         Loading…
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
                         No leads match your filters.
                       </TableCell>
                     </TableRow>
@@ -292,6 +305,19 @@ function PeoplePage() {
                         className="cursor-pointer"
                         onClick={() => setSelected(r)}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={picked.has(r.id)}
+                            onCheckedChange={(v) => {
+                              setPicked((prev) => {
+                                const next = new Set(prev);
+                                if (v) next.add(r.id);
+                                else next.delete(r.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
                         </TableCell>
