@@ -14,13 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      leads: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          hubspot_status: string | null
+          hubspot_sync_date: string | null
+          id: string
+          last_name: string | null
+          linkedin_url: string | null
+          org_annual_revenue: string | null
+          org_description: string | null
+          org_employee_count: string | null
+          org_industry: string | null
+          org_name: string | null
+          org_technologies_used: string | null
+          org_website_url: string | null
+          phone: string | null
+          profile_pic: string | null
+          state: string | null
+          title: string | null
+          validation_status: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hubspot_status?: string | null
+          hubspot_sync_date?: string | null
+          id: string
+          last_name?: string | null
+          linkedin_url?: string | null
+          org_annual_revenue?: string | null
+          org_description?: string | null
+          org_employee_count?: string | null
+          org_industry?: string | null
+          org_name?: string | null
+          org_technologies_used?: string | null
+          org_website_url?: string | null
+          phone?: string | null
+          profile_pic?: string | null
+          state?: string | null
+          title?: string | null
+          validation_status?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          hubspot_status?: string | null
+          hubspot_sync_date?: string | null
+          id?: string
+          last_name?: string | null
+          linkedin_url?: string | null
+          org_annual_revenue?: string | null
+          org_description?: string | null
+          org_employee_count?: string | null
+          org_industry?: string | null
+          org_name?: string | null
+          org_technologies_used?: string | null
+          org_website_url?: string | null
+          phone?: string | null
+          profile_pic?: string | null
+          state?: string | null
+          title?: string | null
+          validation_status?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      saved_searches: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
