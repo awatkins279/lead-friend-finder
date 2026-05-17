@@ -35,6 +35,7 @@ function AppShell() {
 
   const nav_items = [
     { to: "/app/people", icon: Users, label: "People Search" },
+    { to: "/app/lists", icon: ListIcon, label: "Lists" },
     { to: "/app/saved", icon: Bookmark, label: "Saved Searches" },
     { to: "/app/email", icon: Mail, label: "Email (soon)", disabled: true },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
