@@ -14,6 +14,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
+import { Route as AppListsRouteImport } from './routes/app.lists'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -40,11 +41,17 @@ const AppPeopleRoute = AppPeopleRouteImport.update({
   path: '/people',
   getParentRoute: () => AppRoute,
 } as any)
+const AppListsRoute = AppListsRouteImport.update({
+  id: '/lists',
+  path: '/lists',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/lists': typeof AppListsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/lists': typeof AppListsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
 }
@@ -60,15 +68,29 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/app/lists': typeof AppListsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/login' | '/app/people' | '/app/saved'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/lists'
+    | '/app/people'
+    | '/app/saved'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app' | '/login' | '/app/people' | '/app/saved'
-  id: '__root__' | '/' | '/app' | '/login' | '/app/people' | '/app/saved'
+  to: '/' | '/app' | '/login' | '/app/lists' | '/app/people' | '/app/saved'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/login'
+    | '/app/lists'
+    | '/app/people'
+    | '/app/saved'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -114,15 +136,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeopleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/lists': {
+      id: '/app/lists'
+      path: '/lists'
+      fullPath: '/app/lists'
+      preLoaderRoute: typeof AppListsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppListsRoute: typeof AppListsRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppListsRoute: AppListsRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,
 }
