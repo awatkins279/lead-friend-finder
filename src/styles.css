@@ -134,3 +134,12 @@
     font-family: var(--font-sans);
   }
 }
+
+.dashboard-font {
+  font-family: "Epilogue", ui-sans-serif, system-ui, sans-serif;
+}
+.dashboard-font h1, .dashboard-font h2, .dashboard-font h3, .dashboard-font h4,
+.dashboard-font h5, .dashboard-font h6, .dashboard-font .font-display {
+  font-family: "Urbanist", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
