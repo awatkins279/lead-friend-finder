@@ -23,6 +23,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search,
   Filter,
   MapPin,
@@ -34,7 +45,11 @@ import {
   Phone,
   Globe,
   Save,
+  ChevronDown,
+  Download,
+  Sparkles,
   ListPlus,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,6 +97,41 @@ const EMPTY: Filters = {
 };
 
 const PAGE_SIZE = 25;
+const MAX_BULK = 50000;
+
+function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any }>(q: T, f: Filters): T {
+  let r: any = q;
+  if (f.title.trim()) r = r.ilike("title", `%${f.title.trim()}%`);
+  if (f.company.trim()) r = r.ilike("org_name", `%${f.company.trim()}%`);
+  if (f.industry.trim()) r = r.ilike("org_industry", `%${f.industry.trim()}%`);
+  if (f.location.trim()) {
+    const t = f.location.trim();
+    r = r.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
+  }
+  if (f.hasPhone) r = r.not("phone", "is", null).neq("phone", "");
+  if (f.hasEmail) r = r.not("email", "is", null).neq("email", "");
+  return r;
+}
+
+async function fetchMatchingIds(filters: Filters, limit: number): Promise<string[]> {
+  const ids: string[] = [];
+  const chunk = 1000;
+  let offset = 0;
+  while (ids.length < limit) {
+    const take = Math.min(chunk, limit - ids.length);
+    let q: any = supabase.from("leads").select("id");
+    q = applyFilters(q, filters);
+    q = q.order("last_name", { ascending: true, nullsFirst: false }).range(offset, offset + take - 1);
+    const { data, error } = await q;
+    if (error) throw error;
+    const rows = (data ?? []) as { id: string }[];
+    if (rows.length === 0) break;
+    rows.forEach((r) => ids.push(r.id));
+    if (rows.length < take) break;
+    offset += take;
+  }
+  return ids;
+}
 
 function PeoplePage() {
   const [draft, setDraft] = useState<Filters>(EMPTY);
@@ -90,6 +140,13 @@ function PeoplePage() {
   const [selected, setSelected] = useState<Lead | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
+  const [campaignOpen, setCampaignOpen] = useState(false);
+
+  const [selectMenuOpen, setSelectMenuOpen] = useState(false);
+  const [advancedMode, setAdvancedMode] = useState(false);
+  const [advancedN, setAdvancedN] = useState("1000");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
 
   useEffect(() => setPage(0), [filters]);
 
@@ -98,27 +155,16 @@ function PeoplePage() {
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
     queryFn: async () => {
-      let q = supabase
+      let q: any = supabase
         .from("leads")
         .select(
           "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,org_description,org_website_url,org_industry,org_employee_count",
           { count: "exact" },
         );
-
-      if (filters.title.trim()) q = q.ilike("title", `%${filters.title.trim()}%`);
-      if (filters.company.trim()) q = q.ilike("org_name", `%${filters.company.trim()}%`);
-      if (filters.industry.trim()) q = q.ilike("org_industry", `%${filters.industry.trim()}%`);
-      if (filters.location.trim()) {
-        const t = filters.location.trim();
-        q = q.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
-      }
-      if (filters.hasPhone) q = q.not("phone", "is", null).neq("phone", "");
-      if (filters.hasEmail) q = q.not("email", "is", null).neq("email", "");
-
+      q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       q = q.order("last_name", { ascending: true, nullsFirst: false }).range(from, to);
-
       const { data, count, error } = await q;
       if (error) throw error;
       return { rows: (data ?? []) as Lead[], count: count ?? 0 };
@@ -132,6 +178,8 @@ function PeoplePage() {
     const v = filters[k];
     return typeof v === "string" ? v.trim() !== "" : v === true;
   });
+  const allPageChecked = rows.length > 0 && rows.every((r) => picked.has(r.id));
+  const somePageChecked = rows.some((r) => picked.has(r.id));
 
   const apply = () => setFilters(draft);
   const clear = () => {
@@ -153,6 +201,100 @@ function PeoplePage() {
     else toast.success("Saved");
   };
 
+  const selectThisPage = () => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      rows.forEach((r) => next.add(r.id));
+      return next;
+    });
+    setSelectMenuOpen(false);
+    setAdvancedMode(false);
+  };
+
+  const selectAllMatching = async () => {
+    setBulkBusy(true);
+    try {
+      const ids = await fetchMatchingIds(filters, Math.min(total || MAX_BULK, MAX_BULK));
+      setPicked(new Set(ids));
+      toast.success(`${ids.length.toLocaleString()} leads selected`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to select");
+    } finally {
+      setBulkBusy(false);
+      setSelectMenuOpen(false);
+      setAdvancedMode(false);
+    }
+  };
+
+  const applyAdvanced = async () => {
+    const n = Math.max(1, Math.min(MAX_BULK, parseInt(advancedN, 10) || 0));
+    if (n <= 0) {
+      toast.error("Enter a positive number");
+      return;
+    }
+    setBulkBusy(true);
+    try {
+      const ids = await fetchMatchingIds(filters, n);
+      setPicked(new Set(ids));
+      toast.success(`${ids.length.toLocaleString()} leads selected`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to select");
+    } finally {
+      setBulkBusy(false);
+      setSelectMenuOpen(false);
+      setAdvancedMode(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setPicked(new Set());
+    setSelectMenuOpen(false);
+    setAdvancedMode(false);
+  };
+
+  const exportCsv = async () => {
+    setExportBusy(true);
+    try {
+      let ids: string[] = Array.from(picked);
+      if (ids.length === 0) {
+        ids = await fetchMatchingIds(filters, Math.min(total || MAX_BULK, MAX_BULK));
+      }
+      const all: Lead[] = [];
+      const cols =
+        "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,org_description,org_website_url,org_industry,org_employee_count";
+      for (let i = 0; i < ids.length; i += 1000) {
+        const slice = ids.slice(i, i + 1000);
+        const { data, error } = await supabase.from("leads").select(cols).in("id", slice);
+        if (error) throw error;
+        all.push(...((data ?? []) as Lead[]));
+      }
+      const headers = cols.split(",");
+      const escape = (v: any) => {
+        if (v === null || v === undefined) return "";
+        const s = String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const csv = [
+        headers.join(","),
+        ...all.map((r) => headers.map((h) => escape((r as any)[h])).join(",")),
+      ].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${all.length.toLocaleString()} leads`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Export failed");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const hasSelection = picked.size > 0;
+
   return (
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b bg-background px-8 py-5">
@@ -163,11 +305,31 @@ function PeoplePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {picked.size > 0 && (
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <ListPlus className="mr-2 h-4 w-4" /> Add {picked.size} to list
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" disabled={!hasSelection}>
+                <Sparkles className="mr-2 h-4 w-4" /> Actions
+                <ChevronDown className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setAddOpen(true)}>
+                <ListPlus className="mr-2 h-4 w-4" /> Add to List
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setCampaignOpen(true)}>
+                <Send className="mr-2 h-4 w-4" /> Add to Campaign
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exportBusy || (total === 0 && !hasSelection)}
+            onClick={exportCsv}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {exportBusy ? "Exporting…" : "Export"}
+          </Button>
           <Button variant="outline" size="sm" onClick={saveSearch}>
             <Save className="mr-2 h-4 w-4" /> Save search
           </Button>
@@ -260,23 +422,72 @@ function PeoplePage() {
             </div>
           )}
 
+          {hasSelection && (
+            <div className="flex items-center justify-between border-b bg-primary/5 px-6 py-2.5 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{picked.size.toLocaleString()} leads selected</span>
+                <span className="text-muted-foreground">
+                  · selection persists across pages
+                </span>
+              </div>
+              <button
+                onClick={clearSelection}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+
           <div className="p-6">
             <Card className="overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={rows.length > 0 && rows.every((r) => picked.has(r.id))}
-                        onCheckedChange={(v) => {
-                          setPicked((prev) => {
-                            const next = new Set(prev);
-                            if (v) rows.forEach((r) => next.add(r.id));
-                            else rows.forEach((r) => next.delete(r.id));
-                            return next;
-                          });
-                        }}
-                      />
+                    <TableHead className="w-14">
+                      <Popover open={selectMenuOpen} onOpenChange={(o) => { setSelectMenuOpen(o); if (!o) setAdvancedMode(false); }}>
+                        <PopoverTrigger asChild>
+                          <button className="flex items-center gap-1 rounded hover:bg-accent px-1 py-0.5">
+                            <Checkbox
+                              checked={allPageChecked ? true : somePageChecked ? "indeterminate" : false}
+                              onCheckedChange={() => {}}
+                              onClick={(e) => e.preventDefault()}
+                            />
+                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-64 p-1">
+                          {!advancedMode ? (
+                            <div className="flex flex-col">
+                              <MenuItem onClick={selectThisPage}>Select this page</MenuItem>
+                              <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
+                                {bulkBusy ? "Selecting…" : `Select all leads${total ? ` (${total.toLocaleString()})` : ""}`}
+                              </MenuItem>
+                              <MenuItem onClick={() => setAdvancedMode(true)}>Advanced Selection</MenuItem>
+                              <MenuItem onClick={clearSelection}>Clear selection</MenuItem>
+                            </div>
+                          ) : (
+                            <div className="space-y-2 p-2">
+                              <Label className="text-xs">Select number of leads</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={MAX_BULK}
+                                value={advancedN}
+                                onChange={(e) => setAdvancedN(e.target.value)}
+                              />
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="ghost" className="flex-1" onClick={() => setAdvancedMode(false)}>
+                                  Back
+                                </Button>
+                                <Button size="sm" className="flex-1" onClick={applyAdvanced} disabled={bulkBusy}>
+                                  {bulkBusy ? "…" : "Apply Selection"}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
                     </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Title</TableHead>
@@ -377,6 +588,13 @@ function PeoplePage() {
         leadIds={Array.from(picked)}
         onAdded={() => setPicked(new Set())}
       />
+      <AddToListDialog
+        mode="campaign"
+        open={campaignOpen}
+        onOpenChange={setCampaignOpen}
+        leadIds={Array.from(picked)}
+        onAdded={() => setPicked(new Set())}
+      />
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
@@ -436,6 +654,18 @@ function PeoplePage() {
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-50"
+    >
+      {children}
+    </button>
   );
 }
 
