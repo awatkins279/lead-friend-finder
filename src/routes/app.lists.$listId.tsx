@@ -613,29 +613,29 @@ function GenerationProgress({
   const isComplete = done >= total;
 
   return (
-    <Card className="mb-4 border-primary/40 bg-primary/5 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+    <Card className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background p-6">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
           {isComplete ? (
-            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <Sparkles className="h-5 w-5 text-primary" />
           ) : (
-            <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
           )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium">
+          <div>
+            <div className="text-base font-semibold tracking-tight">
               {isComplete
-                ? `Generated sequences for ${done} prospect${done === 1 ? "" : "s"}`
+                ? "Sequences generated"
                 : cancel
                   ? "Stopping…"
-                  : `Generating sequences · ${done} of ${total}`}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
+                  : "Generating AI sequences"}
+            </div>
+            <div className="text-xs text-muted-foreground">
               {isComplete
-                ? `Finished in ${formatDuration(elapsed)}`
+                ? `Done in ${formatDuration(elapsed)} · ${done} prospect${done === 1 ? "" : "s"}`
                 : currentName
-                  ? `Working on ${currentName}…`
-                  : "Starting…"}
-            </p>
+                  ? `Working on ${currentName}`
+                  : "Warming up…"}
+            </div>
           </div>
         </div>
         {!isComplete && !cancel && (
@@ -644,18 +644,32 @@ function GenerationProgress({
           </Button>
         )}
       </div>
-      <div className="mt-3">
-        <Progress value={pct} className="h-2" />
-        <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
-          <span>{pct}% complete</span>
-          <span>
-            {isComplete
-              ? `${formatDuration(elapsed)} elapsed`
-              : done === 0
-                ? "Estimating…"
-                : `~${formatDuration(etaMs)} remaining · avg ${formatDuration(avgMs)}/lead`}
-          </span>
-        </div>
+
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-medium text-foreground">
+          {done} / {total} prospects
+        </span>
+        <span className="text-3xl font-bold tabular-nums tracking-tight text-primary">
+          {pct}<span className="text-xl">%</span>
+        </span>
+      </div>
+
+      <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>Elapsed: {formatDuration(elapsed)}</span>
+        <span>
+          {isComplete
+            ? "Complete"
+            : done === 0
+              ? "Estimating ETA…"
+              : `ETA ~${formatDuration(etaMs)} · avg ${formatDuration(avgMs)}/lead`}
+        </span>
       </div>
     </Card>
   );
