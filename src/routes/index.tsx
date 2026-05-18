@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Users, Mail, Linkedin, ArrowRight } from "lucide-react";
-import forgeLogo from "@/assets/forgeai-logo.svg";
 
 export const Route = createFileRoute("/")({
   component: Landing,
@@ -30,7 +29,12 @@ function Landing() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <img src={forgeLogo} alt="Forge AI" className="h-10 w-auto" />
+        <div className="flex items-center gap-2">
+          <div className="rounded-md bg-primary p-2 text-primary-foreground">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <span className="text-lg font-semibold">Forge AI</span>
+        </div>
         <Link to="/login">
           <Button size="sm">Sign in</Button>
         </Link>
