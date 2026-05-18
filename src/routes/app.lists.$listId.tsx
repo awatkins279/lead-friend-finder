@@ -303,6 +303,10 @@ function ListDetailPage() {
           </Card>
         )}
 
+        {progress && (
+          <GenerationProgress progress={progress} onCancel={cancelRunAll} />
+        )}
+
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
         ) : !rows || rows.length === 0 ? (
