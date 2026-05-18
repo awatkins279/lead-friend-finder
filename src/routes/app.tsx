@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Linkedin, Bookmark, LogOut, Sparkles, List as ListIcon, Inbox } from "lucide-react";
+import { Users, Linkedin, Bookmark, LogOut, List as ListIcon, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import forgeLogo from "@/assets/forgeai-logo.png";
 
 export const Route = createFileRoute("/app")({
   component: AppShell,
