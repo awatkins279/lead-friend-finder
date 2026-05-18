@@ -654,10 +654,10 @@ function GenerationProgress({
         </span>
       </div>
 
-      <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-muted">
+      <div className="mt-3 h-4 w-full overflow-hidden rounded-full border border-primary/20 bg-muted">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-500 ease-out"
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+          style={{ width: `${pct}%`, minWidth: pct > 0 ? "0.5rem" : 0 }}
         />
       </div>
 
