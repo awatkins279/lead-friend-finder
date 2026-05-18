@@ -645,17 +645,18 @@ function PeoplePage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                         Loading…
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                         No leads match your filters.
                       </TableCell>
                     </TableRow>
                   ) : (
+
                     rows.map((r) => (
                       <TableRow
                         key={r.id}
