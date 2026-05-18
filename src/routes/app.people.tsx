@@ -54,6 +54,14 @@ import {
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AddToListDialog } from "@/components/AddToListDialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Target, Loader2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
+
+type ScoreInfo = { score: number; reasoning: string };
+
 
 export const Route = createFileRoute("/app/people")({
   component: PeoplePage,
@@ -148,7 +156,14 @@ function PeoplePage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
 
+  const [scoringContext, setScoringContext] = useState("");
+  const [scores, setScores] = useState<Map<string, ScoreInfo>>(new Map());
+  const [minScore, setMinScore] = useState(0);
+  const [scoringBusy, setScoringBusy] = useState(false);
+  const scoreLeadsCall = useServerFn(scoreLeadsFn);
+
   useEffect(() => setPage(0), [filters]);
+
 
   const queryKey = useMemo(() => ["leads", filters, page], [filters, page]);
 
@@ -295,6 +310,78 @@ function PeoplePage() {
 
   const hasSelection = picked.size > 0;
 
+  const scorePageLeads = async () => {
+    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
+      toast.error("Tell the AI what you're selling (min 10 chars)");
+      return;
+    }
+    const ids = rows.map((r) => r.id).filter((id) => !scores.has(id));
+    if (ids.length === 0) {
+      toast.info("All visible leads are already scored");
+      return;
+    }
+    setScoringBusy(true);
+    try {
+      const { scores: out } = await scoreLeadsCall({
+        data: { leadIds: ids, context: scoringContext.trim() },
+      });
+      setScores((prev) => {
+        const next = new Map(prev);
+        out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning }));
+        return next;
+      });
+      toast.success(`Scored ${out.length} leads`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Scoring failed");
+    } finally {
+      setScoringBusy(false);
+    }
+  };
+
+  const scoreSelectedLeads = async () => {
+    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
+      toast.error("Tell the AI what you're selling (min 10 chars)");
+      return;
+    }
+    const allIds = Array.from(picked).filter((id) => !scores.has(id));
+    if (allIds.length === 0) {
+      toast.info("All selected leads are already scored");
+      return;
+    }
+    setScoringBusy(true);
+    try {
+      let done = 0;
+      for (let i = 0; i < allIds.length; i += 50) {
+        const slice = allIds.slice(i, i + 50);
+        const { scores: out } = await scoreLeadsCall({
+          data: { leadIds: slice, context: scoringContext.trim() },
+        });
+        setScores((prev) => {
+          const next = new Map(prev);
+          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning }));
+          return next;
+        });
+        done += out.length;
+      }
+      toast.success(`Scored ${done} leads`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Scoring failed");
+    } finally {
+      setScoringBusy(false);
+    }
+  };
+
+  const eligibleIds = useMemo(
+    () =>
+      Array.from(picked).filter((id) => {
+        if (minScore <= 0) return true;
+        const s = scores.get(id);
+        return !!s && s.score >= minScore;
+      }),
+    [picked, scores, minScore],
+  );
+
+
   return (
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b bg-background px-8 py-5">
@@ -400,7 +487,64 @@ function PeoplePage() {
               </Button>
             </div>
           </div>
+
+          <div className="mt-6 rounded-md border bg-muted/30 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">AI lead scoring</span>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Tell the AI what you're selling and who you want. It'll score each lead 0–100 on buying likelihood.
+            </p>
+            <Textarea
+              rows={4}
+              value={scoringContext}
+              onChange={(e) => setScoringContext(e.target.value)}
+              placeholder="e.g. We sell AI contact-center software to mid-market companies (200-5000 employees) with large customer support teams. Looking for VP/Dir of CX, Support, or Ops."
+              className="text-xs"
+            />
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={scorePageLeads}
+                disabled={scoringBusy || rows.length === 0}
+              >
+                {scoringBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+                Score page
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={scoreSelectedLeads}
+                disabled={scoringBusy || !hasSelection}
+              >
+                Score selected
+              </Button>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Min score for campaign</span>
+                <span className="font-medium">{minScore === 0 ? "Any" : `${minScore}+`}</span>
+              </div>
+              <Slider
+                value={[minScore]}
+                min={0}
+                max={100}
+                step={5}
+                onValueChange={(v) => setMinScore(v[0] ?? 0)}
+              />
+              {hasSelection && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {eligibleIds.length.toLocaleString()} of {picked.size.toLocaleString()} selected pass the threshold.
+                </p>
+              )}
+            </div>
+          </div>
         </aside>
+
 
         <section className="flex-1 overflow-y-auto">
           {activeChips.length > 0 && (
@@ -490,26 +634,29 @@ function PeoplePage() {
                       </Popover>
                     </TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead className="w-20">Score</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Contact</TableHead>
                   </TableRow>
+
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                         Loading…
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                         No leads match your filters.
                       </TableCell>
                     </TableRow>
                   ) : (
+
                     rows.map((r) => (
                       <TableRow
                         key={r.id}
@@ -532,9 +679,13 @@ function PeoplePage() {
                         <TableCell className="font-medium">
                           {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
                         </TableCell>
+                        <TableCell>
+                          <ScoreBadge info={scores.get(r.id)} />
+                        </TableCell>
                         <TableCell className="max-w-[260px] truncate text-sm">
                           {r.title || "—"}
                         </TableCell>
+
                         <TableCell className="max-w-[220px] truncate text-sm">
                           {r.org_name || "—"}
                         </TableCell>
@@ -592,9 +743,11 @@ function PeoplePage() {
         mode="campaign"
         open={campaignOpen}
         onOpenChange={setCampaignOpen}
-        leadIds={Array.from(picked)}
+        leadIds={eligibleIds}
         onAdded={() => setPicked(new Set())}
       />
+
+
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
@@ -720,3 +873,23 @@ function Row({ icon, value, href }: { icon: React.ReactNode; value: string; href
     </a>
   );
 }
+
+function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
+  if (!info) return <span className="text-xs text-muted-foreground">—</span>;
+  const { score, reasoning } = info;
+  const tone =
+    score >= 85
+      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+      : score >= 65
+        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        : "bg-muted text-muted-foreground border-border";
+  return (
+    <span
+      title={reasoning}
+      className={`inline-flex h-6 min-w-[2.5rem] items-center justify-center rounded-full border px-2 text-xs font-semibold ${tone}`}
+    >
+      {score}
+    </span>
+  );
+}
+
