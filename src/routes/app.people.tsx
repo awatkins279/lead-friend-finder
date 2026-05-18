@@ -873,3 +873,25 @@ function Row({ icon, value, href }: { icon: React.ReactNode; value: string; href
     </a>
   );
 }
+
+function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
+  if (!info) return <span className="text-xs text-muted-foreground">—</span>;
+  const { score, reasoning } = info;
+  const tone =
+    score >= 85
+      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+      : score >= 65
+        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
+        : "bg-muted text-muted-foreground border-border";
+  return (
+    <span
+      title={reasoning}
+      className={`inline-flex h-6 min-w-[2.5rem] items-center justify-center rounded-full border px-2 text-xs font-semibold ${tone}`}
+    >
+      {score}
+    </span>
+  );
+}
+
+  );
+}
