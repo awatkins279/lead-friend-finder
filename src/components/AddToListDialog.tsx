@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -11,40 +11,58 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
-type List = { id: string; name: string };
+type ListRow = { id: string; name: string; sender_name: string | null };
 
 export function AddToListDialog({
   open,
   onOpenChange,
   leadIds,
   onAdded,
+  mode = "list",
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   leadIds: string[];
   onAdded?: () => void;
+  mode?: "list" | "campaign";
 }) {
-  const [lists, setLists] = useState<List[]>([]);
+  const [lists, setLists] = useState<ListRow[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [search, setSearch] = useState("");
+  const [allowDuplicates, setAllowDuplicates] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const isCampaign = mode === "campaign";
+  const noun = isCampaign ? "campaign" : "list";
 
   useEffect(() => {
     if (!open) return;
+    setSearch("");
+    setAllowDuplicates(true);
     supabase
       .from("lists")
-      .select("id, name")
+      .select("id, name, sender_name")
       .order("created_at", { ascending: false })
       .then(({ data }) => {
-        setLists((data ?? []) as List[]);
-        if (data && data.length > 0) setSelectedId((data[0] as List).id);
-        else setSelectedId("");
+        const rows = (data ?? []) as ListRow[];
+        const filtered = isCampaign ? rows.filter((r) => !!r.sender_name) : rows;
+        setLists(filtered);
+        setSelectedId(filtered[0]?.id ?? "");
       });
-  }, [open]);
+  }, [open, isCampaign]);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return lists;
+    return lists.filter((l) => l.name.toLowerCase().includes(q));
+  }, [lists, search]);
 
   const submit = async () => {
     if (leadIds.length === 0) return;
@@ -52,6 +70,10 @@ export function AddToListDialog({
     try {
       let listId = selectedId;
       if (!listId) {
+        if (isCampaign) {
+          toast.error("Pick a campaign");
+          return;
+        }
         if (!newName.trim()) {
           toast.error("Pick a list or name a new one");
           return;
@@ -70,10 +92,12 @@ export function AddToListDialog({
       const rows = leadIds.map((id) => ({ list_id: listId, lead_id: id }));
       const { error: insErr } = await supabase
         .from("list_leads")
-        .upsert(rows, { onConflict: "list_id,lead_id", ignoreDuplicates: true });
+        .upsert(rows, { onConflict: "list_id,lead_id", ignoreDuplicates: !allowDuplicates });
       if (insErr) throw insErr;
 
-      toast.success(`Added ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} to list`);
+      toast.success(
+        `Added ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} to ${noun}`,
+      );
       onAdded?.();
       onOpenChange(false);
       setNewName("");
@@ -89,29 +113,50 @@ export function AddToListDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add {leadIds.length} lead{leadIds.length === 1 ? "" : "s"} to a list</DialogTitle>
+          <DialogTitle>
+            Add {leadIds.length.toLocaleString()} contact{leadIds.length === 1 ? "" : "s"} to {noun}
+          </DialogTitle>
           <DialogDescription>
-            Group these prospects so you can research them and draft personalized emails.
+            {isCampaign
+              ? "Enroll these prospects into a configured campaign."
+              : "Group these prospects so you can research them and draft personalized emails."}
           </DialogDescription>
         </DialogHeader>
 
-        {lists.length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-xs">Existing lists</Label>
-            <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border p-2">
-              {lists.map((l) => (
-                <label
-                  key={l.id}
-                  className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent ${selectedId === l.id ? "bg-accent" : ""}`}
-                >
-                  <input
-                    type="radio"
-                    checked={selectedId === l.id}
-                    onChange={() => setSelectedId(l.id)}
-                  />
-                  {l.name}
-                </label>
-              ))}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${noun}s by name`}
+              className="pl-8"
+            />
+          </div>
+
+          <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
+            {visible.length === 0 && (
+              <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                No {noun}s found
+              </div>
+            )}
+            {visible.map((l) => (
+              <label
+                key={l.id}
+                className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent ${selectedId === l.id ? "bg-accent" : ""}`}
+              >
+                <input
+                  type="radio"
+                  checked={selectedId === l.id}
+                  onChange={() => setSelectedId(l.id)}
+                />
+                <span className="flex-1 truncate">{l.name}</span>
+                {isCampaign && l.sender_name && (
+                  <Badge variant="secondary" className="text-[10px]">configured</Badge>
+                )}
+              </label>
+            ))}
+            {!isCampaign && (
               <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent">
                 <input
                   type="radio"
@@ -120,11 +165,11 @@ export function AddToListDialog({
                 />
                 <Plus className="h-3.5 w-3.5" /> Create new list
               </label>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
-        {selectedId === "" && (
+        {!isCampaign && selectedId === "" && (
           <div className="space-y-3">
             <div>
               <Label className="text-xs">New list name</Label>
@@ -141,12 +186,20 @@ export function AddToListDialog({
           </div>
         )}
 
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Checkbox
+            checked={allowDuplicates}
+            onCheckedChange={(v) => setAllowDuplicates(!!v)}
+          />
+          Allow duplicates
+        </label>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy}>
-            {busy ? "Adding…" : "Add"}
+            {busy ? "Saving…" : isCampaign ? "Add to Campaign" : "Save Leads"}
           </Button>
         </DialogFooter>
       </DialogContent>
