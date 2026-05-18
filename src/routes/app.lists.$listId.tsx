@@ -87,6 +87,13 @@ function ListDetailPage() {
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [progress, setProgress] = useState<{
+    total: number;
+    done: number;
+    startedAt: number;
+    currentName: string;
+    cancel: boolean;
+  } | null>(null);
 
   const { data: list, refetch: refetchList } = useQuery({
     queryKey: ["list", listId],
