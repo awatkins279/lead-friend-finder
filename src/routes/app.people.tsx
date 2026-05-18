@@ -634,11 +634,13 @@ function PeoplePage() {
                       </Popover>
                     </TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead className="w-20">Score</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Contact</TableHead>
                   </TableRow>
+
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
