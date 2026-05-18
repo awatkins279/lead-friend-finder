@@ -17,7 +17,8 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 
@@ -86,6 +87,13 @@ function ListDetailPage() {
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [progress, setProgress] = useState<{
+    total: number;
+    done: number;
+    startedAt: number;
+    currentName: string;
+    cancel: boolean;
+  } | null>(null);
 
   const { data: list, refetch: refetchList } = useQuery({
     queryKey: ["list", listId],
@@ -159,9 +167,37 @@ function ListDetailPage() {
       (r) => r.status !== "enriched" || (r.emails?.length ?? 0) < target,
     );
     if (pending.length === 0) return toast.info("All prospects already have full sequences");
-    toast.info(`Generating ${target}-email sequences for ${pending.length} prospects…`);
-    for (const r of pending) await runOne(r.lead_id);
-    toast.success("Done");
+
+    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    setProgress({ ...state });
+
+    for (let i = 0; i < pending.length; i++) {
+      if (state.cancel) break;
+      const r = pending[i];
+      const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+      state.currentName = name;
+      setProgress({ ...state });
+      try {
+        await enrichFn({ data: { listId, leadId: r.lead_id } });
+      } catch (e: any) {
+        console.error("enrich failed", r.lead_id, e);
+      }
+      state.done = i + 1;
+      setProgress({ ...state });
+      qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+    }
+
+    setProgress((p) => (p?.cancel ? null : p));
+    if (!state.cancel) {
+      toast.success(`Generated sequences for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      setTimeout(() => setProgress(null), 1500);
+    } else {
+      toast.info(`Stopped after ${state.done} of ${state.total}`);
+    }
+  };
+
+  const cancelRunAll = () => {
+    setProgress((p) => (p ? { ...p, cancel: true } : p));
   };
 
   const remove = async (leadId: string) => {
@@ -206,6 +242,16 @@ function ListDetailPage() {
 
   const enrichedCount = (rows ?? []).filter((r) => r.status === "enriched").length;
 
+  // Re-render every second while running so ETA ticks down
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!progress || progress.done >= progress.total || progress.cancel) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [progress]);
+
+  const isRunning = !!progress && !progress.cancel && progress.done < progress.total;
+
   return (
     <div className="flex h-screen flex-col">
       <header className="border-b bg-background px-8 py-5">
@@ -235,8 +281,9 @@ function ListDetailPage() {
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-4 w-4" /> Campaign config
             </Button>
-            <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured}>
-              <Sparkles className="mr-2 h-4 w-4" /> Generate all sequences
+            <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured || isRunning}>
+              {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {isRunning ? "Generating…" : "Generate all sequences"}
             </Button>
           </div>
         </div>
@@ -254,6 +301,10 @@ function ListDetailPage() {
             </div>
             <Button size="sm" onClick={() => setConfigOpen(true)}>Configure</Button>
           </Card>
+        )}
+
+        {progress && (
+          <GenerationProgress progress={progress} onCancel={cancelRunAll} />
         )}
 
         {isLoading ? (
@@ -535,3 +586,78 @@ function LeadDrawer({
     </Sheet>
   );
 }
+
+function formatDuration(ms: number) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return rem ? `${m}m ${rem}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function GenerationProgress({
+  progress,
+  onCancel,
+}: {
+  progress: { total: number; done: number; startedAt: number; currentName: string; cancel: boolean };
+  onCancel: () => void;
+}) {
+  const { total, done, startedAt, currentName, cancel } = progress;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const elapsed = Date.now() - startedAt;
+  const avgMs = done > 0 ? elapsed / done : 0;
+  const remaining = total - done;
+  const etaMs = avgMs > 0 ? avgMs * remaining : 0;
+  const isComplete = done >= total;
+
+  return (
+    <Card className="mb-4 border-primary/40 bg-primary/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {isComplete ? (
+            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          ) : (
+            <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {isComplete
+                ? `Generated sequences for ${done} prospect${done === 1 ? "" : "s"}`
+                : cancel
+                  ? "Stopping…"
+                  : `Generating sequences · ${done} of ${total}`}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {isComplete
+                ? `Finished in ${formatDuration(elapsed)}`
+                : currentName
+                  ? `Working on ${currentName}…`
+                  : "Starting…"}
+            </p>
+          </div>
+        </div>
+        {!isComplete && !cancel && (
+          <Button size="sm" variant="ghost" onClick={onCancel}>
+            <X className="mr-1 h-3.5 w-3.5" /> Stop
+          </Button>
+        )}
+      </div>
+      <div className="mt-3">
+        <Progress value={pct} className="h-2" />
+        <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
+          <span>{pct}% complete</span>
+          <span>
+            {isComplete
+              ? `${formatDuration(elapsed)} elapsed`
+              : done === 0
+                ? "Estimating…"
+                : `~${formatDuration(etaMs)} remaining · avg ${formatDuration(avgMs)}/lead`}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
