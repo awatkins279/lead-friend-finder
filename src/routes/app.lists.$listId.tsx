@@ -242,6 +242,16 @@ function ListDetailPage() {
 
   const enrichedCount = (rows ?? []).filter((r) => r.status === "enriched").length;
 
+  // Re-render every second while running so ETA ticks down
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!progress || progress.done >= progress.total || progress.cancel) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [progress]);
+
+  const isRunning = !!progress && !progress.cancel && progress.done < progress.total;
+
   return (
     <div className="flex h-screen flex-col">
       <header className="border-b bg-background px-8 py-5">
