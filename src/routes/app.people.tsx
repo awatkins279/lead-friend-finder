@@ -679,9 +679,13 @@ function PeoplePage() {
                         <TableCell className="font-medium">
                           {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
                         </TableCell>
+                        <TableCell>
+                          <ScoreBadge info={scores.get(r.id)} />
+                        </TableCell>
                         <TableCell className="max-w-[260px] truncate text-sm">
                           {r.title || "—"}
                         </TableCell>
+
                         <TableCell className="max-w-[220px] truncate text-sm">
                           {r.org_name || "—"}
                         </TableCell>
