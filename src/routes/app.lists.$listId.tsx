@@ -167,9 +167,37 @@ function ListDetailPage() {
       (r) => r.status !== "enriched" || (r.emails?.length ?? 0) < target,
     );
     if (pending.length === 0) return toast.info("All prospects already have full sequences");
-    toast.info(`Generating ${target}-email sequences for ${pending.length} prospects…`);
-    for (const r of pending) await runOne(r.lead_id);
-    toast.success("Done");
+
+    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    setProgress({ ...state });
+
+    for (let i = 0; i < pending.length; i++) {
+      if (state.cancel) break;
+      const r = pending[i];
+      const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+      state.currentName = name;
+      setProgress({ ...state });
+      try {
+        await enrichFn({ data: { listId, leadId: r.lead_id } });
+      } catch (e: any) {
+        console.error("enrich failed", r.lead_id, e);
+      }
+      state.done = i + 1;
+      setProgress({ ...state });
+      qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+    }
+
+    setProgress((p) => (p?.cancel ? null : p));
+    if (!state.cancel) {
+      toast.success(`Generated sequences for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      setTimeout(() => setProgress(null), 1500);
+    } else {
+      toast.info(`Stopped after ${state.done} of ${state.total}`);
+    }
+  };
+
+  const cancelRunAll = () => {
+    setProgress((p) => (p ? { ...p, cancel: true } : p));
   };
 
   const remove = async (leadId: string) => {
