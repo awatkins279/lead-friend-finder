@@ -42,7 +42,7 @@ function AppShell() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="dashboard-font flex min-h-screen bg-muted/30">
       <aside className="flex w-60 flex-col border-r bg-background">
         <div className="flex items-center gap-2 px-5 py-5">
           <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[oklch(0.72_0.18_45)] to-[oklch(0.68_0.20_15)] shadow-md shadow-orange-200/60 rotate-3" />

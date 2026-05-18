@@ -2,6 +2,7 @@
 @source "../src";
 @import "tw-animate-css";
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&family=Epilogue:wght@400;500;600;700&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -132,4 +133,13 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
+}
+
+.dashboard-font {
+  font-family: "Epilogue", ui-sans-serif, system-ui, sans-serif;
+}
+.dashboard-font h1, .dashboard-font h2, .dashboard-font h3, .dashboard-font h4,
+.dashboard-font h5, .dashboard-font h6, .dashboard-font .font-display {
+  font-family: "Urbanist", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
 }
