@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS leads_last_name_btree_idx ON public.leads (last_name ASC NULLS LAST);
