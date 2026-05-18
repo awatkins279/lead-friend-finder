@@ -171,21 +171,32 @@ function ListDetailPage() {
     const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
     setProgress({ ...state });
 
-    for (let i = 0; i < pending.length; i++) {
-      if (state.cancel) break;
-      const r = pending[i];
-      const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
-      state.currentName = name;
-      setProgress({ ...state });
-      try {
-        await enrichFn({ data: { listId, leadId: r.lead_id } });
-      } catch (e: any) {
-        console.error("enrich failed", r.lead_id, e);
+    const CONCURRENCY = 5;
+    let cursor = 0;
+
+    const worker = async () => {
+      while (true) {
+        if (state.cancel) return;
+        const i = cursor++;
+        if (i >= pending.length) return;
+        const r = pending[i];
+        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+        state.currentName = name;
+        setProgress({ ...state });
+        try {
+          await enrichFn({ data: { listId, leadId: r.lead_id } });
+        } catch (e: any) {
+          console.error("enrich failed", r.lead_id, e);
+        }
+        state.done += 1;
+        setProgress({ ...state });
+        qc.invalidateQueries({ queryKey: ["list-leads", listId] });
       }
-      state.done = i + 1;
-      setProgress({ ...state });
-      qc.invalidateQueries({ queryKey: ["list-leads", listId] });
-    }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()),
+    );
 
     setProgress((p) => (p?.cancel ? null : p));
     if (!state.cancel) {
