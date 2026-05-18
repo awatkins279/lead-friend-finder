@@ -6,11 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — Forge AI" }] }),
+  head: () => ({ meta: [{ title: "Sign in — NexusAi" }] }),
 });
 
 function LoginPage() {
@@ -54,10 +53,8 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-muted px-4">
       <Card className="w-full max-w-md p-8 shadow-lg">
         <div className="mb-6 flex items-center gap-2">
-          <div className="rounded-md bg-primary p-2 text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <span className="text-lg font-semibold">Forge AI</span>
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-[oklch(0.72_0.18_45)] to-[oklch(0.68_0.20_15)] shadow-md shadow-orange-200/60 rotate-3" />
+          <span className="text-lg font-bold tracking-tight">NexusAi</span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {mode === "signin" ? "Welcome back" : "Create your account"}

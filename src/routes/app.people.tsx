@@ -57,7 +57,7 @@ import { AddToListDialog } from "@/components/AddToListDialog";
 
 export const Route = createFileRoute("/app/people")({
   component: PeoplePage,
-  head: () => ({ meta: [{ title: "People Search — Forge AI" }] }),
+  head: () => ({ meta: [{ title: "People Search — NexusAi" }] }),
 });
 
 type Lead = {

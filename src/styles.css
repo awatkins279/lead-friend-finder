@@ -1,24 +1,12 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
- */
-
 @theme inline {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -59,43 +47,49 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-rose: var(--brand-rose);
+  --color-brand-purple: var(--brand-purple);
 }
 
 :root {
   --radius: 1rem;
-  /* Forge AI — deep space navy with electric blue/violet accents */
-  --background: oklch(0.16 0.08 270);          /* #0A0F2C deep navy */
-  --foreground: oklch(1 0 0);                  /* pure white */
-  --card: oklch(0.21 0.09 270);                /* #0F1640 lighter navy surface */
-  --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.21 0.09 270);
-  --popover-foreground: oklch(1 0 0);
-  --primary: oklch(0.58 0.24 268);             /* #3B5BFC electric blue */
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.26 0.10 270);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.24 0.08 270);
-  --muted-foreground: oklch(0.68 0.04 255);    /* #8892B0 muted blue-gray */
-  --accent: oklch(0.65 0.22 300);              /* violet purple */
-  --accent-foreground: oklch(1 0 0);
+  /* NexusAi — warm organic light theme (cream + orange/rose/purple aurora) */
+  --background: oklch(0.99 0.005 70);          /* #fffcf9 cream */
+  --foreground: oklch(0.18 0.02 290);          /* near-black with violet tilt */
+  --card: oklch(1 0 0 / 50%);                  /* translucent white */
+  --card-foreground: oklch(0.18 0.02 290);
+  --popover: oklch(0.99 0.005 70);
+  --popover-foreground: oklch(0.18 0.02 290);
+  --primary: oklch(0.18 0.02 290);             /* dark zinc — primary CTA */
+  --primary-foreground: oklch(0.99 0.005 70);
+  --secondary: oklch(0.96 0.01 70);
+  --secondary-foreground: oklch(0.18 0.02 290);
+  --muted: oklch(0.96 0.01 70);
+  --muted-foreground: oklch(0.55 0.02 285);    /* zinc-500 */
+  --accent: oklch(0.72 0.18 45);               /* warm orange accent */
+  --accent-foreground: oklch(0.99 0.005 70);
   --destructive: oklch(0.62 0.22 18);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.32 0.10 268);              /* #1E2D6B subtle navy border */
-  --input: oklch(0.28 0.09 270);
-  --ring: oklch(0.58 0.24 268);
-  --chart-1: oklch(0.78 0.16 220);             /* cyan #00C6FF */
-  --chart-2: oklch(0.58 0.24 268);             /* blue #5B5BFC */
-  --chart-3: oklch(0.65 0.22 300);             /* violet */
-  --chart-4: oklch(0.72 0.20 350);             /* pink #FF6B9D */
-  --chart-5: oklch(0.70 0.18 200);
-  --sidebar: oklch(0.13 0.07 270);             /* darker than bg */
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.58 0.24 268);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.24 0.09 270);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.30 0.10 268);
-  --sidebar-ring: oklch(0.58 0.24 268);
+  --border: oklch(0.92 0.01 60);
+  --input: oklch(0.94 0.01 60);
+  --ring: oklch(0.72 0.18 45);
+  --brand-orange: oklch(0.72 0.18 45);
+  --brand-rose: oklch(0.68 0.20 15);
+  --brand-purple: oklch(0.62 0.18 300);
+  --chart-1: oklch(0.72 0.18 45);
+  --chart-2: oklch(0.68 0.20 15);
+  --chart-3: oklch(0.62 0.18 300);
+  --chart-4: oklch(0.78 0.14 80);
+  --chart-5: oklch(0.55 0.15 260);
+  --sidebar: oklch(0.97 0.008 60);
+  --sidebar-foreground: oklch(0.18 0.02 290);
+  --sidebar-primary: oklch(0.72 0.18 45);
+  --sidebar-primary-foreground: oklch(0.99 0.005 70);
+  --sidebar-accent: oklch(0.94 0.015 60);
+  --sidebar-accent-foreground: oklch(0.18 0.02 290);
+  --sidebar-border: oklch(0.92 0.01 60);
+  --sidebar-ring: oklch(0.72 0.18 45);
 }
 
 .dark {
@@ -118,11 +112,6 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -141,5 +130,6 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
   }
 }
