@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Users, Mail, Linkedin, ArrowRight } from "lucide-react";
-import forgeLogo from "@/assets/forgeai-logo.svg";
 
 export const Route = createFileRoute("/")({
   component: Landing,
