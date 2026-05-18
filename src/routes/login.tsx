@@ -10,7 +10,7 @@ import { Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — Outreach" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Forge AI" }] }),
 });
 
 function LoginPage() {
@@ -57,7 +57,7 @@ function LoginPage() {
           <div className="rounded-md bg-primary p-2 text-primary-foreground">
             <Sparkles className="h-4 w-4" />
           </div>
-          <span className="text-lg font-semibold">Outreach</span>
+          <span className="text-lg font-semibold">Forge AI</span>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {mode === "signin" ? "Welcome back" : "Create your account"}

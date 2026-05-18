@@ -48,7 +48,7 @@ function AppShell() {
           <div className="rounded-md bg-primary p-2 text-primary-foreground">
             <Sparkles className="h-4 w-4" />
           </div>
-          <span className="text-base font-semibold">Outreach</span>
+          <span className="text-base font-semibold">Forge AI</span>
         </div>
         <nav className="flex-1 px-3">
           {nav_items.map((item) => {
