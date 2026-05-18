@@ -17,7 +17,8 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 
