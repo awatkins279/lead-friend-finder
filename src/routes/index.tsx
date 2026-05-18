@@ -30,12 +30,7 @@ function Landing() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2">
-          <div className="rounded-md bg-primary p-2 text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <span className="text-lg font-semibold">Forge AI</span>
-        </div>
+        <img src={forgeLogo} alt="Forge AI" className="h-10 w-auto" />
         <Link to="/login">
           <Button size="sm">Sign in</Button>
         </Link>
