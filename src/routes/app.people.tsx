@@ -893,5 +893,3 @@ function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
   );
 }
 
-  );
-}
