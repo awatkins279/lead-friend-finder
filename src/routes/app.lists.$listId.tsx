@@ -586,3 +586,78 @@ function LeadDrawer({
     </Sheet>
   );
 }
+
+function formatDuration(ms: number) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return rem ? `${m}m ${rem}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+function GenerationProgress({
+  progress,
+  onCancel,
+}: {
+  progress: { total: number; done: number; startedAt: number; currentName: string; cancel: boolean };
+  onCancel: () => void;
+}) {
+  const { total, done, startedAt, currentName, cancel } = progress;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const elapsed = Date.now() - startedAt;
+  const avgMs = done > 0 ? elapsed / done : 0;
+  const remaining = total - done;
+  const etaMs = avgMs > 0 ? avgMs * remaining : 0;
+  const isComplete = done >= total;
+
+  return (
+    <Card className="mb-4 border-primary/40 bg-primary/5 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {isComplete ? (
+            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          ) : (
+            <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {isComplete
+                ? `Generated sequences for ${done} prospect${done === 1 ? "" : "s"}`
+                : cancel
+                  ? "Stopping…"
+                  : `Generating sequences · ${done} of ${total}`}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {isComplete
+                ? `Finished in ${formatDuration(elapsed)}`
+                : currentName
+                  ? `Working on ${currentName}…`
+                  : "Starting…"}
+            </p>
+          </div>
+        </div>
+        {!isComplete && !cancel && (
+          <Button size="sm" variant="ghost" onClick={onCancel}>
+            <X className="mr-1 h-3.5 w-3.5" /> Stop
+          </Button>
+        )}
+      </div>
+      <div className="mt-3">
+        <Progress value={pct} className="h-2" />
+        <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
+          <span>{pct}% complete</span>
+          <span>
+            {isComplete
+              ? `${formatDuration(elapsed)} elapsed`
+              : done === 0
+                ? "Estimating…"
+                : `~${formatDuration(etaMs)} remaining · avg ${formatDuration(avgMs)}/lead`}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
