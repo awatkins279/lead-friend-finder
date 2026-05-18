@@ -743,8 +743,10 @@ function PeoplePage() {
         mode="campaign"
         open={campaignOpen}
         onOpenChange={setCampaignOpen}
-        leadIds={Array.from(picked)}
+        leadIds={eligibleIds}
         onAdded={() => setPicked(new Set())}
+      />
+
       />
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
