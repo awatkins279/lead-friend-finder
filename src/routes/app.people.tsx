@@ -156,7 +156,14 @@ function PeoplePage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
 
+  const [scoringContext, setScoringContext] = useState("");
+  const [scores, setScores] = useState<Map<string, ScoreInfo>>(new Map());
+  const [minScore, setMinScore] = useState(0);
+  const [scoringBusy, setScoringBusy] = useState(false);
+  const scoreLeadsCall = useServerFn(scoreLeadsFn);
+
   useEffect(() => setPage(0), [filters]);
+
 
   const queryKey = useMemo(() => ["leads", filters, page], [filters, page]);
 
