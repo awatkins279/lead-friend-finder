@@ -747,7 +747,7 @@ function PeoplePage() {
         onAdded={() => setPicked(new Set())}
       />
 
-      />
+
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
