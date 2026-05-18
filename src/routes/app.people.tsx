@@ -487,7 +487,64 @@ function PeoplePage() {
               </Button>
             </div>
           </div>
+
+          <div className="mt-6 rounded-md border bg-muted/30 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">AI lead scoring</span>
+            </div>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Tell the AI what you're selling and who you want. It'll score each lead 0–100 on buying likelihood.
+            </p>
+            <Textarea
+              rows={4}
+              value={scoringContext}
+              onChange={(e) => setScoringContext(e.target.value)}
+              placeholder="e.g. We sell AI contact-center software to mid-market companies (200-5000 employees) with large customer support teams. Looking for VP/Dir of CX, Support, or Ops."
+              className="text-xs"
+            />
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={scorePageLeads}
+                disabled={scoringBusy || rows.length === 0}
+              >
+                {scoringBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+                Score page
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={scoreSelectedLeads}
+                disabled={scoringBusy || !hasSelection}
+              >
+                Score selected
+              </Button>
+            </div>
+
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Min score for campaign</span>
+                <span className="font-medium">{minScore === 0 ? "Any" : `${minScore}+`}</span>
+              </div>
+              <Slider
+                value={[minScore]}
+                min={0}
+                max={100}
+                step={5}
+                onValueChange={(v) => setMinScore(v[0] ?? 0)}
+              />
+              {hasSelection && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {eligibleIds.length.toLocaleString()} of {picked.size.toLocaleString()} selected pass the threshold.
+                </p>
+              )}
+            </div>
+          </div>
         </aside>
+
 
         <section className="flex-1 overflow-y-auto">
           {activeChips.length > 0 && (
