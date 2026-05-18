@@ -20,7 +20,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/lists/")({
   component: ListsPage,
-  head: () => ({ meta: [{ title: "Lists — Forge AI" }] }),
+  head: () => ({ meta: [{ title: "Lists — NexusAi" }] }),
 });
 
 function ListsPage() {

@@ -63,7 +63,7 @@
 
 :root {
   --radius: 1rem;
-  /* Forge AI — deep space navy with electric blue/violet accents */
+  /* NexusAi — deep space navy with electric blue/violet accents */
   --background: oklch(0.16 0.08 270);          /* #0A0F2C deep navy */
   --foreground: oklch(1 0 0);                  /* pure white */
   --card: oklch(0.21 0.09 270);                /* #0F1640 lighter navy surface */

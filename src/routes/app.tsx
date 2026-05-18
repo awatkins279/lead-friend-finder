@@ -46,7 +46,7 @@ function AppShell() {
     <div className="flex min-h-screen bg-muted/30">
       <aside className="flex w-60 flex-col border-r bg-background">
         <div className="px-2 py-3">
-          <img src={forgeLogo} alt="Forge AI" className="h-24 w-full object-contain" />
+          <img src={forgeLogo} alt="NexusAi" className="h-24 w-full object-contain" />
         </div>
         <nav className="flex-1 px-3">
           {nav_items.map((item) => {

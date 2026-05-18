@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/app/accounts")({
   component: AccountsPage,
-  head: () => ({ meta: [{ title: "Sending accounts — Forge AI" }] }),
+  head: () => ({ meta: [{ title: "Sending accounts — NexusAi" }] }),
 });
 
 function AccountsPage() {

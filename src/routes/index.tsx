@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "Forge AI — All-in-one B2B sales tool" },
+      { title: "NexusAi — All-in-one B2B sales tool" },
       {
         name: "description",
         content:
@@ -30,7 +30,7 @@ function Landing() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <img src={forgeLogo} alt="Forge AI" className="h-12 w-auto" />
+        <img src={forgeLogo} alt="NexusAi" className="h-12 w-auto" />
         <Link to="/login">
           <Button size="sm">Sign in</Button>
         </Link>

@@ -24,7 +24,7 @@ import { CampaignConfigDialog, type CampaignConfig } from "@/components/Campaign
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
-  head: () => ({ meta: [{ title: "Campaign — Forge AI" }] }),
+  head: () => ({ meta: [{ title: "Campaign — NexusAi" }] }),
 });
 
 type EmailInSequence = {

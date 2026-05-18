@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/saved")({
   component: SavedPage,
-  head: () => ({ meta: [{ title: "Saved Searches — Forge AI" }] }),
+  head: () => ({ meta: [{ title: "Saved Searches — NexusAi" }] }),
 });
 
 function SavedPage() {
