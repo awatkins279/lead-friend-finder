@@ -44,8 +44,11 @@ function AppShell() {
   return (
     <div className="flex min-h-screen bg-muted/30">
       <aside className="flex w-60 flex-col border-r bg-background">
-        <div className="px-4 py-4">
-          <img src={forgeLogo} alt="Forge AI" className="h-10 w-auto" />
+        <div className="flex items-center gap-2 px-5 py-5">
+          <div className="rounded-md bg-primary p-2 text-primary-foreground">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <span className="text-base font-semibold">Forge AI</span>
         </div>
         <nav className="flex-1 px-3">
           {nav_items.map((item) => {
