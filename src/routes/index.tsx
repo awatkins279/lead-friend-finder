@@ -8,7 +8,7 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "Outreach — All-in-one B2B sales tool" },
+      { title: "Forge AI — All-in-one B2B sales tool" },
       {
         name: "description",
         content:
@@ -33,7 +33,7 @@ function Landing() {
           <div className="rounded-md bg-primary p-2 text-primary-foreground">
             <Sparkles className="h-4 w-4" />
           </div>
-          <span className="text-lg font-semibold">Outreach</span>
+          <span className="text-lg font-semibold">Forge AI</span>
         </div>
         <Link to="/login">
           <Button size="sm">Sign in</Button>
