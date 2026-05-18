@@ -54,6 +54,14 @@ import {
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AddToListDialog } from "@/components/AddToListDialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Target, Loader2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
+
+type ScoreInfo = { score: number; reasoning: string };
+
 
 export const Route = createFileRoute("/app/people")({
   component: PeoplePage,
