@@ -310,6 +310,78 @@ function PeoplePage() {
 
   const hasSelection = picked.size > 0;
 
+  const scorePageLeads = async () => {
+    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
+      toast.error("Tell the AI what you're selling (min 10 chars)");
+      return;
+    }
+    const ids = rows.map((r) => r.id).filter((id) => !scores.has(id));
+    if (ids.length === 0) {
+      toast.info("All visible leads are already scored");
+      return;
+    }
+    setScoringBusy(true);
+    try {
+      const { scores: out } = await scoreLeadsCall({
+        data: { leadIds: ids, context: scoringContext.trim() },
+      });
+      setScores((prev) => {
+        const next = new Map(prev);
+        out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning }));
+        return next;
+      });
+      toast.success(`Scored ${out.length} leads`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Scoring failed");
+    } finally {
+      setScoringBusy(false);
+    }
+  };
+
+  const scoreSelectedLeads = async () => {
+    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
+      toast.error("Tell the AI what you're selling (min 10 chars)");
+      return;
+    }
+    const allIds = Array.from(picked).filter((id) => !scores.has(id));
+    if (allIds.length === 0) {
+      toast.info("All selected leads are already scored");
+      return;
+    }
+    setScoringBusy(true);
+    try {
+      let done = 0;
+      for (let i = 0; i < allIds.length; i += 50) {
+        const slice = allIds.slice(i, i + 50);
+        const { scores: out } = await scoreLeadsCall({
+          data: { leadIds: slice, context: scoringContext.trim() },
+        });
+        setScores((prev) => {
+          const next = new Map(prev);
+          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning }));
+          return next;
+        });
+        done += out.length;
+      }
+      toast.success(`Scored ${done} leads`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Scoring failed");
+    } finally {
+      setScoringBusy(false);
+    }
+  };
+
+  const eligibleIds = useMemo(
+    () =>
+      Array.from(picked).filter((id) => {
+        if (minScore <= 0) return true;
+        const s = scores.get(id);
+        return !!s && s.score >= minScore;
+      }),
+    [picked, scores, minScore],
+  );
+
+
   return (
     <div className="flex h-screen flex-col">
       <header className="flex items-center justify-between border-b bg-background px-8 py-5">
