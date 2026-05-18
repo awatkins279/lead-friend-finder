@@ -657,7 +657,7 @@ function GenerationProgress({
       <div className="mt-3 h-4 w-full overflow-hidden rounded-full border border-primary/20 bg-muted">
         <div
           className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-          style={{ width: `${Math.max(pct, isRunning => 0)}%`, minWidth: pct > 0 ? "0.5rem" : 0 }}
+          style={{ width: `${pct}%`, minWidth: pct > 0 ? "0.5rem" : 0 }}
         />
       </div>
 
