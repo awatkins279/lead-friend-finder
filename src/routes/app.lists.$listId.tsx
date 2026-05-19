@@ -403,7 +403,7 @@ function ListDetailPage() {
               <Headphones className="mr-2 h-4 w-4" /> Calling config
             </Button>
             <Button
-              onClick={activeTab === "calling" ? runAllScripts : runAll}
+              onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
               disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
             >
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
