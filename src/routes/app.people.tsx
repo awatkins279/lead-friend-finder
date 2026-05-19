@@ -317,6 +317,39 @@ function PeoplePage() {
 
   const hasSelection = picked.size > 0;
 
+  // Score in small AI batches but run many batches in parallel for throughput.
+  const BATCH_SIZE = 12;     // leads per AI request (keeps JSON reliable)
+  const CONCURRENCY = 5;     // parallel requests in flight
+
+  const runScoringWaves = async (ids: string[]) => {
+    const batches: string[][] = [];
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) batches.push(ids.slice(i, i + BATCH_SIZE));
+    let done = 0;
+    let failed = 0;
+    for (let i = 0; i < batches.length; i += CONCURRENCY) {
+      const wave = batches.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        wave.map((slice) =>
+          scoreLeadsCall({ data: { leadIds: slice, context: scoringContext.trim() } })
+        )
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          const out = r.value.scores;
+          setScores((prev) => {
+            const next = new Map(prev);
+            out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
+            return next;
+          });
+          done += out.length;
+        } else {
+          failed += 1;
+        }
+      }
+    }
+    return { done, failed };
+  };
+
   const scorePageLeads = async () => {
     if (!scoringContext.trim() || scoringContext.trim().length < 10) {
       toast.error("Tell the AI what you're selling (min 10 chars)");
@@ -329,20 +362,9 @@ function PeoplePage() {
     }
     setScoringBusy(true);
     try {
-      let done = 0;
-      for (let i = 0; i < ids.length; i += 10) {
-        const slice = ids.slice(i, i + 10);
-        const { scores: out } = await scoreLeadsCall({
-          data: { leadIds: slice, context: scoringContext.trim() },
-        });
-        setScores((prev) => {
-          const next = new Map(prev);
-          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
-          return next;
-        });
-        done += out.length;
-      }
-      toast.success(`Scored ${done} leads`);
+      const { done, failed } = await runScoringWaves(ids);
+      if (done > 0) toast.success(`Scored ${done} leads${failed ? ` (${failed} batch${failed > 1 ? "es" : ""} failed)` : ""}`);
+      else toast.error("Scoring failed");
     } catch (e: any) {
       toast.error(e.message ?? "Scoring failed");
     } finally {
@@ -362,26 +384,16 @@ function PeoplePage() {
     }
     setScoringBusy(true);
     try {
-      let done = 0;
-      for (let i = 0; i < allIds.length; i += 10) {
-        const slice = allIds.slice(i, i + 10);
-        const { scores: out } = await scoreLeadsCall({
-          data: { leadIds: slice, context: scoringContext.trim() },
-        });
-        setScores((prev) => {
-          const next = new Map(prev);
-          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
-          return next;
-        });
-        done += out.length;
-      }
-      toast.success(`Scored ${done} leads`);
+      const { done, failed } = await runScoringWaves(allIds);
+      if (done > 0) toast.success(`Scored ${done} leads${failed ? ` (${failed} batch${failed > 1 ? "es" : ""} failed)` : ""}`);
+      else toast.error("Scoring failed");
     } catch (e: any) {
       toast.error(e.message ?? "Scoring failed");
     } finally {
       setScoringBusy(false);
     }
   };
+
 
   const eligibleIds = useMemo(
     () =>
