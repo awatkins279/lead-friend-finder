@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Plus, Search, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type ListRow = { id: string; name: string; sender_name: string | null };
@@ -24,12 +25,17 @@ export function AddToListDialog({
   leadIds,
   onAdded,
   mode = "list",
+  leadScores,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   leadIds: string[];
   onAdded?: () => void;
   mode?: "list" | "campaign";
+  /** Optional per-lead score (0-100). When provided in campaign mode, a min-score
+   * filter is shown and below-threshold leads are flagged but excluded unless
+   * the user explicitly overrides them. */
+  leadScores?: Map<string, number | null | undefined>;
 }) {
   const [lists, setLists] = useState<ListRow[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -38,9 +44,35 @@ export function AddToListDialog({
   const [search, setSearch] = useState("");
   const [allowDuplicates, setAllowDuplicates] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [minScore, setMinScore] = useState(70);
+  const [overrides, setOverrides] = useState<Set<string>>(new Set());
 
   const isCampaign = mode === "campaign";
   const noun = isCampaign ? "campaign" : "list";
+  const hasScores = !!leadScores && leadScores.size > 0;
+  const showScoreFilter = isCampaign && hasScores;
+
+  const scoreOf = (id: string): number | null => {
+    if (!leadScores) return null;
+    const v = leadScores.get(id);
+    return typeof v === "number" ? v : null;
+  };
+
+  const effectiveIds = useMemo(() => {
+    if (!showScoreFilter) return leadIds;
+    return leadIds.filter((id) => {
+      if (overrides.has(id)) return true;
+      const s = scoreOf(id);
+      if (s == null) return false; // unscored excluded unless overridden
+      return s >= minScore;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIds, leadScores, minScore, overrides, showScoreFilter]);
+
+  // Reset overrides when dialog opens
+  useEffect(() => {
+    if (open) setOverrides(new Set());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -65,7 +97,11 @@ export function AddToListDialog({
   }, [lists, search]);
 
   const submit = async () => {
-    if (leadIds.length === 0) return;
+    const idsToAdd = showScoreFilter ? effectiveIds : leadIds;
+    if (idsToAdd.length === 0) {
+      toast.error(showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
+      return;
+    }
     setBusy(true);
     try {
       let listId = selectedId;
@@ -89,14 +125,14 @@ export function AddToListDialog({
         listId = created.id;
       }
 
-      const rows = leadIds.map((id) => ({ list_id: listId, lead_id: id }));
+      const rows = idsToAdd.map((id) => ({ list_id: listId, lead_id: id }));
       const { error: insErr } = await supabase
         .from("list_leads")
         .upsert(rows, { onConflict: "list_id,lead_id", ignoreDuplicates: !allowDuplicates });
       if (insErr) throw insErr;
 
       toast.success(
-        `Added ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} to ${noun}`,
+        `Added ${idsToAdd.length} lead${idsToAdd.length === 1 ? "" : "s"} to ${noun}`,
       );
       onAdded?.();
       onOpenChange(false);
@@ -111,7 +147,7 @@ export function AddToListDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Add {leadIds.length.toLocaleString()} contact{leadIds.length === 1 ? "" : "s"} to {noun}
@@ -122,6 +158,7 @@ export function AddToListDialog({
               : "Group these prospects so you can research them and draft personalized emails."}
           </DialogDescription>
         </DialogHeader>
+
 
         <div className="space-y-2">
           <div className="relative">
@@ -186,6 +223,95 @@ export function AddToListDialog({
           </div>
         )}
 
+        {showScoreFilter && (
+          <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide">
+                  Minimum AI score
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={minScore}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (Number.isFinite(n)) setMinScore(Math.max(0, Math.min(100, Math.round(n))));
+                    }}
+                    className="h-7 w-16 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">/ 100</span>
+                </div>
+              </div>
+              <Slider
+                value={[minScore]}
+                onValueChange={(v) => setMinScore(v[0] ?? 0)}
+                min={0}
+                max={100}
+                step={1}
+                className="mt-3"
+              />
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be added.
+                Below-threshold prospects are flagged — tick to override.
+              </p>
+            </div>
+
+            <div className="max-h-44 space-y-0.5 overflow-y-auto rounded border bg-background p-1">
+              {leadIds.map((id) => {
+                const s = scoreOf(id);
+                const passes = s != null && s >= minScore;
+                const overridden = overrides.has(id);
+                const included = passes || overridden;
+                return (
+                  <label
+                    key={id}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-accent"
+                  >
+                    <Checkbox
+                      checked={included}
+                      onCheckedChange={(v) => {
+                        setOverrides((prev) => {
+                          const next = new Set(prev);
+                          if (v) {
+                            if (!passes) next.add(id);
+                            else next.delete(id);
+                          } else {
+                            if (passes) next.add(id); // suppress a passing one via override-off? skip
+                            else next.delete(id);
+                          }
+                          // Simpler model: override toggles "force include" for non-passing leads only
+                          return next;
+                        });
+                      }}
+                      disabled={passes}
+                    />
+                    <span className="flex-1 truncate font-mono text-[10px] text-muted-foreground">
+                      {id.slice(0, 10)}…
+                    </span>
+                    {s == null ? (
+                      <Badge variant="outline" className="text-[10px]">Not scored</Badge>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                          passes
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                        }`}
+                      >
+                        {!passes && <AlertTriangle className="h-2.5 w-2.5" />}
+                        {s}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <Checkbox
             checked={allowDuplicates}
@@ -199,8 +325,13 @@ export function AddToListDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy}>
-            {busy ? "Saving…" : isCampaign ? "Add to Campaign" : "Save Leads"}
+            {busy
+              ? "Saving…"
+              : isCampaign
+                ? `Add ${(showScoreFilter ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
+                : "Save Leads"}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>
