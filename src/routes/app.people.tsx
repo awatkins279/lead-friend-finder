@@ -182,7 +182,7 @@ function PeoplePage() {
     status: string;
   } | null>(null);
   const scoringBusy = jobProgress?.status === "running";
-  const scoreLeadsCall = useServerFn(scoreLeadsFn); // kept for backward compat
+  
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
