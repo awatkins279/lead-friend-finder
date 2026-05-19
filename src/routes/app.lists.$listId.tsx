@@ -665,11 +665,212 @@ function LeadDrawer({
                   Click <strong>Generate</strong> to research this prospect and create a personalized email sequence.
                 </Card>
               )}
+
+              <CallScriptSection
+                script={script}
+                busy={scriptBusy}
+                onGenerate={() => genScript(false)}
+                onRegenerate={() => genScript(true)}
+                onOpenCallMode={() => setCallMode(true)}
+              />
             </div>
           </>
         )}
       </SheetContent>
+
+      {row && script && (
+        <CallModeView
+          open={callMode}
+          onOpenChange={setCallMode}
+          script={script}
+          leadName={[row.lead?.first_name, row.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
+          leadSub={`${row.lead?.title ?? ""}${row.lead?.org_name ? ` · ${row.lead.org_name}` : ""}`}
+          phone={row.lead?.phone ?? null}
+        />
+      )}
     </Sheet>
+  );
+}
+
+function CallScriptSection({
+  script,
+  busy,
+  onGenerate,
+  onRegenerate,
+  onOpenCallMode,
+}: {
+  script: CallScript | null;
+  busy: boolean;
+  onGenerate: () => void;
+  onRegenerate: () => void;
+  onOpenCallMode: () => void;
+}) {
+  return (
+    <div className="space-y-3 border-t pt-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Cold-call script
+        </div>
+        <div className="flex gap-2">
+          {script && (
+            <Button size="sm" variant="default" onClick={onOpenCallMode}>
+              <Maximize2 className="mr-1.5 h-3.5 w-3.5" /> Open in call mode
+            </Button>
+          )}
+          <Button size="sm" variant={script ? "outline" : "default"} onClick={script ? onRegenerate : onGenerate} disabled={busy}>
+            {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PhoneCall className="mr-1.5 h-3.5 w-3.5" />}
+            {script ? "Regenerate script" : "Generate script"}
+          </Button>
+        </div>
+      </div>
+      {!script ? (
+        <Card className="p-4 text-center text-sm text-muted-foreground">
+          NEPQ-style script personalized to this prospect using your Calling config.
+        </Card>
+      ) : (
+        <div className="space-y-3 text-sm">
+          <ScriptBlock title="Opener" body={script.opener} />
+          <ScriptList title="Problem questions" items={script.problem_questions} />
+          <ScriptList title="Solution questions" items={script.solution_questions} />
+          <ScriptList title="Consequence questions" items={script.consequence_questions} />
+          <ScriptList title="Qualifying questions" items={script.qualifying_questions} />
+          <ScriptBlock title="Close" body={script.close} />
+          {script.objection_map.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Objection handling</div>
+              <div className="space-y-1.5">
+                {script.objection_map.map((o, i) => (
+                  <div key={i} className="rounded-md border p-2.5">
+                    <div className="text-xs font-medium">{o.objection}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{o.response}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScriptBlock({ title, body }: { title: string; body: string }) {
+  if (!body) return null;
+  return (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <p className="rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function ScriptList({ title, items }: { title: string; items: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <ul className="space-y-1.5">
+        {items.map((q, i) => (
+          <li key={i} className="rounded-md border bg-muted/30 p-3 leading-relaxed">{q}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CallModeView({
+  open,
+  onOpenChange,
+  script,
+  leadName,
+  leadSub,
+  phone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  script: CallScript;
+  leadName: string;
+  leadSub: string;
+  phone: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="h-[95vh] w-[95vw] max-w-[1400px] overflow-hidden p-0">
+        <div className="flex h-full flex-col">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle className="flex items-baseline justify-between gap-4">
+              <span className="text-xl">{leadName}</span>
+              <span className="text-sm font-normal text-muted-foreground">{leadSub}</span>
+              {phone && (
+                <a href={`tel:${phone}`} className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+                  <Phone className="h-4 w-4" /> {phone}
+                </a>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <CallSection title="Opener" tone="primary">
+                <p className="text-lg leading-relaxed">{script.opener}</p>
+              </CallSection>
+              <CallSection title="Problem questions">
+                <BigList items={script.problem_questions} />
+              </CallSection>
+              <CallSection title="Solution questions">
+                <BigList items={script.solution_questions} />
+              </CallSection>
+              <CallSection title="Consequence questions">
+                <BigList items={script.consequence_questions} />
+              </CallSection>
+              <CallSection title="Qualifying questions">
+                <BigList items={script.qualifying_questions} />
+              </CallSection>
+              <CallSection title="Close" tone="primary">
+                <p className="text-lg leading-relaxed">{script.close}</p>
+              </CallSection>
+            </div>
+            <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Objection cheat-sheet
+              </div>
+              {script.objection_map.map((o, i) => (
+                <Card key={i} className="p-3">
+                  <div className="text-sm font-semibold">{o.objection}</div>
+                  <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CallSection({ title, tone, children }: { title: string; tone?: "primary"; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className={`mb-2 text-xs font-semibold uppercase tracking-wide ${tone === "primary" ? "text-primary" : "text-muted-foreground"}`}>
+        {title}
+      </h3>
+      <div className={`rounded-lg border p-4 ${tone === "primary" ? "border-primary/40 bg-primary/5" : "bg-card"}`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function BigList({ items }: { items: string[] }) {
+  if (!items || items.length === 0) return <p className="text-sm text-muted-foreground">—</p>;
+  return (
+    <ol className="space-y-3 text-lg leading-relaxed">
+      {items.map((q, i) => (
+        <li key={i} className="flex gap-3">
+          <span className="shrink-0 text-sm font-semibold text-muted-foreground">{i + 1}.</span>
+          <span>{q}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
