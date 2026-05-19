@@ -367,24 +367,39 @@ function PeoplePage() {
     const token = cancelTokenRef.current;
 
     const workerLoop = async () => {
+      let emptyClaims = 0;
       while (!token.cancelled) {
         try {
           const res = await processNextBatchCall({ data: { jobId } });
-          if (!res.claimed) break; // queue empty
-          if (res.results && res.results.length > 0) mergeScoreResults(res.results);
-          if (res.job) {
-            setJobProgress({
-              totalBatches: res.job.total_batches,
-              completedBatches: res.job.completed_batches,
-              failedBatches: res.job.failed_batches,
-              scoredLeads: res.job.scored_leads,
-              totalLeads: res.job.total_leads,
-              status: res.job.status,
-            });
-            if (res.job.status !== "running") break;
+          if (res.claimed) {
+            emptyClaims = 0;
+            if (res.results && res.results.length > 0) mergeScoreResults(res.results);
+            if (res.job) {
+              setJobProgress({
+                totalBatches: res.job.total_batches,
+                completedBatches: res.job.completed_batches,
+                failedBatches: res.job.failed_batches,
+                scoredLeads: res.job.scored_leads,
+                totalLeads: res.job.total_leads,
+                status: res.job.status,
+              });
+              if (res.job.status !== "running") break;
+            }
+            continue;
           }
+          // No batch claimed. If job is finished, stop. Otherwise siblings may
+          // still re-queue failures into 'retry' — wait and poll a few times.
+          if (res.job && res.job.status !== "running") break;
+          if (
+            res.job &&
+            res.job.completed_batches + res.job.failed_batches >= res.job.total_batches
+          ) {
+            break;
+          }
+          emptyClaims += 1;
+          if (emptyClaims > 20) break; // ~30s of nothing-to-do → bail
+          await new Promise((r) => setTimeout(r, 1500));
         } catch (e) {
-          // brief backoff on network/server hiccup
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
