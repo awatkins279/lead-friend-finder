@@ -185,6 +185,18 @@ Return JSON with this exact shape:
           reasoning: parsed.reasoning ?? "",
           pain_points: parsed.pain_points ?? [],
           talking_points: parsed.talking_points ?? [],
+          ipp_breakdown: Array.isArray(parsed.ipp_breakdown)
+            ? parsed.ipp_breakdown
+                .filter((s) => s && typeof s === "object")
+                .map((s) => ({
+                  label: String(s.label ?? "").slice(0, 60),
+                  verdict: (["strong", "partial", "weak", "unknown"].includes(s.verdict as string)
+                    ? s.verdict
+                    : "unknown") as IppSignal["verdict"],
+                  note: String(s.note ?? "").slice(0, 300),
+                }))
+                .slice(0, 8)
+            : [],
         },
         emails,
         email_subject: emails[0]?.subject ?? "",
