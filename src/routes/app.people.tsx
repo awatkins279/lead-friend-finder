@@ -887,9 +887,22 @@ function Row({ icon, value, href }: { icon: React.ReactNode; value: string; href
   );
 }
 
+const verdictBadge: Record<Signal["verdict"], string> = {
+  strong: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  partial: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  weak: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30",
+  unknown: "bg-muted text-muted-foreground border-border",
+};
+const verdictDot: Record<Signal["verdict"], string> = {
+  strong: "bg-emerald-500",
+  partial: "bg-amber-500",
+  weak: "bg-rose-500",
+  unknown: "bg-muted-foreground/40",
+};
+
 function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
   if (!info) return <span className="text-xs text-muted-foreground">—</span>;
-  const { score, reasoning } = info;
+  const { score } = info;
   const tone =
     score >= 85
       ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
@@ -897,12 +910,98 @@ function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
         ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
         : "bg-muted text-muted-foreground border-border";
   return (
-    <span
-      title={reasoning}
-      className={`inline-flex h-6 min-w-[2.5rem] items-center justify-center rounded-full border px-2 text-xs font-semibold ${tone}`}
-    >
-      {score}
-    </span>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className={`inline-flex h-6 min-w-[2.5rem] cursor-pointer items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors hover:opacity-90 ${tone}`}
+        >
+          {score}
+          <ChevronDown className="h-3 w-3 opacity-60" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-96 p-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <IppBreakdown info={info} />
+      </PopoverContent>
+    </Popover>
   );
 }
+
+function IppBreakdown({ info }: { info: ScoreInfo }) {
+  const { score, reasoning, signals, strengths, gaps } = info;
+  return (
+    <div className="max-h-[28rem] space-y-4 overflow-y-auto p-4 text-sm">
+      <div>
+        <div className="flex items-baseline justify-between">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            IPP fit
+          </div>
+          <div className="text-2xl font-bold tabular-nums">
+            {score}
+            <span className="text-sm text-muted-foreground">/100</span>
+          </div>
+        </div>
+        {reasoning && (
+          <p className="mt-1 text-xs text-muted-foreground">{reasoning}</p>
+        )}
+      </div>
+
+      {signals.length > 0 && (
+        <div className="space-y-2">
+          {signals.map((s, i) => (
+            <div key={i} className="rounded-md border p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">{s.label}</span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${verdictBadge[s.verdict]}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${verdictDot[s.verdict]}`} />
+                  {s.verdict}
+                </span>
+              </div>
+              {s.note && <p className="mt-1 text-[11px] text-muted-foreground">{s.note}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(strengths.length > 0 || gaps.length > 0) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {strengths.length > 0 && (
+            <div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+                Why they fit
+              </div>
+              <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                {strengths.map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
+            </div>
+          )}
+          {gaps.length > 0 && (
+            <div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-rose-600 dark:text-rose-400">
+                Concerns
+              </div>
+              <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+                {gaps.map((g, i) => <li key={i}>{g}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {signals.length === 0 && strengths.length === 0 && gaps.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No detailed breakdown — re-score this lead to get an in-depth IPP analysis.
+        </p>
+      )}
+    </div>
+  );
+}
+
 
