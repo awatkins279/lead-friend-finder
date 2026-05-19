@@ -460,6 +460,14 @@ function ListDetailPage() {
           onSaved={() => refetchList()}
         />
       )}
+
+      <CallingConfigDialog
+        listId={listId}
+        initial={callCfg}
+        open={callConfigOpen}
+        onOpenChange={setCallConfigOpen}
+        onSaved={loadCallCfg}
+      />
     </div>
   );
 }
