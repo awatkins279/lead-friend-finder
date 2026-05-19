@@ -57,7 +57,27 @@ export const scoreLeads = createServerFn({ method: "POST" })
     const userPrompt = `SELLER CONTEXT (what we're selling / who we want):
 ${data.context}
 
-Score every prospect below. Return JSON: { "scores": [ { "leadId": "...", "score": 0-100, "reasoning": "1 sentence why" }, ... ] }. One entry per prospect, same ids.
+For every prospect, return a detailed IPP qualification. Return JSON exactly:
+{
+  "scores": [
+    {
+      "leadId": "...",
+      "score": 0-100,
+      "reasoning": "1-2 sentence overall verdict",
+      "signals": [
+        { "label": "Industry fit", "verdict": "strong|partial|weak|unknown", "note": "1 short sentence with evidence" },
+        { "label": "Company size fit", "verdict": "...", "note": "..." },
+        { "label": "Role relevance", "verdict": "...", "note": "..." },
+        { "label": "Pain point alignment", "verdict": "...", "note": "..." },
+        { "label": "Tech / buying signal", "verdict": "...", "note": "..." },
+        { "label": "Geography / timing", "verdict": "...", "note": "..." }
+      ],
+      "strengths": ["2-3 concrete reasons this prospect IS a fit"],
+      "gaps": ["1-3 concrete reasons they may NOT be a fit, or 'none' if perfect"]
+    }
+  ]
+}
+Use only "strong" / "partial" / "weak" / "unknown" for verdicts. Cite evidence from the prospect's title, industry, headcount, tech, or description. Do not inflate.
 
 PROSPECTS:
 ${JSON.stringify(compact)}`;
