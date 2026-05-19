@@ -1,0 +1,282 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { NEPQ_SYSTEM_PROMPT } from "./nepq-prompt";
+
+// ---------------------------------------------------------------------------
+// Generate a personalized NEPQ-style call script for a single lead.
+// Cached on list_leads.call_script — re-opening the call page is instant.
+// ---------------------------------------------------------------------------
+const genInput = z.object({
+  listId: z.string().uuid(),
+  leadId: z.string().min(1),
+  force: z.boolean().optional(),
+});
+
+export type CallScript = {
+  opener: string;
+  problem_questions: string[];
+  solution_questions: string[];
+  consequence_questions: string[];
+  qualifying_questions: string[];
+  close: string;
+  objection_map: { objection: string; response: string }[];
+};
+
+export const generateCallScript = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => genInput.parse(i))
+  .handler(async ({ data, context }): Promise<{ script: CallScript }> => {
+    const { supabase } = context;
+
+    // Cached?
+    if (!data.force) {
+      const { data: existing } = await supabase
+        .from("list_leads")
+        .select("call_script")
+        .eq("list_id", data.listId)
+        .eq("lead_id", data.leadId)
+        .maybeSingle();
+      if (existing?.call_script) {
+        return { script: existing.call_script as unknown as CallScript };
+      }
+    }
+
+    const [{ data: list }, { data: cfg }, { data: lead }] = await Promise.all([
+      supabase.from("lists").select("name, what_selling, key_selling_points, sender_name, sender_company").eq("id", data.listId).maybeSingle(),
+      supabase.from("list_call_configs").select("*").eq("list_id", data.listId).maybeSingle(),
+      supabase.from("leads").select("first_name,last_name,title,org_name,org_industry,org_description,org_employee_count,city,state,country").eq("id", data.leadId).maybeSingle(),
+    ]);
+
+    if (!lead) throw new Error("Lead not found");
+    if (!list?.what_selling) throw new Error("Set up the campaign config first");
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+
+    const system = NEPQ_SYSTEM_PROMPT.replace("{{KNOWLEDGE_BASE}}", "");
+
+    const userPrompt = `Write a personalized cold-call script for this single prospect, using the NEPQ approach.
+
+SELLER:
+- Rep name: ${list.sender_name ?? "the rep"}
+- Company: ${list.sender_company ?? ""}
+- Selling: ${list.what_selling}
+${list.key_selling_points ? `- ICP / selling points: ${list.key_selling_points}` : ""}
+
+CALLING CONFIG:
+- Tone: ${cfg?.tone ?? "consultative"}
+- Personalization: ${cfg?.personalization_level ?? "high"}
+- Objectives: ${cfg?.objectives ?? "Book a 15-min discovery call"}
+- Common objections + preferred handling: ${cfg?.objection_notes ?? "None specified"}
+${cfg?.script_template ? `- USER-PROVIDED BASE TEMPLATE (use as the backbone, personalize per the prospect):\n${cfg.script_template}` : ""}
+${cfg?.extra_instructions ? `- Extra rep instructions: ${cfg.extra_instructions}` : ""}
+${cfg?.record_calls ? `- Recording disclaimer (work into opener naturally): "${cfg.consent_disclaimer}"` : ""}
+
+PROSPECT:
+- Name: ${[lead.first_name, lead.last_name].filter(Boolean).join(" ")}
+- Title: ${lead.title ?? ""}
+- Company: ${lead.org_name ?? ""} (${lead.org_industry ?? "?"}, ${lead.org_employee_count ?? "?"} employees)
+- Location: ${[lead.city, lead.state, lead.country].filter(Boolean).join(", ")}
+- About company: ${(lead.org_description ?? "").slice(0, 400)}
+
+Return JSON exactly:
+{
+  "opener": "1-2 sentence pattern-interrupt opener that names them, drops tonality, and asks permission",
+  "problem_questions": ["3-5 questions that surface pain in their world — phrased so THEY say the problem"],
+  "solution_questions": ["2-3 questions getting them to describe what 'fixed' looks like in their words"],
+  "consequence_questions": ["2-3 questions about the cost of doing nothing"],
+  "qualifying_questions": ["2-3 questions on budget, decision process, timing — NEPQ-style, not BANT-checklist"],
+  "close": "Transition + commitment ask — get THEIR words on the next step",
+  "objection_map": [
+    {"objection": "Not interested", "response": "NEPQ-style reframe in 1-2 sentences"},
+    {"objection": "Send me info", "response": "..."},
+    {"objection": "We already have a solution", "response": "..."},
+    {"objection": "Too expensive / no budget", "response": "..."},
+    {"objection": "Call me back next quarter", "response": "..."}
+  ]
+}
+
+Every line should feel like it was written for THIS prospect — reference their title, company, or industry naturally. No corporate jargon. No "I wanted to reach out". No "synergy". Conversational, like a peer-to-peer call.`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 3000,
+      }),
+    });
+
+    if (res.status === 429) throw new Error("AI rate limit — try again in a moment");
+    if (res.status === 402) throw new Error("AI credits exhausted — add credits in Workspace settings");
+    if (!res.ok) throw new Error(`AI error ${res.status}`);
+
+    const payload = await res.json();
+    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new Error("AI returned invalid JSON — try again");
+    }
+
+    const script: CallScript = {
+      opener: String(parsed.opener ?? "").slice(0, 800),
+      problem_questions: arr(parsed.problem_questions, 8, 400),
+      solution_questions: arr(parsed.solution_questions, 6, 400),
+      consequence_questions: arr(parsed.consequence_questions, 6, 400),
+      qualifying_questions: arr(parsed.qualifying_questions, 6, 400),
+      close: String(parsed.close ?? "").slice(0, 800),
+      objection_map: Array.isArray(parsed.objection_map)
+        ? parsed.objection_map
+            .filter((o: any) => o && typeof o === "object")
+            .map((o: any) => ({
+              objection: String(o.objection ?? "").slice(0, 120),
+              response: String(o.response ?? "").slice(0, 600),
+            }))
+            .slice(0, 10)
+        : [],
+    };
+
+    // Ensure row exists, then cache the script
+    await supabase
+      .from("list_leads")
+      .upsert(
+        { list_id: data.listId, lead_id: data.leadId, call_script: script as any, status: "scripted" },
+        { onConflict: "list_id,lead_id" },
+      );
+
+    return { script };
+  });
+
+function arr(v: unknown, max: number, lim: number): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x).slice(0, lim)).filter(Boolean).slice(0, max);
+}
+
+// ---------------------------------------------------------------------------
+// Mint a short-lived Twilio Voice Access Token (JWT) for the browser SDK.
+// ---------------------------------------------------------------------------
+const tokenInput = z.object({
+  phoneAccountId: z.string().uuid(),
+  identity: z.string().min(1).max(120).optional(),
+});
+
+export const getTwilioToken = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => tokenInput.parse(i))
+  .handler(async ({ data, context }): Promise<{ token: string; identity: string }> => {
+    const { supabase, userId } = context;
+
+    const { data: acc, error } = await supabase
+      .from("user_phone_accounts")
+      .select("twilio_account_sid, twilio_api_key_sid, twilio_api_key_secret, twilio_twiml_app_sid")
+      .eq("id", data.phoneAccountId)
+      .maybeSingle();
+
+    if (error || !acc) throw new Error("Phone account not found");
+    if (!acc.twilio_twiml_app_sid) {
+      throw new Error("Phone account is missing the TwiML App SID. Add it in Sending Accounts.");
+    }
+
+    const identity = data.identity ?? `rep-${userId.slice(0, 8)}`;
+
+    // Lazy-import on the server only
+    const twilio = (await import("twilio")).default;
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
+
+    const token = new AccessToken(
+      acc.twilio_account_sid,
+      acc.twilio_api_key_sid,
+      acc.twilio_api_key_secret,
+      { identity, ttl: 3600 },
+    );
+
+    token.addGrant(
+      new VoiceGrant({
+        outgoingApplicationSid: acc.twilio_twiml_app_sid,
+        incomingAllow: false,
+      }),
+    );
+
+    return { token: token.toJwt(), identity };
+  });
+
+// ---------------------------------------------------------------------------
+// Create a `calls` row when the rep clicks "Call" — returns callId we pass
+// to the Voice SDK as a custom param so the TwiML endpoint can identify it.
+// ---------------------------------------------------------------------------
+const startInput = z.object({
+  listId: z.string().uuid(),
+  leadId: z.string().min(1),
+  phoneAccountId: z.string().uuid(),
+  toNumber: z.string().min(3).max(32),
+});
+
+export const startCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => startInput.parse(i))
+  .handler(async ({ data, context }): Promise<{ callId: string }> => {
+    const { supabase, userId } = context;
+
+    const { data: acc } = await supabase
+      .from("user_phone_accounts")
+      .select("from_number")
+      .eq("id", data.phoneAccountId)
+      .maybeSingle();
+    if (!acc) throw new Error("Phone account not found");
+
+    const { data: row, error } = await supabase
+      .from("calls")
+      .insert({
+        user_id: userId,
+        list_id: data.listId,
+        lead_id: data.leadId,
+        phone_account_id: data.phoneAccountId,
+        to_number: data.toNumber,
+        from_number: acc.from_number,
+        status: "initiated",
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    return { callId: row.id };
+  });
+
+// ---------------------------------------------------------------------------
+// Persist notes / outcome / final duration after the rep hangs up.
+// ---------------------------------------------------------------------------
+const endInput = z.object({
+  callId: z.string().uuid(),
+  durationSec: z.number().int().min(0).max(7200).optional(),
+  outcome: z.string().max(40).optional(),
+  notes: z.string().max(4000).optional(),
+});
+
+export const endCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => endInput.parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase
+      .from("calls")
+      .update({
+        status: "completed",
+        ended_at: new Date().toISOString(),
+        duration_sec: data.durationSec ?? null,
+        outcome: data.outcome ?? null,
+        notes: data.notes ?? null,
+      })
+      .eq("id", data.callId)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
