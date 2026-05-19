@@ -243,6 +243,59 @@ function ListDetailPage() {
     }
   };
 
+  const runAllScripts = async () => {
+    const callCfgRow = await supabase
+      .from("list_call_configs")
+      .select("list_id")
+      .eq("list_id", listId)
+      .maybeSingle();
+    if (!callCfgRow.data) {
+      toast.error("Set up the calling config first");
+      setCallConfigOpen(true);
+      return;
+    }
+    const pending = (rows ?? []).filter((r) => !r.call_script);
+    if (pending.length === 0) return toast.info("All prospects already have call scripts");
+
+    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    setProgress({ ...state });
+
+    const CONCURRENCY = 4;
+    let cursor = 0;
+
+    const worker = async () => {
+      while (true) {
+        if (state.cancel) return;
+        const i = cursor++;
+        if (i >= pending.length) return;
+        const r = pending[i];
+        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+        state.currentName = name;
+        setProgress({ ...state });
+        try {
+          await genScriptBulkFn({ data: { listId, leadId: r.lead_id, force: false } });
+        } catch (e: any) {
+          console.error("script generation failed", r.lead_id, e);
+        }
+        state.done += 1;
+        setProgress({ ...state });
+        qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()),
+    );
+
+    setProgress((p) => (p?.cancel ? null : p));
+    if (!state.cancel) {
+      toast.success(`Generated call scripts for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      setTimeout(() => setProgress(null), 1500);
+    } else {
+      toast.info(`Stopped after ${state.done} of ${state.total}`);
+    }
+  };
+
   const cancelRunAll = () => {
     setProgress((p) => (p ? { ...p, cancel: true } : p));
   };
