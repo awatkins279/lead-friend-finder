@@ -7,7 +7,20 @@ const inputSchema = z.object({
   context: z.string().min(10).max(4000),
 });
 
-type ScoreRow = { leadId: string; score: number; reasoning: string };
+type Signal = {
+  label: string;
+  verdict: "strong" | "partial" | "weak" | "unknown";
+  note: string;
+};
+
+type ScoreRow = {
+  leadId: string;
+  score: number;
+  reasoning: string;
+  signals: Signal[];
+  strengths: string[];
+  gaps: string[];
+};
 
 export const scoreLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
