@@ -13,7 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Plus, Search, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 type ListRow = { id: string; name: string; sender_name: string | null };
@@ -24,12 +25,17 @@ export function AddToListDialog({
   leadIds,
   onAdded,
   mode = "list",
+  leadScores,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   leadIds: string[];
   onAdded?: () => void;
   mode?: "list" | "campaign";
+  /** Optional per-lead score (0-100). When provided in campaign mode, a min-score
+   * filter is shown and below-threshold leads are flagged but excluded unless
+   * the user explicitly overrides them. */
+  leadScores?: Map<string, number | null | undefined>;
 }) {
   const [lists, setLists] = useState<ListRow[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
