@@ -15,11 +15,18 @@ type EmailInSequence = {
   send_after_days: number;
 };
 
+type IppSignal = {
+  label: string;
+  verdict: "strong" | "partial" | "weak" | "unknown";
+  note: string;
+};
+
 type EnrichOutput = {
   score: number;
   reasoning: string;
   pain_points: string[];
   talking_points: string[];
+  ipp_breakdown?: IppSignal[];
   emails: EmailInSequence[];
 };
 
