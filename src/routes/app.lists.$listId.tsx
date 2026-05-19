@@ -384,15 +384,22 @@ function ListDetailPage() {
             <Button variant="outline" onClick={() => setCallConfigOpen(true)}>
               <Headphones className="mr-2 h-4 w-4" /> Calling config
             </Button>
-            <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured || isRunning}>
+            <Button
+              onClick={activeTab === "calling" ? runAllScripts : runAll}
+              disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
+            >
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              {isRunning ? "Generating…" : "Generate all sequences"}
+              {isRunning
+                ? "Generating…"
+                : activeTab === "calling"
+                  ? "Generate all call scripts"
+                  : "Generate all sequences"}
             </Button>
           </div>
         </div>
       </header>
 
-      <Tabs defaultValue="email" className="flex flex-1 flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
         <div className="border-b bg-background px-8">
           <TabsList className="h-11 bg-transparent p-0">
             <TabsTrigger
