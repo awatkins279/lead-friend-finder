@@ -378,6 +378,7 @@ function ListDetailPage() {
                     <div className="truncate text-sm text-muted-foreground">
                       {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
                     </div>
+                    <IppTagStrip research={r.research} scored={r.score != null} />
                     {eff[0]?.subject && (
                       <div className="mt-1 truncate text-xs text-muted-foreground">
                         ✉ {eff[0].subject}
