@@ -824,6 +824,9 @@ function CallScriptSection({
       ) : (
         <div className="space-y-3 text-sm">
           <ScriptBlock title="Opener" body={script.opener} />
+          {script.talk_track?.map((s, i) => (
+            <ScriptBlock key={i} title={s.heading} body={s.body} />
+          ))}
           <ScriptList title="Problem questions" items={script.problem_questions} />
           <ScriptList title="Solution questions" items={script.solution_questions} />
           <ScriptList title="Consequence questions" items={script.consequence_questions} />
@@ -853,7 +856,7 @@ function ScriptBlock({ title, body }: { title: string; body: string }) {
   return (
     <div>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-      <p className="rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
+      <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
     </div>
   );
 }
@@ -905,8 +908,13 @@ function CallModeView({
           <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <CallSection title="Opener" tone="primary">
-                <p className="text-lg leading-relaxed">{script.opener}</p>
+                <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.opener}</p>
               </CallSection>
+              {script.talk_track?.map((s, i) => (
+                <CallSection key={i} title={s.heading}>
+                  <p className="whitespace-pre-wrap text-lg leading-relaxed">{s.body}</p>
+                </CallSection>
+              ))}
               <CallSection title="Problem questions">
                 <BigList items={script.problem_questions} />
               </CallSection>
@@ -1337,8 +1345,13 @@ function CallWorkstation({
                 <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
                   <div className="space-y-5 lg:col-span-2">
                     <CallSection title="Opener" tone="primary">
-                      <p className="text-lg leading-relaxed">{activeScript.opener}</p>
+                      <p className="whitespace-pre-wrap text-lg leading-relaxed">{activeScript.opener}</p>
                     </CallSection>
+                    {activeScript.talk_track?.map((s, i) => (
+                      <CallSection key={i} title={s.heading}>
+                        <p className="whitespace-pre-wrap text-lg leading-relaxed">{s.body}</p>
+                      </CallSection>
+                    ))}
                     <CallSection title="Problem questions">
                       <BigList items={activeScript.problem_questions} />
                     </CallSection>
