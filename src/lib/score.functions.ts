@@ -95,6 +95,7 @@ ${JSON.stringify(compact)}`;
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
+        max_tokens: 8000,
       }),
     });
 
@@ -109,10 +110,12 @@ ${JSON.stringify(compact)}`;
     const content: string = payload.choices?.[0]?.message?.content ?? "{}";
     let parsed: { scores?: ScoreRow[] };
     try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new Error("AI returned invalid JSON");
+      parsed = extractJson(content) as { scores?: ScoreRow[] };
+    } catch (e) {
+      console.error("Score JSON parse failed. Raw content:", content.slice(0, 1000));
+      throw new Error("AI returned invalid JSON — try scoring fewer leads at once.");
     }
+
 
     const allowed: Signal["verdict"][] = ["strong", "partial", "weak", "unknown"];
     const scores: ScoreRow[] = (parsed.scores ?? [])
