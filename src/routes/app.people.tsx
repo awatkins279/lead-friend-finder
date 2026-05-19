@@ -172,13 +172,24 @@ function PeoplePage() {
   const [scoringContext, setScoringContext] = useState("");
   const [scores, setScores] = useState<Map<string, ScoreInfo>>(new Map());
   const [minScore, setMinScore] = useState(0);
-  const [scoringBusy, setScoringBusy] = useState(false);
-  const scoreLeadsCall = useServerFn(scoreLeadsFn);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [jobProgress, setJobProgress] = useState<{
+    totalBatches: number;
+    completedBatches: number;
+    failedBatches: number;
+    scoredLeads: number;
+    totalLeads: number;
+    status: string;
+  } | null>(null);
+  const scoringBusy = jobProgress?.status === "running";
+  const scoreLeadsCall = useServerFn(scoreLeadsFn); // kept for backward compat
+  const createScoringJobCall = useServerFn(createScoringJobFn);
+  const processNextBatchCall = useServerFn(processNextBatchFn);
+  const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
+  const cancelScoringJobCall = useServerFn(cancelScoringJobFn);
 
   useEffect(() => setPage(0), [filters]);
 
-
-  const queryKey = useMemo(() => ["leads", filters, page], [filters, page]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
