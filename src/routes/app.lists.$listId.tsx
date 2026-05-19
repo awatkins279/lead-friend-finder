@@ -522,7 +522,12 @@ function ListDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="calling" className="m-0 flex-1 overflow-hidden">
+        <TabsContent value="calling" className="m-0 flex-1 overflow-y-auto">
+          {progress && (
+            <div className="px-8 pt-6">
+              <GenerationProgress progress={progress} onCancel={cancelRunAll} />
+            </div>
+          )}
           <CallWorkstation
             listId={listId}
             rows={rows ?? []}
