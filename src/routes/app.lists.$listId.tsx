@@ -17,10 +17,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
+import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { generateCallScript, type CallScript } from "@/lib/calls.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -42,6 +45,7 @@ type Row = {
   emails: EmailInSequence[] | null;
   email_subject: string | null;
   email_body: string | null;
+  call_script: CallScript | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
@@ -92,6 +96,8 @@ function ListDetailPage() {
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
+  const [callConfigOpen, setCallConfigOpen] = useState(false);
+  const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
     total: number;
     done: number;
@@ -120,8 +126,8 @@ function ListDetailPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("list_leads")
-    .select(
-          "lead_id, score, status, emails, email_subject, email_body, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
+        .select(
+          "lead_id, score, status, emails, email_subject, email_body, call_script, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
         )
         .eq("list_id", listId)
         .order("score", { ascending: false, nullsFirst: false });
@@ -139,6 +145,29 @@ function ListDetailPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list?.id]);
+
+  // Load calling config so the dialog opens with existing values
+  const loadCallCfg = async () => {
+    const { data } = await supabase
+      .from("list_call_configs")
+      .select("*")
+      .eq("list_id", listId)
+      .maybeSingle();
+    if (data) {
+      setCallCfg({
+        script_template: data.script_template,
+        tone: data.tone,
+        objectives: data.objectives,
+        objection_notes: data.objection_notes,
+        personalization_level: data.personalization_level,
+        record_calls: data.record_calls,
+        consent_disclaimer: data.consent_disclaimer,
+        extra_instructions: data.extra_instructions,
+      });
+    }
+  };
+  useEffect(() => { loadCallCfg(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [listId]);
+
 
   const runOne = async (leadId: string) => {
     if (!isConfigured) {
@@ -297,6 +326,9 @@ function ListDetailPage() {
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-4 w-4" /> Campaign config
             </Button>
+            <Button variant="outline" onClick={() => setCallConfigOpen(true)}>
+              <Headphones className="mr-2 h-4 w-4" /> Calling config
+            </Button>
             <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured || isRunning}>
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               {isRunning ? "Generating…" : "Generate all sequences"}
@@ -428,6 +460,14 @@ function ListDetailPage() {
           onSaved={() => refetchList()}
         />
       )}
+
+      <CallingConfigDialog
+        listId={listId}
+        initial={callCfg}
+        open={callConfigOpen}
+        onOpenChange={setCallConfigOpen}
+        onSaved={loadCallCfg}
+      />
     </div>
   );
 }
@@ -445,11 +485,33 @@ function LeadDrawer({
 }) {
   const [emails, setEmails] = useState<EmailInSequence[]>([]);
   const [activeStep, setActiveStep] = useState("1");
+  const [script, setScript] = useState<CallScript | null>(null);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [callMode, setCallMode] = useState(false);
+  const genScriptFn = useServerFn(generateCallScript);
 
   useEffect(() => {
     setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
-  }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body]);
+    setScript(row?.call_script ?? null);
+    setCallMode(false);
+  }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body, row?.call_script]);
+
+  const genScript = async (force = false) => {
+    if (!row) return;
+    setScriptBusy(true);
+    try {
+      const res = await genScriptFn({ data: { listId, leadId: row.lead_id, force } });
+      setScript(res.script);
+      onChanged();
+      toast.success(force ? "Script regenerated" : "Script ready");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to generate script");
+    } finally {
+      setScriptBusy(false);
+    }
+  };
+
 
   const updateEmail = (idx: number, patch: Partial<EmailInSequence>) => {
     setEmails((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
@@ -603,11 +665,212 @@ function LeadDrawer({
                   Click <strong>Generate</strong> to research this prospect and create a personalized email sequence.
                 </Card>
               )}
+
+              <CallScriptSection
+                script={script}
+                busy={scriptBusy}
+                onGenerate={() => genScript(false)}
+                onRegenerate={() => genScript(true)}
+                onOpenCallMode={() => setCallMode(true)}
+              />
             </div>
           </>
         )}
       </SheetContent>
+
+      {row && script && (
+        <CallModeView
+          open={callMode}
+          onOpenChange={setCallMode}
+          script={script}
+          leadName={[row.lead?.first_name, row.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
+          leadSub={`${row.lead?.title ?? ""}${row.lead?.org_name ? ` · ${row.lead.org_name}` : ""}`}
+          phone={row.lead?.phone ?? null}
+        />
+      )}
     </Sheet>
+  );
+}
+
+function CallScriptSection({
+  script,
+  busy,
+  onGenerate,
+  onRegenerate,
+  onOpenCallMode,
+}: {
+  script: CallScript | null;
+  busy: boolean;
+  onGenerate: () => void;
+  onRegenerate: () => void;
+  onOpenCallMode: () => void;
+}) {
+  return (
+    <div className="space-y-3 border-t pt-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Cold-call script
+        </div>
+        <div className="flex gap-2">
+          {script && (
+            <Button size="sm" variant="default" onClick={onOpenCallMode}>
+              <Maximize2 className="mr-1.5 h-3.5 w-3.5" /> Open in call mode
+            </Button>
+          )}
+          <Button size="sm" variant={script ? "outline" : "default"} onClick={script ? onRegenerate : onGenerate} disabled={busy}>
+            {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PhoneCall className="mr-1.5 h-3.5 w-3.5" />}
+            {script ? "Regenerate script" : "Generate script"}
+          </Button>
+        </div>
+      </div>
+      {!script ? (
+        <Card className="p-4 text-center text-sm text-muted-foreground">
+          NEPQ-style script personalized to this prospect using your Calling config.
+        </Card>
+      ) : (
+        <div className="space-y-3 text-sm">
+          <ScriptBlock title="Opener" body={script.opener} />
+          <ScriptList title="Problem questions" items={script.problem_questions} />
+          <ScriptList title="Solution questions" items={script.solution_questions} />
+          <ScriptList title="Consequence questions" items={script.consequence_questions} />
+          <ScriptList title="Qualifying questions" items={script.qualifying_questions} />
+          <ScriptBlock title="Close" body={script.close} />
+          {script.objection_map.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Objection handling</div>
+              <div className="space-y-1.5">
+                {script.objection_map.map((o, i) => (
+                  <div key={i} className="rounded-md border p-2.5">
+                    <div className="text-xs font-medium">{o.objection}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{o.response}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScriptBlock({ title, body }: { title: string; body: string }) {
+  if (!body) return null;
+  return (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <p className="rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+function ScriptList({ title, items }: { title: string; items: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <ul className="space-y-1.5">
+        {items.map((q, i) => (
+          <li key={i} className="rounded-md border bg-muted/30 p-3 leading-relaxed">{q}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CallModeView({
+  open,
+  onOpenChange,
+  script,
+  leadName,
+  leadSub,
+  phone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  script: CallScript;
+  leadName: string;
+  leadSub: string;
+  phone: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="h-[95vh] w-[95vw] max-w-[1400px] overflow-hidden p-0">
+        <div className="flex h-full flex-col">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle className="flex items-baseline justify-between gap-4">
+              <span className="text-xl">{leadName}</span>
+              <span className="text-sm font-normal text-muted-foreground">{leadSub}</span>
+              {phone && (
+                <a href={`tel:${phone}`} className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+                  <Phone className="h-4 w-4" /> {phone}
+                </a>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              <CallSection title="Opener" tone="primary">
+                <p className="text-lg leading-relaxed">{script.opener}</p>
+              </CallSection>
+              <CallSection title="Problem questions">
+                <BigList items={script.problem_questions} />
+              </CallSection>
+              <CallSection title="Solution questions">
+                <BigList items={script.solution_questions} />
+              </CallSection>
+              <CallSection title="Consequence questions">
+                <BigList items={script.consequence_questions} />
+              </CallSection>
+              <CallSection title="Qualifying questions">
+                <BigList items={script.qualifying_questions} />
+              </CallSection>
+              <CallSection title="Close" tone="primary">
+                <p className="text-lg leading-relaxed">{script.close}</p>
+              </CallSection>
+            </div>
+            <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Objection cheat-sheet
+              </div>
+              {script.objection_map.map((o, i) => (
+                <Card key={i} className="p-3">
+                  <div className="text-sm font-semibold">{o.objection}</div>
+                  <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CallSection({ title, tone, children }: { title: string; tone?: "primary"; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className={`mb-2 text-xs font-semibold uppercase tracking-wide ${tone === "primary" ? "text-primary" : "text-muted-foreground"}`}>
+        {title}
+      </h3>
+      <div className={`rounded-lg border p-4 ${tone === "primary" ? "border-primary/40 bg-primary/5" : "bg-card"}`}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function BigList({ items }: { items: string[] }) {
+  if (!items || items.length === 0) return <p className="text-sm text-muted-foreground">—</p>;
+  return (
+    <ol className="space-y-3 text-lg leading-relaxed">
+      {items.map((q, i) => (
+        <li key={i} className="flex gap-3">
+          <span className="shrink-0 text-sm font-semibold text-muted-foreground">{i + 1}.</span>
+          <span>{q}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
