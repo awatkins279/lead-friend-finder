@@ -44,9 +44,35 @@ export function AddToListDialog({
   const [search, setSearch] = useState("");
   const [allowDuplicates, setAllowDuplicates] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [minScore, setMinScore] = useState(70);
+  const [overrides, setOverrides] = useState<Set<string>>(new Set());
 
   const isCampaign = mode === "campaign";
   const noun = isCampaign ? "campaign" : "list";
+  const hasScores = !!leadScores && leadScores.size > 0;
+  const showScoreFilter = isCampaign && hasScores;
+
+  const scoreOf = (id: string): number | null => {
+    if (!leadScores) return null;
+    const v = leadScores.get(id);
+    return typeof v === "number" ? v : null;
+  };
+
+  const effectiveIds = useMemo(() => {
+    if (!showScoreFilter) return leadIds;
+    return leadIds.filter((id) => {
+      if (overrides.has(id)) return true;
+      const s = scoreOf(id);
+      if (s == null) return false; // unscored excluded unless overridden
+      return s >= minScore;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadIds, leadScores, minScore, overrides, showScoreFilter]);
+
+  // Reset overrides when dialog opens
+  useEffect(() => {
+    if (open) setOverrides(new Set());
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
