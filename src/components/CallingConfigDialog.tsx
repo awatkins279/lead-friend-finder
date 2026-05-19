@@ -124,8 +124,9 @@ export function CallingConfigDialog({
               rows={4}
               value={cfg.objection_notes ?? ""}
               onChange={(e) => update("objection_notes", e.target.value)}
-              placeholder='e.g. "Send me info" → don\'t send anything, ask what made them say that. "Too expensive" → reframe as cost of inaction.'
+              placeholder={`e.g. "Send me info" → don't send anything, ask what made them say that. "Too expensive" → reframe as cost of inaction.`}
             />
+
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
