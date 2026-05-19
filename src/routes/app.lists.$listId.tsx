@@ -856,7 +856,7 @@ function ScriptBlock({ title, body }: { title: string; body: string }) {
   return (
     <div>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-      <p className="rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
+      <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
     </div>
   );
 }
