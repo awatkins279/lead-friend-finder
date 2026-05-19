@@ -363,8 +363,8 @@ function PeoplePage() {
     setScoringBusy(true);
     try {
       let done = 0;
-      for (let i = 0; i < allIds.length; i += 50) {
-        const slice = allIds.slice(i, i + 50);
+      for (let i = 0; i < allIds.length; i += 10) {
+        const slice = allIds.slice(i, i + 10);
         const { scores: out } = await scoreLeadsCall({
           data: { leadIds: slice, context: scoringContext.trim() },
         });
