@@ -117,7 +117,7 @@ Every line should feel like it was written for THIS prospect — reference their
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 3000,
+        max_tokens: 6000,
       }),
     });
 
