@@ -40,8 +40,8 @@ export const DEFAULT_CALLING_CONFIG: CallingConfig = {
   objectives: "Book a 15-minute discovery call",
   objection_notes: null,
   personalization_level: "high",
-  record_calls: true,
-  consent_disclaimer: "This call may be recorded for quality and training purposes.",
+  record_calls: false,
+  consent_disclaimer: "",
   extra_instructions: null,
 };
 
@@ -155,28 +155,8 @@ export function CallingConfigDialog({
             </Field>
           </div>
 
-          <div className="rounded-md border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <Label className="text-sm font-medium">Record calls</Label>
-                <p className="text-xs text-muted-foreground">
-                  Recordings power post-call AI scorecards. Disclaimer is read on every call.
-                </p>
-              </div>
-              <Switch
-                checked={cfg.record_calls}
-                onCheckedChange={(v) => update("record_calls", v)}
-              />
-            </div>
-            {cfg.record_calls && (
-              <Input
-                className="mt-3"
-                value={cfg.consent_disclaimer}
-                onChange={(e) => update("consent_disclaimer", e.target.value)}
-                placeholder="This call may be recorded for quality and training purposes."
-              />
-            )}
-          </div>
+
+
 
           <Field
             label="Extra coaching instructions (optional)"

@@ -337,112 +337,139 @@ function ListDetailPage() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-8">
-        {!isConfigured && list && (
-          <Card className="mb-4 flex items-center gap-3 border-amber-500/40 bg-amber-50/40 p-4 dark:bg-amber-950/20">
-            <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
-            <div className="flex-1 text-sm">
-              <p className="font-medium">Campaign not configured</p>
-              <p className="text-muted-foreground">
-                Set up sender info + what you're selling so the AI knows what to write.
+      <Tabs defaultValue="email" className="flex flex-1 flex-col overflow-hidden">
+        <div className="border-b bg-background px-8">
+          <TabsList className="h-11 bg-transparent p-0">
+            <TabsTrigger
+              value="email"
+              className="rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <Mail className="mr-2 h-4 w-4" /> Email outreach
+            </TabsTrigger>
+            <TabsTrigger
+              value="calling"
+              className="rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <PhoneCall className="mr-2 h-4 w-4" /> Cold calling
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="email" className="m-0 flex-1 overflow-y-auto p-8">
+          {!isConfigured && list && (
+            <Card className="mb-4 flex items-center gap-3 border-amber-500/40 bg-amber-50/40 p-4 dark:bg-amber-950/20">
+              <AlertCircle className="h-5 w-5 shrink-0 text-amber-600" />
+              <div className="flex-1 text-sm">
+                <p className="font-medium">Campaign not configured</p>
+                <p className="text-muted-foreground">
+                  Set up sender info + what you're selling so the AI knows what to write.
+                </p>
+              </div>
+              <Button size="sm" onClick={() => setConfigOpen(true)}>Configure</Button>
+            </Card>
+          )}
+
+          {progress && <GenerationProgress progress={progress} onCancel={cancelRunAll} />}
+
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          ) : !rows || rows.length === 0 ? (
+            <Card className="p-12 text-center">
+              <p className="text-sm text-muted-foreground">
+                No prospects yet. Add some from{" "}
+                <Link to="/app/people" className="underline">People Search</Link>.
               </p>
-            </div>
-            <Button size="sm" onClick={() => setConfigOpen(true)}>Configure</Button>
-          </Card>
-        )}
-
-        {progress && (
-          <GenerationProgress progress={progress} onCancel={cancelRunAll} />
-        )}
-
-        {isLoading ? (
-          <div className="text-sm text-muted-foreground">Loading…</div>
-        ) : !rows || rows.length === 0 ? (
-          <Card className="p-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              No prospects yet. Add some from{" "}
-              <Link to="/app/people" className="underline">People Search</Link>.
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {rows.map((r) => {
-              const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
-              const isBusy = busy.has(r.lead_id);
-              const eff = effectiveEmails(r);
-              const emailCount = eff.length;
-              const isLegacy = (!r.emails || r.emails.length === 0) && eff.length > 0;
-              return (
-                <Card
-                  key={r.lead_id}
-                  className="flex cursor-pointer items-center gap-4 p-4 transition-shadow hover:shadow-sm"
-                  onClick={() => setOpen(r)}
-                >
-                  <div className="flex w-12 shrink-0 flex-col items-center">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
-                        r.score == null
-                          ? "bg-muted text-muted-foreground"
-                          : r.score >= 75
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                            : r.score >= 50
-                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                              : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
-                      }`}
-                    >
-                      {r.score ?? "—"}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{name}</span>
-                      {emailCount > 0 && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {emailCount} email{emailCount > 1 ? " sequence" : ""}
-                        </Badge>
-                      )}
-                      {isLegacy && (
-                        <Badge variant="outline" className="text-[10px]">
-                          Regenerate for full sequence
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="truncate text-sm text-muted-foreground">
-                      {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
-                    </div>
-                    <IppTagStrip research={r.research} scored={r.score != null} />
-                    {eff[0]?.subject && (
-                      <div className="mt-1 truncate text-xs text-muted-foreground">
-                        ✉ {eff[0].subject}
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {rows.map((r) => {
+                const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
+                const isBusy = busy.has(r.lead_id);
+                const eff = effectiveEmails(r);
+                const emailCount = eff.length;
+                const isLegacy = (!r.emails || r.emails.length === 0) && eff.length > 0;
+                return (
+                  <Card
+                    key={r.lead_id}
+                    className="flex cursor-pointer items-center gap-4 p-4 transition-shadow hover:shadow-sm"
+                    onClick={() => setOpen(r)}
+                  >
+                    <div className="flex w-12 shrink-0 flex-col items-center">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
+                          r.score == null
+                            ? "bg-muted text-muted-foreground"
+                            : r.score >= 75
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                              : r.score >= 50
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                        }`}
+                      >
+                        {r.score ?? "—"}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="sm"
-                      variant={r.status === "enriched" ? "outline" : "default"}
-                      onClick={() => runOne(r.lead_id)}
-                      disabled={isBusy}
-                    >
-                      {isBusy ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                          {r.status === "enriched" ? "Regenerate" : "Generate"}
-                        </>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{name}</span>
+                        {emailCount > 0 && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {emailCount} email{emailCount > 1 ? " sequence" : ""}
+                          </Badge>
+                        )}
+                        {isLegacy && (
+                          <Badge variant="outline" className="text-[10px]">
+                            Regenerate for full sequence
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="truncate text-sm text-muted-foreground">
+                        {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
+                      </div>
+                      <IppTagStrip research={r.research} scored={r.score != null} />
+                      {eff[0]?.subject && (
+                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                          ✉ {eff[0].subject}
+                        </div>
                       )}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => remove(r.lead_id)}>
-                      Remove
-                    </Button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant={r.status === "enriched" ? "outline" : "default"}
+                        onClick={() => runOne(r.lead_id)}
+                        disabled={isBusy}
+                      >
+                        {isBusy ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <>
+                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                            {r.status === "enriched" ? "Regenerate" : "Generate"}
+                          </>
+                        )}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => remove(r.lead_id)}>
+                        Remove
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="calling" className="m-0 flex-1 overflow-hidden">
+          <CallWorkstation
+            listId={listId}
+            rows={rows ?? []}
+            onOpenConfig={() => setCallConfigOpen(true)}
+            onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
+          />
+        </TabsContent>
+      </Tabs>
+
 
       <LeadDrawer
         listId={listId}
@@ -1027,6 +1054,315 @@ function IppBreakdownPanel({ research, scored }: { research: Row["research"]; sc
             {s.note && <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cold-call workstation: 2-pane view (lead queue ⇄ active-lead script)
+// optimized for speed — phone visible, click-to-call, prev/next, no clutter.
+// ---------------------------------------------------------------------------
+function CallWorkstation({
+  listId,
+  rows,
+  onOpenConfig,
+  onChanged,
+}: {
+  listId: string;
+  rows: Row[];
+  onOpenConfig: () => void;
+  onChanged: () => void;
+}) {
+  const genScriptFn = useServerFn(generateCallScript);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [localScripts, setLocalScripts] = useState<Record<string, CallScript>>({});
+  const [outcomeBusy, setOutcomeBusy] = useState(false);
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (activeId || rows.length === 0) return;
+    const firstWithPhone = rows.find((r) => r.lead?.phone);
+    setActiveId((firstWithPhone ?? rows[0]).lead_id);
+  }, [rows, activeId]);
+
+  useEffect(() => {
+    setNotes("");
+  }, [activeId]);
+
+  const active = rows.find((r) => r.lead_id === activeId) ?? null;
+  const activeScript = active ? (localScripts[active.lead_id] ?? active.call_script) : null;
+  const activeIndex = active ? rows.findIndex((r) => r.lead_id === active.lead_id) : -1;
+
+  const goTo = (delta: number) => {
+    if (activeIndex < 0) return;
+    const next = rows[activeIndex + delta];
+    if (next) setActiveId(next.lead_id);
+  };
+
+  const generate = async (force = false) => {
+    if (!active) return;
+    setScriptBusy(true);
+    try {
+      const res = await genScriptFn({ data: { listId, leadId: active.lead_id, force } });
+      setLocalScripts((p) => ({ ...p, [active.lead_id]: res.script }));
+      onChanged();
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to generate script");
+    } finally {
+      setScriptBusy(false);
+    }
+  };
+
+  const logOutcome = async (outcome: string) => {
+    if (!active) return;
+    setOutcomeBusy(true);
+    try {
+      const { error } = await supabase.from("calls").insert({
+        list_id: listId,
+        lead_id: active.lead_id,
+        to_number: active.lead?.phone ?? "",
+        status: "completed",
+        outcome,
+        notes: notes || null,
+        ended_at: new Date().toISOString(),
+      } as any);
+      if (error) throw error;
+      toast.success(`Logged: ${outcome}`);
+      setNotes("");
+      goTo(1);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to log call");
+    } finally {
+      setOutcomeBusy(false);
+    }
+  };
+
+  if (rows.length === 0) {
+    return (
+      <div className="p-8">
+        <Card className="p-12 text-center text-sm text-muted-foreground">
+          No prospects yet. Add some from{" "}
+          <Link to="/app/people" className="underline">People Search</Link>.
+        </Card>
+      </div>
+    );
+  }
+
+  const withPhone = rows.filter((r) => r.lead?.phone);
+  const scriptedCount = rows.filter((r) => r.call_script || localScripts[r.lead_id]).length;
+
+  return (
+    <div className="flex h-full overflow-hidden">
+      <aside className="flex w-80 shrink-0 flex-col border-r bg-muted/20">
+        <div className="border-b px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold">Call queue</div>
+              <div className="text-[11px] text-muted-foreground">
+                {withPhone.length}/{rows.length} have phone · {scriptedCount} scripted
+              </div>
+            </div>
+            <Button size="sm" variant="ghost" onClick={onOpenConfig}>
+              <Settings2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2">
+          {rows.map((r) => {
+            const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
+            const isActive = r.lead_id === activeId;
+            const hasScript = !!(r.call_script || localScripts[r.lead_id]);
+            const hasPhone = !!r.lead?.phone;
+            return (
+              <button
+                key={r.lead_id}
+                onClick={() => setActiveId(r.lead_id)}
+                className={`mb-1 w-full rounded-md border px-3 py-2 text-left transition ${
+                  isActive
+                    ? "border-primary bg-primary/10"
+                    : "border-transparent hover:border-border hover:bg-background"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                      r.score == null
+                        ? "bg-muted text-muted-foreground"
+                        : r.score >= 75
+                          ? "bg-emerald-100 text-emerald-700"
+                          : r.score >= 50
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {r.score ?? "—"}
+                  </span>
+                  <span className="flex-1 truncate text-sm font-medium">{name}</span>
+                  {hasScript && <Sparkles className="h-3 w-3 text-primary" />}
+                </div>
+                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                  {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
+                </div>
+                <div className={`mt-0.5 truncate text-[11px] ${hasPhone ? "text-foreground" : "text-muted-foreground/60"}`}>
+                  {hasPhone ? `☎ ${r.lead?.phone}` : "no phone"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {active ? (
+          <>
+            <div className="flex items-center justify-between gap-4 border-b bg-background px-6 py-4">
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-3">
+                  <h2 className="truncate text-xl font-semibold tracking-tight">
+                    {[active.lead?.first_name, active.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
+                  </h2>
+                  <span className="truncate text-sm text-muted-foreground">
+                    {active.lead?.title}{active.lead?.org_name ? ` · ${active.lead.org_name}` : ""}
+                  </span>
+                </div>
+                {active.research?.reasoning && (
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{active.research.reasoning}</p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => goTo(-1)} disabled={activeIndex <= 0}>
+                  ← Prev
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => goTo(1)} disabled={activeIndex >= rows.length - 1}>
+                  Next →
+                </Button>
+                {active.lead?.phone ? (
+                  <a
+                    href={`tel:${active.lead.phone}`}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    <Phone className="h-4 w-4" /> {active.lead.phone}
+                  </a>
+                ) : (
+                  <span className="text-xs text-muted-foreground">No phone on file</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {!activeScript ? (
+                <div className="flex h-full items-center justify-center p-12">
+                  <Card className="max-w-md p-8 text-center">
+                    <PhoneCall className="mx-auto mb-3 h-8 w-8 text-primary" />
+                    <div className="mb-1 text-base font-semibold">No script yet</div>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Generate a NEPQ-style script personalized to this prospect using your Calling config.
+                    </p>
+                    <Button onClick={() => generate(false)} disabled={scriptBusy}>
+                      {scriptBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                      Generate script
+                    </Button>
+                  </Card>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
+                  <div className="space-y-5 lg:col-span-2">
+                    <CallSection title="Opener" tone="primary">
+                      <p className="text-lg leading-relaxed">{activeScript.opener}</p>
+                    </CallSection>
+                    <CallSection title="Problem questions">
+                      <BigList items={activeScript.problem_questions} />
+                    </CallSection>
+                    <CallSection title="Solution questions">
+                      <BigList items={activeScript.solution_questions} />
+                    </CallSection>
+                    <CallSection title="Consequence questions">
+                      <BigList items={activeScript.consequence_questions} />
+                    </CallSection>
+                    <CallSection title="Qualifying questions">
+                      <BigList items={activeScript.qualifying_questions} />
+                    </CallSection>
+                    <CallSection title="Close" tone="primary">
+                      <p className="text-lg leading-relaxed">{activeScript.close}</p>
+                    </CallSection>
+                    <div className="flex justify-end">
+                      <Button size="sm" variant="outline" onClick={() => generate(true)} disabled={scriptBusy}>
+                        {scriptBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                        Regenerate
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Objection cheat-sheet
+                      </div>
+                      <div className="space-y-2">
+                        {activeScript.objection_map.map((o, i) => (
+                          <Card key={i} className="p-3">
+                            <div className="text-sm font-semibold">{o.objection}</div>
+                            <div className="mt-1 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Call notes
+                      </div>
+                      <Textarea
+                        rows={5}
+                        placeholder="Quick notes — saved with the outcome"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Log outcome
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
+                          { v: "interested", label: "Interested", c: "" },
+                          { v: "callback", label: "Callback", c: "" },
+                          { v: "voicemail", label: "Voicemail", c: "" },
+                          { v: "no_answer", label: "No answer", c: "" },
+                          { v: "not_interested", label: "Not interested", c: "" },
+                          { v: "wrong_number", label: "Wrong #", c: "" },
+                          { v: "dnc", label: "Do not call", c: "" },
+                        ].map((o) => (
+                          <Button
+                            key={o.v}
+                            size="sm"
+                            variant={o.c ? undefined : "outline"}
+                            className={o.c}
+                            disabled={outcomeBusy}
+                            onClick={() => logOutcome(o.v)}
+                          >
+                            {o.label}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        Logging auto-advances to the next prospect.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            Select a prospect from the queue
+          </div>
+        )}
       </div>
     </div>
   );
