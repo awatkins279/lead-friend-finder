@@ -23,6 +23,16 @@ import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { generateCallScript, type CallScript } from "@/lib/calls.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
