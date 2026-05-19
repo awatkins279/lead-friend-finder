@@ -773,6 +773,22 @@ function PeoplePage() {
                 <SheetDescription>{selected.title}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-5 px-4 pb-6 text-sm">
+                {(() => {
+                  const info = scores.get(selected.id);
+                  return info ? (
+                    <Section title="AI IPP analysis">
+                      <div className="-mx-1 rounded-md border">
+                        <IppBreakdown info={info} />
+                      </div>
+                    </Section>
+                  ) : (
+                    <Section title="AI IPP analysis">
+                      <p className="text-xs text-muted-foreground">
+                        Not scored yet. Run "Score this page" or "Score selected" to get an in-depth fit breakdown.
+                      </p>
+                    </Section>
+                  );
+                })()}
                 <Section title="Company">
                   <div className="font-medium">{selected.org_name || "—"}</div>
                   {selected.org_industry && (
