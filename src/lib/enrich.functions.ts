@@ -116,6 +116,13 @@ Return JSON with this exact shape:
   "reasoning": "1-2 sentence explanation",
   "pain_points": ["3-5 inferred pain points relevant to what's being sold"],
   "talking_points": ["3-5 angles for outreach"],
+  "ipp_breakdown": [
+    { "label": "Industry fit", "verdict": "strong|partial|weak|unknown", "note": "1 short sentence citing evidence" },
+    { "label": "Company size fit", "verdict": "strong|partial|weak|unknown", "note": "..." },
+    { "label": "Role relevance", "verdict": "strong|partial|weak|unknown", "note": "..." },
+    { "label": "Pain point alignment", "verdict": "strong|partial|weak|unknown", "note": "..." },
+    { "label": "Tech / buying signal", "verdict": "strong|partial|weak|unknown", "note": "..." }
+  ],
   "emails": [
     {
       "step": 1,
