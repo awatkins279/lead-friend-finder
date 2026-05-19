@@ -45,6 +45,7 @@ type Row = {
   emails: EmailInSequence[] | null;
   email_subject: string | null;
   email_body: string | null;
+  call_script: CallScript | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
