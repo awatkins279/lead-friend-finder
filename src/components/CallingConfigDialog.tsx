@@ -40,8 +40,8 @@ export const DEFAULT_CALLING_CONFIG: CallingConfig = {
   objectives: "Book a 15-minute discovery call",
   objection_notes: null,
   personalization_level: "high",
-  record_calls: true,
-  consent_disclaimer: "This call may be recorded for quality and training purposes.",
+  record_calls: false,
+  consent_disclaimer: "",
   extra_instructions: null,
 };
 
