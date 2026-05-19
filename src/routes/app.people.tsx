@@ -329,15 +329,20 @@ function PeoplePage() {
     }
     setScoringBusy(true);
     try {
-      const { scores: out } = await scoreLeadsCall({
-        data: { leadIds: ids, context: scoringContext.trim() },
-      });
-      setScores((prev) => {
-        const next = new Map(prev);
-        out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
-        return next;
-      });
-      toast.success(`Scored ${out.length} leads`);
+      let done = 0;
+      for (let i = 0; i < ids.length; i += 10) {
+        const slice = ids.slice(i, i + 10);
+        const { scores: out } = await scoreLeadsCall({
+          data: { leadIds: slice, context: scoringContext.trim() },
+        });
+        setScores((prev) => {
+          const next = new Map(prev);
+          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
+          return next;
+        });
+        done += out.length;
+      }
+      toast.success(`Scored ${done} leads`);
     } catch (e: any) {
       toast.error(e.message ?? "Scoring failed");
     } finally {
@@ -358,8 +363,8 @@ function PeoplePage() {
     setScoringBusy(true);
     try {
       let done = 0;
-      for (let i = 0; i < allIds.length; i += 50) {
-        const slice = allIds.slice(i, i + 50);
+      for (let i = 0; i < allIds.length; i += 10) {
+        const slice = allIds.slice(i, i + 10);
         const { scores: out } = await scoreLeadsCall({
           data: { leadIds: slice, context: scoringContext.trim() },
         });

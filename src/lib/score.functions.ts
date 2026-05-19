@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const inputSchema = z.object({
-  leadIds: z.array(z.string().min(1)).min(1).max(50),
+  leadIds: z.array(z.string().min(1)).min(1).max(15),
   context: z.string().min(10).max(4000),
 });
 
@@ -95,6 +95,7 @@ ${JSON.stringify(compact)}`;
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
+        max_tokens: 8000,
       }),
     });
 
@@ -109,10 +110,12 @@ ${JSON.stringify(compact)}`;
     const content: string = payload.choices?.[0]?.message?.content ?? "{}";
     let parsed: { scores?: ScoreRow[] };
     try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new Error("AI returned invalid JSON");
+      parsed = extractJson(content) as { scores?: ScoreRow[] };
+    } catch (e) {
+      console.error("Score JSON parse failed. Raw content:", content.slice(0, 1000));
+      throw new Error("AI returned invalid JSON — try scoring fewer leads at once.");
     }
+
 
     const allowed: Signal["verdict"][] = ["strong", "partial", "weak", "unknown"];
     const scores: ScoreRow[] = (parsed.scores ?? [])
@@ -141,3 +144,56 @@ ${JSON.stringify(compact)}`;
 
     return { scores };
   });
+
+// Tolerant JSON extractor — strips markdown fences, finds object bounds,
+// repairs trailing commas / control chars, and attempts to close a truncated
+// "scores" array so a partial response still yields usable rows.
+function extractJson(raw: string): unknown {
+  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const start = s.search(/[\{\[]/);
+  if (start === -1) throw new Error("No JSON found");
+  s = s.slice(start);
+
+  const tryParse = (txt: string) => JSON.parse(txt);
+
+  try { return tryParse(s); } catch {}
+
+  // Clean trailing commas + stray control chars
+  let cleaned = s
+    .replace(/,\s*}/g, "}")
+    .replace(/,\s*]/g, "]")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  try { return tryParse(cleaned); } catch {}
+
+  // Truncation repair: cut after the last complete object inside scores[]
+  const arrStart = cleaned.indexOf('"scores"');
+  if (arrStart !== -1) {
+    const bracketStart = cleaned.indexOf("[", arrStart);
+    if (bracketStart !== -1) {
+      let depth = 0;
+      let inStr = false;
+      let esc = false;
+      let lastGoodEnd = -1;
+      for (let i = bracketStart; i < cleaned.length; i++) {
+        const c = cleaned[i];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (c === "\\") esc = true;
+          else if (c === '"') inStr = false;
+          continue;
+        }
+        if (c === '"') inStr = true;
+        else if (c === "{") depth++;
+        else if (c === "}") {
+          depth--;
+          if (depth === 0) lastGoodEnd = i;
+        }
+      }
+      if (lastGoodEnd !== -1) {
+        const repaired = cleaned.slice(0, lastGoodEnd + 1) + "]}";
+        return tryParse(repaired);
+      }
+    }
+  }
+  throw new Error("Unrecoverable JSON");
+}
