@@ -556,6 +556,21 @@ function ListDetailPage() {
       </Tabs>
 
 
+      <AlertDialog open={confirmScripts} onOpenChange={setConfirmScripts}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate all call scripts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will rewrite the existing call scripts for all {rows?.length ?? 0} prospects in this campaign using your current Calling config. Any edits made to individual scripts will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={runAllScripts}>Rewrite all scripts</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <LeadDrawer
         listId={listId}
         row={open}
