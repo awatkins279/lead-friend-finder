@@ -46,6 +46,11 @@ type Row = {
     reasoning?: string;
     pain_points?: string[];
     talking_points?: string[];
+    ipp_breakdown?: Array<{
+      label: string;
+      verdict: "strong" | "partial" | "weak" | "unknown";
+      note: string;
+    }>;
   } | null;
   lead: {
     id: string;
