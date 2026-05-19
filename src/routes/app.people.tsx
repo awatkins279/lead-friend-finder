@@ -59,6 +59,12 @@ import { Slider } from "@/components/ui/slider";
 import { Target, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
+import {
+  createScoringJob as createScoringJobFn,
+  processNextBatch as processNextBatchFn,
+  getJobSnapshot as getJobSnapshotFn,
+  cancelScoringJob as cancelScoringJobFn,
+} from "@/lib/scoring-jobs.functions";
 
 type Signal = { label: string; verdict: "strong" | "partial" | "weak" | "unknown"; note: string };
 type ScoreInfo = {
