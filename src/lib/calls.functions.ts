@@ -15,6 +15,7 @@ const genInput = z.object({
 
 export type CallScript = {
   opener: string;
+  talk_track: { heading: string; body: string }[];
   problem_questions: string[];
   solution_questions: string[];
   consequence_questions: string[];
