@@ -485,11 +485,33 @@ function LeadDrawer({
 }) {
   const [emails, setEmails] = useState<EmailInSequence[]>([]);
   const [activeStep, setActiveStep] = useState("1");
+  const [script, setScript] = useState<CallScript | null>(null);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [callMode, setCallMode] = useState(false);
+  const genScriptFn = useServerFn(generateCallScript);
 
   useEffect(() => {
     setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
-  }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body]);
+    setScript(row?.call_script ?? null);
+    setCallMode(false);
+  }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body, row?.call_script]);
+
+  const genScript = async (force = false) => {
+    if (!row) return;
+    setScriptBusy(true);
+    try {
+      const res = await genScriptFn({ data: { listId, leadId: row.lead_id, force } });
+      setScript(res.script);
+      onChanged();
+      toast.success(force ? "Script regenerated" : "Script ready");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to generate script");
+    } finally {
+      setScriptBusy(false);
+    }
+  };
+
 
   const updateEmail = (idx: number, patch: Partial<EmailInSequence>) => {
     setEmails((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
