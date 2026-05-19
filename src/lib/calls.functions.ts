@@ -71,7 +71,8 @@ CALLING CONFIG:
 - Common objections + preferred handling: ${cfg?.objection_notes ?? "None specified"}
 ${cfg?.script_template ? `- USER-PROVIDED BASE TEMPLATE (use as the backbone, personalize per the prospect):\n${cfg.script_template}` : ""}
 ${cfg?.extra_instructions ? `- Extra rep instructions: ${cfg.extra_instructions}` : ""}
-${cfg?.record_calls ? `- Recording disclaimer (work into opener naturally): "${cfg.consent_disclaimer}"` : ""}
+
+
 
 PROSPECT:
 - Name: ${[lead.first_name, lead.last_name].filter(Boolean).join(" ")}
