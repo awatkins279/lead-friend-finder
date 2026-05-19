@@ -824,6 +824,9 @@ function CallScriptSection({
       ) : (
         <div className="space-y-3 text-sm">
           <ScriptBlock title="Opener" body={script.opener} />
+          {script.talk_track?.map((s, i) => (
+            <ScriptBlock key={i} title={s.heading} body={s.body} />
+          ))}
           <ScriptList title="Problem questions" items={script.problem_questions} />
           <ScriptList title="Solution questions" items={script.solution_questions} />
           <ScriptList title="Consequence questions" items={script.consequence_questions} />
