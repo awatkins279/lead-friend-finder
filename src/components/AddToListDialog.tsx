@@ -223,6 +223,95 @@ export function AddToListDialog({
           </div>
         )}
 
+        {showScoreFilter && (
+          <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide">
+                  Minimum AI score
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={minScore}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (Number.isFinite(n)) setMinScore(Math.max(0, Math.min(100, Math.round(n))));
+                    }}
+                    className="h-7 w-16 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">/ 100</span>
+                </div>
+              </div>
+              <Slider
+                value={[minScore]}
+                onValueChange={(v) => setMinScore(v[0] ?? 0)}
+                min={0}
+                max={100}
+                step={1}
+                className="mt-3"
+              />
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be added.
+                Below-threshold prospects are flagged — tick to override.
+              </p>
+            </div>
+
+            <div className="max-h-44 space-y-0.5 overflow-y-auto rounded border bg-background p-1">
+              {leadIds.map((id) => {
+                const s = scoreOf(id);
+                const passes = s != null && s >= minScore;
+                const overridden = overrides.has(id);
+                const included = passes || overridden;
+                return (
+                  <label
+                    key={id}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-accent"
+                  >
+                    <Checkbox
+                      checked={included}
+                      onCheckedChange={(v) => {
+                        setOverrides((prev) => {
+                          const next = new Set(prev);
+                          if (v) {
+                            if (!passes) next.add(id);
+                            else next.delete(id);
+                          } else {
+                            if (passes) next.add(id); // suppress a passing one via override-off? skip
+                            else next.delete(id);
+                          }
+                          // Simpler model: override toggles "force include" for non-passing leads only
+                          return next;
+                        });
+                      }}
+                      disabled={passes}
+                    />
+                    <span className="flex-1 truncate font-mono text-[10px] text-muted-foreground">
+                      {id.slice(0, 10)}…
+                    </span>
+                    {s == null ? (
+                      <Badge variant="outline" className="text-[10px]">Not scored</Badge>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                          passes
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
+                        }`}
+                      >
+                        {!passes && <AlertTriangle className="h-2.5 w-2.5" />}
+                        {s}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <Checkbox
             checked={allowDuplicates}
@@ -236,8 +325,13 @@ export function AddToListDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={busy}>
-            {busy ? "Saving…" : isCampaign ? "Add to Campaign" : "Save Leads"}
+            {busy
+              ? "Saving…"
+              : isCampaign
+                ? `Add ${(showScoreFilter ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
+                : "Save Leads"}
           </Button>
+
         </DialogFooter>
       </DialogContent>
     </Dialog>
