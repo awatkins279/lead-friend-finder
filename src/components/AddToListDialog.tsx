@@ -97,7 +97,11 @@ export function AddToListDialog({
   }, [lists, search]);
 
   const submit = async () => {
-    if (leadIds.length === 0) return;
+    const idsToAdd = showScoreFilter ? effectiveIds : leadIds;
+    if (idsToAdd.length === 0) {
+      toast.error(showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
+      return;
+    }
     setBusy(true);
     try {
       let listId = selectedId;
@@ -121,14 +125,14 @@ export function AddToListDialog({
         listId = created.id;
       }
 
-      const rows = leadIds.map((id) => ({ list_id: listId, lead_id: id }));
+      const rows = idsToAdd.map((id) => ({ list_id: listId, lead_id: id }));
       const { error: insErr } = await supabase
         .from("list_leads")
         .upsert(rows, { onConflict: "list_id,lead_id", ignoreDuplicates: !allowDuplicates });
       if (insErr) throw insErr;
 
       toast.success(
-        `Added ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} to ${noun}`,
+        `Added ${idsToAdd.length} lead${idsToAdd.length === 1 ? "" : "s"} to ${noun}`,
       );
       onAdded?.();
       onOpenChange(false);
@@ -143,7 +147,7 @@ export function AddToListDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Add {leadIds.length.toLocaleString()} contact{leadIds.length === 1 ? "" : "s"} to {noun}
@@ -154,6 +158,7 @@ export function AddToListDialog({
               : "Group these prospects so you can research them and draft personalized emails."}
           </DialogDescription>
         </DialogHeader>
+
 
         <div className="space-y-2">
           <div className="relative">
