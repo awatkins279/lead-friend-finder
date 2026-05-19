@@ -60,7 +60,14 @@ import { Target, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
 
-type ScoreInfo = { score: number; reasoning: string };
+type Signal = { label: string; verdict: "strong" | "partial" | "weak" | "unknown"; note: string };
+type ScoreInfo = {
+  score: number;
+  reasoning: string;
+  signals: Signal[];
+  strengths: string[];
+  gaps: string[];
+};
 
 
 export const Route = createFileRoute("/app/people")({
