@@ -136,6 +136,15 @@ Every line should feel like it was written for THIS prospect — reference their
 
     const script: CallScript = {
       opener: String(parsed.opener ?? "").slice(0, 800),
+      talk_track: Array.isArray(parsed.talk_track)
+        ? parsed.talk_track
+            .filter((s: any) => s && typeof s === "object" && (s.heading || s.body))
+            .map((s: any) => ({
+              heading: String(s.heading ?? "").slice(0, 120),
+              body: String(s.body ?? "").slice(0, 2500),
+            }))
+            .slice(0, 12)
+        : [],
       problem_questions: arr(parsed.problem_questions, 8, 400),
       solution_questions: arr(parsed.solution_questions, 6, 400),
       consequence_questions: arr(parsed.consequence_questions, 6, 400),
