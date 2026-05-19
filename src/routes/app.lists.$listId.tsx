@@ -254,7 +254,7 @@ function ListDetailPage() {
     }
   };
 
-  const runAllScripts = async () => {
+  const requestRunAllScripts = async () => {
     const callCfgRow = await supabase
       .from("list_call_configs")
       .select("list_id")
@@ -265,16 +265,15 @@ function ListDetailPage() {
       setCallConfigOpen(true);
       return;
     }
-    const targets = rows ?? [];
-    if (targets.length === 0) return toast.info("No prospects in this list");
+    if (!rows || rows.length === 0) return toast.info("No prospects in this list");
+    setConfirmScripts(true);
+  };
 
-    const hasExisting = targets.some((r) => !!r.call_script);
-    const msg = hasExisting
-      ? `This will REWRITE existing call scripts for all ${targets.length} prospects. Continue?`
-      : `Generate call scripts for all ${targets.length} prospects?`;
-    if (!window.confirm(msg)) return;
+  const runAllScripts = async () => {
+    setConfirmScripts(false);
+    const pending = rows ?? [];
+    if (pending.length === 0) return;
 
-    const pending = targets;
 
     const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
     setProgress({ ...state });
