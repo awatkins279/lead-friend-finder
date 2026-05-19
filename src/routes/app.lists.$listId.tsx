@@ -326,6 +326,9 @@ function ListDetailPage() {
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-4 w-4" /> Campaign config
             </Button>
+            <Button variant="outline" onClick={() => setCallConfigOpen(true)}>
+              <Headphones className="mr-2 h-4 w-4" /> Calling config
+            </Button>
             <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured || isRunning}>
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               {isRunning ? "Generating…" : "Generate all sequences"}
