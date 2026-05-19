@@ -487,6 +487,7 @@ export type Database = {
           twilio_account_sid: string
           twilio_api_key_secret: string
           twilio_api_key_sid: string
+          twilio_auth_token: string
           twilio_twiml_app_sid: string | null
           updated_at: string
           user_id: string
@@ -500,6 +501,7 @@ export type Database = {
           twilio_account_sid: string
           twilio_api_key_secret: string
           twilio_api_key_sid: string
+          twilio_auth_token?: string
           twilio_twiml_app_sid?: string | null
           updated_at?: string
           user_id: string
@@ -513,6 +515,7 @@ export type Database = {
           twilio_account_sid?: string
           twilio_api_key_secret?: string
           twilio_api_key_sid?: string
+          twilio_auth_token?: string
           twilio_twiml_app_sid?: string | null
           updated_at?: string
           user_id?: string
