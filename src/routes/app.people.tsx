@@ -654,6 +654,51 @@ function PeoplePage() {
               </Button>
             </div>
 
+            {jobProgress && (
+              <div className="mt-3 rounded-md border bg-background p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">
+                    {jobProgress.status === "running" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+                    {jobProgress.status === "running"
+                      ? "Scoring in background…"
+                      : jobProgress.status === "completed"
+                        ? "Scoring complete"
+                        : jobProgress.status === "completed_with_errors"
+                          ? "Done (some errors)"
+                          : jobProgress.status === "cancelled"
+                            ? "Cancelled"
+                            : jobProgress.status}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {jobProgress.scoredLeads.toLocaleString()} / {jobProgress.totalLeads.toLocaleString()}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${jobProgress.totalBatches === 0 ? 0 : Math.round(((jobProgress.completedBatches + jobProgress.failedBatches) / jobProgress.totalBatches) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>
+                    {jobProgress.completedBatches + jobProgress.failedBatches} / {jobProgress.totalBatches} batches
+                    {jobProgress.failedBatches > 0 ? ` · ${jobProgress.failedBatches} failed` : ""}
+                  </span>
+                  {jobProgress.status === "running" && activeJobId && (
+                    <button onClick={cancelScoring} className="text-destructive hover:underline">
+                      Cancel
+                    </button>
+                  )}
+                </div>
+                {jobProgress.status === "running" && (
+                  <p className="mt-1 text-[10px] text-muted-foreground">Safe to close the tab — progress is saved.</p>
+                )}
+              </div>
+            )}
+
+
             <div className="mt-4">
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Min score for campaign</span>
