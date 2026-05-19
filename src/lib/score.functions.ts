@@ -114,11 +114,28 @@ ${JSON.stringify(compact)}`;
       throw new Error("AI returned invalid JSON");
     }
 
+    const allowed: Signal["verdict"][] = ["strong", "partial", "weak", "unknown"];
     const scores: ScoreRow[] = (parsed.scores ?? [])
-      .map((s) => ({
+      .map((s: any) => ({
         leadId: String(s.leadId),
         score: Math.max(0, Math.min(100, Math.round(Number(s.score) || 0))),
         reasoning: String(s.reasoning ?? "").slice(0, 400),
+        signals: Array.isArray(s.signals)
+          ? s.signals
+              .filter((x: any) => x && typeof x === "object")
+              .map((x: any) => ({
+                label: String(x.label ?? "").slice(0, 60),
+                verdict: (allowed.includes(x.verdict) ? x.verdict : "unknown") as Signal["verdict"],
+                note: String(x.note ?? "").slice(0, 240),
+              }))
+              .slice(0, 8)
+          : [],
+        strengths: Array.isArray(s.strengths)
+          ? s.strengths.map((v: any) => String(v).slice(0, 200)).slice(0, 5)
+          : [],
+        gaps: Array.isArray(s.gaps)
+          ? s.gaps.map((v: any) => String(v).slice(0, 200)).slice(0, 5)
+          : [],
       }))
       .filter((s) => data.leadIds.includes(s.leadId));
 
