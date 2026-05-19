@@ -93,10 +93,12 @@ function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
   const enrichFn = useServerFn(enrichLead);
+  const genScriptBulkFn = useServerFn(generateCallScript);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"email" | "calling">("email");
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
     total: number;
