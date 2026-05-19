@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      calls: {
+        Row: {
+          created_at: string
+          duration_sec: number | null
+          ended_at: string | null
+          from_number: string | null
+          id: string
+          lead_id: string
+          list_id: string
+          notes: string | null
+          outcome: string | null
+          phone_account_id: string | null
+          recording_duration_sec: number | null
+          recording_sid: string | null
+          recording_url: string | null
+          scorecard: Json | null
+          started_at: string
+          status: string
+          to_number: string
+          transcript: Json | null
+          twilio_call_sid: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_sec?: number | null
+          ended_at?: string | null
+          from_number?: string | null
+          id?: string
+          lead_id: string
+          list_id: string
+          notes?: string | null
+          outcome?: string | null
+          phone_account_id?: string | null
+          recording_duration_sec?: number | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          scorecard?: Json | null
+          started_at?: string
+          status?: string
+          to_number: string
+          transcript?: Json | null
+          twilio_call_sid?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_sec?: number | null
+          ended_at?: string | null
+          from_number?: string | null
+          id?: string
+          lead_id?: string
+          list_id?: string
+          notes?: string | null
+          outcome?: string | null
+          phone_account_id?: string | null
+          recording_duration_sec?: number | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          scorecard?: Json | null
+          started_at?: string
+          status?: string
+          to_number?: string
+          transcript?: Json | null
+          twilio_call_sid?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calls_phone_account_id_fkey"
+            columns: ["phone_account_id"]
+            isOneToOne: false
+            referencedRelation: "user_phone_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           city: string | null
@@ -89,9 +176,61 @@ export type Database = {
         }
         Relationships: []
       }
+      list_call_configs: {
+        Row: {
+          consent_disclaimer: string
+          created_at: string
+          extra_instructions: string | null
+          list_id: string
+          objection_notes: string | null
+          objectives: string | null
+          personalization_level: string
+          record_calls: boolean
+          script_template: string | null
+          tone: string
+          updated_at: string
+        }
+        Insert: {
+          consent_disclaimer?: string
+          created_at?: string
+          extra_instructions?: string | null
+          list_id: string
+          objection_notes?: string | null
+          objectives?: string | null
+          personalization_level?: string
+          record_calls?: boolean
+          script_template?: string | null
+          tone?: string
+          updated_at?: string
+        }
+        Update: {
+          consent_disclaimer?: string
+          created_at?: string
+          extra_instructions?: string | null
+          list_id?: string
+          objection_notes?: string | null
+          objectives?: string | null
+          personalization_level?: string
+          record_calls?: boolean
+          script_template?: string | null
+          tone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_call_configs_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: true
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       list_leads: {
         Row: {
+          call_script: Json | null
           created_at: string
+          do_not_call: boolean
           email_body: string | null
           email_subject: string | null
           emails: Json | null
@@ -103,7 +242,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          call_script?: Json | null
           created_at?: string
+          do_not_call?: boolean
           email_body?: string | null
           email_subject?: string | null
           emails?: Json | null
@@ -115,7 +256,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          call_script?: Json | null
           created_at?: string
+          do_not_call?: boolean
           email_body?: string | null
           email_subject?: string | null
           emails?: Json | null
@@ -329,6 +472,48 @@ export type Database = {
           status?: string
           total_batches?: number
           total_leads?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_phone_accounts: {
+        Row: {
+          created_at: string
+          from_number: string
+          id: string
+          is_default: boolean
+          label: string
+          twilio_account_sid: string
+          twilio_api_key_secret: string
+          twilio_api_key_sid: string
+          twilio_twiml_app_sid: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_number: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          twilio_account_sid: string
+          twilio_api_key_secret: string
+          twilio_api_key_sid: string
+          twilio_twiml_app_sid?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_number?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          twilio_account_sid?: string
+          twilio_api_key_secret?: string
+          twilio_api_key_sid?: string
+          twilio_twiml_app_sid?: string | null
           updated_at?: string
           user_id?: string
         }
