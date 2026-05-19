@@ -190,6 +190,7 @@ function PeoplePage() {
 
   useEffect(() => setPage(0), [filters]);
 
+  const queryKey = useMemo(() => ["leads", filters, page], [filters, page]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey,
