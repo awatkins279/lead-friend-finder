@@ -58,7 +58,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Target, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
+
 import {
   createScoringJob as createScoringJobFn,
   processNextBatch as processNextBatchFn,
