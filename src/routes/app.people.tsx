@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,12 @@ import { Slider } from "@/components/ui/slider";
 import { Target, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
+import {
+  createScoringJob as createScoringJobFn,
+  processNextBatch as processNextBatchFn,
+  getJobSnapshot as getJobSnapshotFn,
+  cancelScoringJob as cancelScoringJobFn,
+} from "@/lib/scoring-jobs.functions";
 
 type Signal = { label: string; verdict: "strong" | "partial" | "weak" | "unknown"; note: string };
 type ScoreInfo = {
@@ -166,11 +172,23 @@ function PeoplePage() {
   const [scoringContext, setScoringContext] = useState("");
   const [scores, setScores] = useState<Map<string, ScoreInfo>>(new Map());
   const [minScore, setMinScore] = useState(0);
-  const [scoringBusy, setScoringBusy] = useState(false);
-  const scoreLeadsCall = useServerFn(scoreLeadsFn);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [jobProgress, setJobProgress] = useState<{
+    totalBatches: number;
+    completedBatches: number;
+    failedBatches: number;
+    scoredLeads: number;
+    totalLeads: number;
+    status: string;
+  } | null>(null);
+  const scoringBusy = jobProgress?.status === "running";
+  const scoreLeadsCall = useServerFn(scoreLeadsFn); // kept for backward compat
+  const createScoringJobCall = useServerFn(createScoringJobFn);
+  const processNextBatchCall = useServerFn(processNextBatchFn);
+  const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
+  const cancelScoringJobCall = useServerFn(cancelScoringJobFn);
 
   useEffect(() => setPage(0), [filters]);
-
 
   const queryKey = useMemo(() => ["leads", filters, page], [filters, page]);
 
@@ -317,82 +335,170 @@ function PeoplePage() {
 
   const hasSelection = picked.size > 0;
 
-  // Score in small AI batches but run many batches in parallel for throughput.
-  const BATCH_SIZE = 12;     // leads per AI request (keeps JSON reliable)
-  const CONCURRENCY = 5;     // parallel requests in flight
+  // ---- Background scoring jobs ----
+  // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
+  // re-opening the page resumes via the localStorage handle.
+  const WORKER_COUNT = 8;
+  const STORAGE_KEY = "active-scoring-job-id";
 
-  const runScoringWaves = async (ids: string[]) => {
-    const batches: string[][] = [];
-    for (let i = 0; i < ids.length; i += BATCH_SIZE) batches.push(ids.slice(i, i + BATCH_SIZE));
-    let done = 0;
-    let failed = 0;
-    for (let i = 0; i < batches.length; i += CONCURRENCY) {
-      const wave = batches.slice(i, i + CONCURRENCY);
-      const results = await Promise.allSettled(
-        wave.map((slice) =>
-          scoreLeadsCall({ data: { leadIds: slice, context: scoringContext.trim() } })
-        )
+  const mergeScoreResults = (
+    rows: Array<{ leadId: string; score: number; reasoning: string; signals: any; strengths: any; gaps: any }>,
+  ) => {
+    if (rows.length === 0) return;
+    setScores((prev) => {
+      const next = new Map(prev);
+      rows.forEach((s) =>
+        next.set(s.leadId, {
+          score: s.score,
+          reasoning: s.reasoning,
+          signals: s.signals ?? [],
+          strengths: s.strengths ?? [],
+          gaps: s.gaps ?? [],
+        }),
       );
-      for (const r of results) {
-        if (r.status === "fulfilled") {
-          const out = r.value.scores;
-          setScores((prev) => {
-            const next = new Map(prev);
-            out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
-            return next;
-          });
-          done += out.length;
-        } else {
-          failed += 1;
+      return next;
+    });
+  };
+
+  const cancelTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+
+  const runWorkers = async (jobId: string, totalBatches: number) => {
+    cancelTokenRef.current = { cancelled: false };
+    const token = cancelTokenRef.current;
+
+    const workerLoop = async () => {
+      while (!token.cancelled) {
+        try {
+          const res = await processNextBatchCall({ data: { jobId } });
+          if (!res.claimed) break; // queue empty
+          if (res.results && res.results.length > 0) mergeScoreResults(res.results);
+          if (res.job) {
+            setJobProgress({
+              totalBatches: res.job.total_batches,
+              completedBatches: res.job.completed_batches,
+              failedBatches: res.job.failed_batches,
+              scoredLeads: res.job.scored_leads,
+              totalLeads: res.job.total_leads,
+              status: res.job.status,
+            });
+            if (res.job.status !== "running") break;
+          }
+        } catch (e) {
+          // brief backoff on network/server hiccup
+          await new Promise((r) => setTimeout(r, 1500));
         }
       }
-    }
-    return { done, failed };
-  };
+    };
 
-  const scorePageLeads = async () => {
-    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
-      toast.error("Tell the AI what you're selling (min 10 chars)");
-      return;
-    }
-    const ids = rows.map((r) => r.id).filter((id) => !scores.has(id));
-    if (ids.length === 0) {
-      toast.info("All visible leads are already scored");
-      return;
-    }
-    setScoringBusy(true);
+    await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
+
+    // Final snapshot to sync counters + status
     try {
-      const { done, failed } = await runScoringWaves(ids);
-      if (done > 0) toast.success(`Scored ${done} leads${failed ? ` (${failed} batch${failed > 1 ? "es" : ""} failed)` : ""}`);
-      else toast.error("Scoring failed");
-    } catch (e: any) {
-      toast.error(e.message ?? "Scoring failed");
-    } finally {
-      setScoringBusy(false);
-    }
+      const snap = await getJobSnapshotCall({ data: { jobId } });
+      setJobProgress({
+        totalBatches: snap.job.total_batches,
+        completedBatches: snap.job.completed_batches,
+        failedBatches: snap.job.failed_batches,
+        scoredLeads: snap.job.scored_leads,
+        totalLeads: snap.job.total_leads,
+        status: snap.job.status,
+      });
+      if (snap.job.status !== "running") {
+        localStorage.removeItem(STORAGE_KEY);
+        setActiveJobId(null);
+        if (!token.cancelled) {
+          const failed = snap.job.failed_batches;
+          if (snap.job.status === "completed") {
+            toast.success(`Scored ${snap.job.scored_leads.toLocaleString()} of ${snap.job.total_leads.toLocaleString()} leads`);
+          } else if (snap.job.status === "completed_with_errors") {
+            toast.warning(`Scored ${snap.job.scored_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed`);
+          }
+        }
+      }
+    } catch {}
   };
 
-  const scoreSelectedLeads = async () => {
+  const startScoringJob = async (ids: string[]) => {
     if (!scoringContext.trim() || scoringContext.trim().length < 10) {
       toast.error("Tell the AI what you're selling (min 10 chars)");
       return;
     }
-    const allIds = Array.from(picked).filter((id) => !scores.has(id));
-    if (allIds.length === 0) {
+    if (scoringBusy) {
+      toast.info("A scoring job is already running");
+      return;
+    }
+    const todo = ids.filter((id) => !scores.has(id));
+    if (todo.length === 0) {
       toast.info("All selected leads are already scored");
       return;
     }
-    setScoringBusy(true);
     try {
-      const { done, failed } = await runScoringWaves(allIds);
-      if (done > 0) toast.success(`Scored ${done} leads${failed ? ` (${failed} batch${failed > 1 ? "es" : ""} failed)` : ""}`);
-      else toast.error("Scoring failed");
+      const { jobId, totalBatches, totalLeads } = await createScoringJobCall({
+        data: { leadIds: todo, context: scoringContext.trim() },
+      });
+      localStorage.setItem(STORAGE_KEY, jobId);
+      setActiveJobId(jobId);
+      setJobProgress({
+        totalBatches,
+        completedBatches: 0,
+        failedBatches: 0,
+        scoredLeads: 0,
+        totalLeads,
+        status: "running",
+      });
+      toast.success(`Queued ${totalLeads.toLocaleString()} leads — scoring in background`);
+      // fire-and-forget: workers update state as they go
+      void runWorkers(jobId, totalBatches);
     } catch (e: any) {
-      toast.error(e.message ?? "Scoring failed");
-    } finally {
-      setScoringBusy(false);
+      toast.error(e.message ?? "Failed to start scoring job");
     }
   };
+
+  const scorePageLeads = () => startScoringJob(rows.map((r) => r.id));
+  const scoreSelectedLeads = () => startScoringJob(Array.from(picked));
+
+  const cancelScoring = async () => {
+    if (!activeJobId) return;
+    cancelTokenRef.current.cancelled = true;
+    try {
+      await cancelScoringJobCall({ data: { jobId: activeJobId } });
+    } catch {}
+    localStorage.removeItem(STORAGE_KEY);
+    setActiveJobId(null);
+    setJobProgress((p) => (p ? { ...p, status: "cancelled" } : null));
+    toast.info("Scoring cancelled");
+  };
+
+  // Resume any active job on mount (e.g. user closed tab mid-run)
+  useEffect(() => {
+    const jobId = localStorage.getItem(STORAGE_KEY);
+    if (!jobId) return;
+    (async () => {
+      try {
+        const snap = await getJobSnapshotCall({ data: { jobId } });
+        if (snap.results.length > 0) mergeScoreResults(snap.results);
+        setJobProgress({
+          totalBatches: snap.job.total_batches,
+          completedBatches: snap.job.completed_batches,
+          failedBatches: snap.job.failed_batches,
+          scoredLeads: snap.job.scored_leads,
+          totalLeads: snap.job.total_leads,
+          status: snap.job.status,
+        });
+        if (snap.job.status === "running") {
+          setActiveJobId(jobId);
+          void runWorkers(jobId, snap.job.total_batches);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
 
 
   const eligibleIds = useMemo(
@@ -547,6 +653,51 @@ function PeoplePage() {
                 Score selected
               </Button>
             </div>
+
+            {jobProgress && (
+              <div className="mt-3 rounded-md border bg-background p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">
+                    {jobProgress.status === "running" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+                    {jobProgress.status === "running"
+                      ? "Scoring in background…"
+                      : jobProgress.status === "completed"
+                        ? "Scoring complete"
+                        : jobProgress.status === "completed_with_errors"
+                          ? "Done (some errors)"
+                          : jobProgress.status === "cancelled"
+                            ? "Cancelled"
+                            : jobProgress.status}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {jobProgress.scoredLeads.toLocaleString()} / {jobProgress.totalLeads.toLocaleString()}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${jobProgress.totalBatches === 0 ? 0 : Math.round(((jobProgress.completedBatches + jobProgress.failedBatches) / jobProgress.totalBatches) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>
+                    {jobProgress.completedBatches + jobProgress.failedBatches} / {jobProgress.totalBatches} batches
+                    {jobProgress.failedBatches > 0 ? ` · ${jobProgress.failedBatches} failed` : ""}
+                  </span>
+                  {jobProgress.status === "running" && activeJobId && (
+                    <button onClick={cancelScoring} className="text-destructive hover:underline">
+                      Cancel
+                    </button>
+                  )}
+                </div>
+                {jobProgress.status === "running" && (
+                  <p className="mt-1 text-[10px] text-muted-foreground">Safe to close the tab — progress is saved.</p>
+                )}
+              </div>
+            )}
+
 
             <div className="mt-4">
               <div className="mb-1.5 flex items-center justify-between text-xs">
