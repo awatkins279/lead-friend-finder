@@ -146,6 +146,29 @@ function ListDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list?.id]);
 
+  // Load calling config so the dialog opens with existing values
+  const loadCallCfg = async () => {
+    const { data } = await supabase
+      .from("list_call_configs")
+      .select("*")
+      .eq("list_id", listId)
+      .maybeSingle();
+    if (data) {
+      setCallCfg({
+        script_template: data.script_template,
+        tone: data.tone,
+        objectives: data.objectives,
+        objection_notes: data.objection_notes,
+        personalization_level: data.personalization_level,
+        record_calls: data.record_calls,
+        consent_disclaimer: data.consent_disclaimer,
+        extra_instructions: data.extra_instructions,
+      });
+    }
+  };
+  useEffect(() => { loadCallCfg(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [listId]);
+
+
   const runOne = async (leadId: string) => {
     if (!isConfigured) {
       toast.error("Set up the campaign first");
