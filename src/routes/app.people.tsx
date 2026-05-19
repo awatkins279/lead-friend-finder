@@ -58,7 +58,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Target, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { scoreLeads as scoreLeadsFn } from "@/lib/score.functions";
+
 import {
   createScoringJob as createScoringJobFn,
   processNextBatch as processNextBatchFn,
@@ -182,7 +182,7 @@ function PeoplePage() {
     status: string;
   } | null>(null);
   const scoringBusy = jobProgress?.status === "running";
-  const scoreLeadsCall = useServerFn(scoreLeadsFn); // kept for backward compat
+  
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);

@@ -17,7 +17,7 @@ export type ScoreRow = {
   gaps: string[];
 };
 
-const BATCH_SIZE = 12;
+const BATCH_SIZE = 8;
 const MAX_LEADS_PER_JOB = 20000;
 
 // ---------- createScoringJob ----------
@@ -363,7 +363,7 @@ ${JSON.stringify(compact)}`;
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 8000,
+      max_tokens: 16000,
     }),
   });
 
