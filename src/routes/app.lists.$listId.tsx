@@ -254,8 +254,16 @@ function ListDetailPage() {
       setCallConfigOpen(true);
       return;
     }
-    const pending = (rows ?? []).filter((r) => !r.call_script);
-    if (pending.length === 0) return toast.info("All prospects already have call scripts");
+    const targets = rows ?? [];
+    if (targets.length === 0) return toast.info("No prospects in this list");
+
+    const hasExisting = targets.some((r) => !!r.call_script);
+    const msg = hasExisting
+      ? `This will REWRITE existing call scripts for all ${targets.length} prospects. Continue?`
+      : `Generate call scripts for all ${targets.length} prospects?`;
+    if (!window.confirm(msg)) return;
+
+    const pending = targets;
 
     const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
     setProgress({ ...state });
