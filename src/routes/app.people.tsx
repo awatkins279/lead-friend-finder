@@ -334,7 +334,7 @@ function PeoplePage() {
       });
       setScores((prev) => {
         const next = new Map(prev);
-        out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning }));
+        out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
         return next;
       });
       toast.success(`Scored ${out.length} leads`);
@@ -365,7 +365,7 @@ function PeoplePage() {
         });
         setScores((prev) => {
           const next = new Map(prev);
-          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning }));
+          out.forEach((s) => next.set(s.leadId, { score: s.score, reasoning: s.reasoning, signals: s.signals ?? [], strengths: s.strengths ?? [], gaps: s.gaps ?? [] }));
           return next;
         });
         done += out.length;
