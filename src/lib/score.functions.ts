@@ -7,7 +7,20 @@ const inputSchema = z.object({
   context: z.string().min(10).max(4000),
 });
 
-type ScoreRow = { leadId: string; score: number; reasoning: string };
+type Signal = {
+  label: string;
+  verdict: "strong" | "partial" | "weak" | "unknown";
+  note: string;
+};
+
+type ScoreRow = {
+  leadId: string;
+  score: number;
+  reasoning: string;
+  signals: Signal[];
+  strengths: string[];
+  gaps: string[];
+};
 
 export const scoreLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -44,7 +57,27 @@ export const scoreLeads = createServerFn({ method: "POST" })
     const userPrompt = `SELLER CONTEXT (what we're selling / who we want):
 ${data.context}
 
-Score every prospect below. Return JSON: { "scores": [ { "leadId": "...", "score": 0-100, "reasoning": "1 sentence why" }, ... ] }. One entry per prospect, same ids.
+For every prospect, return a detailed IPP qualification. Return JSON exactly:
+{
+  "scores": [
+    {
+      "leadId": "...",
+      "score": 0-100,
+      "reasoning": "1-2 sentence overall verdict",
+      "signals": [
+        { "label": "Industry fit", "verdict": "strong|partial|weak|unknown", "note": "1 short sentence with evidence" },
+        { "label": "Company size fit", "verdict": "...", "note": "..." },
+        { "label": "Role relevance", "verdict": "...", "note": "..." },
+        { "label": "Pain point alignment", "verdict": "...", "note": "..." },
+        { "label": "Tech / buying signal", "verdict": "...", "note": "..." },
+        { "label": "Geography / timing", "verdict": "...", "note": "..." }
+      ],
+      "strengths": ["2-3 concrete reasons this prospect IS a fit"],
+      "gaps": ["1-3 concrete reasons they may NOT be a fit, or 'none' if perfect"]
+    }
+  ]
+}
+Use only "strong" / "partial" / "weak" / "unknown" for verdicts. Cite evidence from the prospect's title, industry, headcount, tech, or description. Do not inflate.
 
 PROSPECTS:
 ${JSON.stringify(compact)}`;
@@ -81,11 +114,28 @@ ${JSON.stringify(compact)}`;
       throw new Error("AI returned invalid JSON");
     }
 
+    const allowed: Signal["verdict"][] = ["strong", "partial", "weak", "unknown"];
     const scores: ScoreRow[] = (parsed.scores ?? [])
-      .map((s) => ({
+      .map((s: any) => ({
         leadId: String(s.leadId),
         score: Math.max(0, Math.min(100, Math.round(Number(s.score) || 0))),
         reasoning: String(s.reasoning ?? "").slice(0, 400),
+        signals: Array.isArray(s.signals)
+          ? s.signals
+              .filter((x: any) => x && typeof x === "object")
+              .map((x: any) => ({
+                label: String(x.label ?? "").slice(0, 60),
+                verdict: (allowed.includes(x.verdict) ? x.verdict : "unknown") as Signal["verdict"],
+                note: String(x.note ?? "").slice(0, 240),
+              }))
+              .slice(0, 8)
+          : [],
+        strengths: Array.isArray(s.strengths)
+          ? s.strengths.map((v: any) => String(v).slice(0, 200)).slice(0, 5)
+          : [],
+        gaps: Array.isArray(s.gaps)
+          ? s.gaps.map((v: any) => String(v).slice(0, 200)).slice(0, 5)
+          : [],
       }))
       .filter((s) => data.leadIds.includes(s.leadId));
 
