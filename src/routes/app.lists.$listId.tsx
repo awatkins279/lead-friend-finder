@@ -23,6 +23,16 @@ import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { generateCallScript, type CallScript } from "@/lib/calls.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
@@ -99,6 +109,7 @@ function ListDetailPage() {
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"email" | "calling">("email");
+  const [confirmScripts, setConfirmScripts] = useState(false);
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
     total: number;
@@ -243,7 +254,7 @@ function ListDetailPage() {
     }
   };
 
-  const runAllScripts = async () => {
+  const requestRunAllScripts = async () => {
     const callCfgRow = await supabase
       .from("list_call_configs")
       .select("list_id")
@@ -254,16 +265,15 @@ function ListDetailPage() {
       setCallConfigOpen(true);
       return;
     }
-    const targets = rows ?? [];
-    if (targets.length === 0) return toast.info("No prospects in this list");
+    if (!rows || rows.length === 0) return toast.info("No prospects in this list");
+    setConfirmScripts(true);
+  };
 
-    const hasExisting = targets.some((r) => !!r.call_script);
-    const msg = hasExisting
-      ? `This will REWRITE existing call scripts for all ${targets.length} prospects. Continue?`
-      : `Generate call scripts for all ${targets.length} prospects?`;
-    if (!window.confirm(msg)) return;
+  const runAllScripts = async () => {
+    setConfirmScripts(false);
+    const pending = rows ?? [];
+    if (pending.length === 0) return;
 
-    const pending = targets;
 
     const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
     setProgress({ ...state });
@@ -393,7 +403,7 @@ function ListDetailPage() {
               <Headphones className="mr-2 h-4 w-4" /> Calling config
             </Button>
             <Button
-              onClick={activeTab === "calling" ? runAllScripts : runAll}
+              onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
               disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
             >
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
@@ -545,6 +555,21 @@ function ListDetailPage() {
         </TabsContent>
       </Tabs>
 
+
+      <AlertDialog open={confirmScripts} onOpenChange={setConfirmScripts}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate all call scripts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will rewrite the existing call scripts for all {rows?.length ?? 0} prospects in this campaign using your current Calling config. Any edits made to individual scripts will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={runAllScripts}>Rewrite all scripts</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <LeadDrawer
         listId={listId}
