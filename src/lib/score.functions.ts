@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const inputSchema = z.object({
-  leadIds: z.array(z.string().min(1)).min(1).max(15),
+  leadIds: z.array(z.string().min(1)).min(1).max(25),
   context: z.string().min(10).max(4000),
 });
 
