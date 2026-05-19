@@ -512,7 +512,7 @@ function LeadDrawer({
                 )}
               </div>
 
-              {row.score != null && (
+              {row.score != null ? (
                 <div>
                   <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Fit score: {row.score}/100
@@ -521,7 +521,14 @@ function LeadDrawer({
                     <p className="text-muted-foreground">{row.research.reasoning}</p>
                   )}
                 </div>
+              ) : (
+                <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                  Not scored yet — click <strong>Generate</strong> to run AI research and IPP analysis.
+                </div>
               )}
+
+              <IppBreakdownPanel research={row.research} scored={row.score != null} />
+
 
               {row.research?.pain_points && row.research.pain_points.length > 0 && (
                 <div>
