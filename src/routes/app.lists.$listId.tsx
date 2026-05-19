@@ -281,7 +281,7 @@ function ListDetailPage() {
         state.currentName = name;
         setProgress({ ...state });
         try {
-          await genScriptBulkFn({ data: { listId, leadId: r.lead_id, force: false } });
+          await genScriptBulkFn({ data: { listId, leadId: r.lead_id, force: true } });
         } catch (e: any) {
           console.error("script generation failed", r.lead_id, e);
         }
