@@ -1345,8 +1345,13 @@ function CallWorkstation({
                 <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
                   <div className="space-y-5 lg:col-span-2">
                     <CallSection title="Opener" tone="primary">
-                      <p className="text-lg leading-relaxed">{activeScript.opener}</p>
+                      <p className="whitespace-pre-wrap text-lg leading-relaxed">{activeScript.opener}</p>
                     </CallSection>
+                    {activeScript.talk_track?.map((s, i) => (
+                      <CallSection key={i} title={s.heading}>
+                        <p className="whitespace-pre-wrap text-lg leading-relaxed">{s.body}</p>
+                      </CallSection>
+                    ))}
                     <CallSection title="Problem questions">
                       <BigList items={activeScript.problem_questions} />
                     </CallSection>
