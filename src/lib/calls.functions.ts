@@ -82,9 +82,15 @@ PROSPECT:
 - Location: ${[lead.city, lead.state, lead.country].filter(Boolean).join(", ")}
 - About company: ${(lead.org_description ?? "").slice(0, 400)}
 
+${cfg?.script_template ? `CRITICAL: The user provided a base script template above. Your job is to REWRITE THAT FULL TEMPLATE, line-by-line, personalized for THIS prospect — keep its structure, talking points, stories, statistics, and ordering. Do NOT just extract questions from it. Output the personalized full script in "talk_track" as ordered sections that mirror the template's flow. Then also pull out the NEPQ-style questions into the question arrays so the rep has them isolated for quick reference.` : `No template was provided — generate a full talk-track of your own in "talk_track" with sections like "Pattern interrupt", "Reason for the call", "Pain framing", "Bridge to solution", "Story / proof", etc. Don't just output an opener + questions + close — write the actual things the rep should SAY in between.`}
+
 Return JSON exactly:
 {
   "opener": "1-2 sentence pattern-interrupt opener that names them, drops tonality, and asks permission",
+  "talk_track": [
+    {"heading": "Section name (mirror the template's flow, or use NEPQ phases if no template)", "body": "The actual words the rep says — full sentences, conversational, personalized to THIS prospect. Multiple paragraphs ok. This is the meat of the script."},
+    {"heading": "...", "body": "..."}
+  ],
   "problem_questions": ["3-5 questions that surface pain in their world — phrased so THEY say the problem"],
   "solution_questions": ["2-3 questions getting them to describe what 'fixed' looks like in their words"],
   "consequence_questions": ["2-3 questions about the cost of doing nothing"],
@@ -99,7 +105,7 @@ Return JSON exactly:
   ]
 }
 
-Every line should feel like it was written for THIS prospect — reference their title, company, or industry naturally. No corporate jargon. No "I wanted to reach out". No "synergy". Conversational, like a peer-to-peer call.`;
+Every line should feel like it was written for THIS prospect — reference their title, company, or industry naturally. No corporate jargon. No "I wanted to reach out". No "synergy". Conversational, like a peer-to-peer call. The talk_track sections should be SUBSTANTIAL — this is the actual script, not bullet points.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
