@@ -17,7 +17,7 @@ export type ScoreRow = {
   gaps: string[];
 };
 
-const BATCH_SIZE = 8;
+const BATCH_SIZE = 6;
 const MAX_LEADS_PER_JOB = 20000;
 
 // ---------- createScoringJob ----------
@@ -357,7 +357,7 @@ ${JSON.stringify(compact)}`;
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash-lite",
       messages: [
         { role: "system", content: system },
         { role: "user", content: userPrompt },
