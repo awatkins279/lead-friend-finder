@@ -743,9 +743,15 @@ function PeoplePage() {
         mode="campaign"
         open={campaignOpen}
         onOpenChange={setCampaignOpen}
-        leadIds={eligibleIds}
+        leadIds={Array.from(picked)}
+        leadScores={
+          new Map(
+            Array.from(picked).map((id) => [id, scores.get(id)?.score ?? null] as const),
+          )
+        }
         onAdded={() => setPicked(new Set())}
       />
+
 
 
 
