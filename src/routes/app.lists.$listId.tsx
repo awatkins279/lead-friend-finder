@@ -93,10 +93,12 @@ function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
   const enrichFn = useServerFn(enrichLead);
+  const genScriptBulkFn = useServerFn(generateCallScript);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"email" | "calling">("email");
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
     total: number;
@@ -241,6 +243,59 @@ function ListDetailPage() {
     }
   };
 
+  const runAllScripts = async () => {
+    const callCfgRow = await supabase
+      .from("list_call_configs")
+      .select("list_id")
+      .eq("list_id", listId)
+      .maybeSingle();
+    if (!callCfgRow.data) {
+      toast.error("Set up the calling config first");
+      setCallConfigOpen(true);
+      return;
+    }
+    const pending = (rows ?? []).filter((r) => !r.call_script);
+    if (pending.length === 0) return toast.info("All prospects already have call scripts");
+
+    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    setProgress({ ...state });
+
+    const CONCURRENCY = 4;
+    let cursor = 0;
+
+    const worker = async () => {
+      while (true) {
+        if (state.cancel) return;
+        const i = cursor++;
+        if (i >= pending.length) return;
+        const r = pending[i];
+        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+        state.currentName = name;
+        setProgress({ ...state });
+        try {
+          await genScriptBulkFn({ data: { listId, leadId: r.lead_id, force: false } });
+        } catch (e: any) {
+          console.error("script generation failed", r.lead_id, e);
+        }
+        state.done += 1;
+        setProgress({ ...state });
+        qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()),
+    );
+
+    setProgress((p) => (p?.cancel ? null : p));
+    if (!state.cancel) {
+      toast.success(`Generated call scripts for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      setTimeout(() => setProgress(null), 1500);
+    } else {
+      toast.info(`Stopped after ${state.done} of ${state.total}`);
+    }
+  };
+
   const cancelRunAll = () => {
     setProgress((p) => (p ? { ...p, cancel: true } : p));
   };
@@ -329,15 +384,22 @@ function ListDetailPage() {
             <Button variant="outline" onClick={() => setCallConfigOpen(true)}>
               <Headphones className="mr-2 h-4 w-4" /> Calling config
             </Button>
-            <Button onClick={runAll} disabled={!rows || rows.length === 0 || !isConfigured || isRunning}>
+            <Button
+              onClick={activeTab === "calling" ? runAllScripts : runAll}
+              disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
+            >
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              {isRunning ? "Generating…" : "Generate all sequences"}
+              {isRunning
+                ? "Generating…"
+                : activeTab === "calling"
+                  ? "Generate all call scripts"
+                  : "Generate all sequences"}
             </Button>
           </div>
         </div>
       </header>
 
-      <Tabs defaultValue="email" className="flex flex-1 flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
         <div className="border-b bg-background px-8">
           <TabsList className="h-11 bg-transparent p-0">
             <TabsTrigger
