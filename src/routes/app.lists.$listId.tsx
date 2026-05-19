@@ -908,8 +908,13 @@ function CallModeView({
           <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto p-8 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <CallSection title="Opener" tone="primary">
-                <p className="text-lg leading-relaxed">{script.opener}</p>
+                <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.opener}</p>
               </CallSection>
+              {script.talk_track?.map((s, i) => (
+                <CallSection key={i} title={s.heading}>
+                  <p className="whitespace-pre-wrap text-lg leading-relaxed">{s.body}</p>
+                </CallSection>
+              ))}
               <CallSection title="Problem questions">
                 <BigList items={script.problem_questions} />
               </CallSection>
