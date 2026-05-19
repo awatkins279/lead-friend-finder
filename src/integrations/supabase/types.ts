@@ -245,11 +245,107 @@ export type Database = {
         }
         Relationships: []
       }
+      scoring_job_batches: {
+        Row: {
+          attempts: number
+          created_at: string
+          error: string | null
+          id: string
+          job_id: string
+          lead_ids: string[]
+          results: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id: string
+          lead_ids: string[]
+          results?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id?: string
+          lead_ids?: string[]
+          results?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scoring_job_batches_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scoring_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scoring_jobs: {
+        Row: {
+          completed_batches: number
+          context: string
+          created_at: string
+          error: string | null
+          failed_batches: number
+          id: string
+          scored_leads: number
+          status: string
+          total_batches: number
+          total_leads: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_batches?: number
+          context: string
+          created_at?: string
+          error?: string | null
+          failed_batches?: number
+          id?: string
+          scored_leads?: number
+          status?: string
+          total_batches?: number
+          total_leads?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_batches?: number
+          context?: string
+          created_at?: string
+          error?: string | null
+          failed_batches?: number
+          id?: string
+          scored_leads?: number
+          status?: string
+          total_batches?: number
+          total_leads?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      claim_scoring_batch: {
+        Args: { p_job_id: string }
+        Returns: {
+          id: string
+          lead_ids: string[]
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
