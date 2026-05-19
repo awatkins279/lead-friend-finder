@@ -699,3 +699,72 @@ function GenerationProgress({
   );
 }
 
+
+type IppSignal = NonNullable<NonNullable<Row["research"]>["ipp_breakdown"]>[number];
+
+const verdictStyles: Record<IppSignal["verdict"], string> = {
+  strong: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
+  partial: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
+  weak: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900",
+  unknown: "bg-muted text-muted-foreground border-border",
+};
+
+const verdictDot: Record<IppSignal["verdict"], string> = {
+  strong: "bg-emerald-500",
+  partial: "bg-amber-500",
+  weak: "bg-rose-500",
+  unknown: "bg-muted-foreground/40",
+};
+
+function IppTagStrip({ research, scored }: { research: Row["research"]; scored: boolean }) {
+  const items = research?.ipp_breakdown ?? [];
+  if (!scored) {
+    return (
+      <div className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+        IPP · Not scored
+      </div>
+    );
+  }
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {items.slice(0, 5).map((s, i) => (
+        <span
+          key={i}
+          title={s.note}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${verdictStyles[s.verdict]}`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${verdictDot[s.verdict]}`} />
+          {s.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function IppBreakdownPanel({ research, scored }: { research: Row["research"]; scored: boolean }) {
+  if (!scored) return null;
+  const items = research?.ipp_breakdown ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        IPP match breakdown
+      </div>
+      <div className="space-y-2">
+        {items.map((s, i) => (
+          <div key={i} className="rounded-md border p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{s.label}</span>
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${verdictStyles[s.verdict]}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${verdictDot[s.verdict]}`} />
+                {s.verdict}
+              </span>
+            </div>
+            {s.note && <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
