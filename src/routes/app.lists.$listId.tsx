@@ -935,9 +935,9 @@ function CallModeView({
               <span className="text-xl">{leadName}</span>
               <span className="text-sm font-normal text-muted-foreground">{leadSub}</span>
               {phone && (
-                <a href={`tel:${phone}`} className="ml-auto inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+                <span className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Phone className="h-4 w-4" /> {phone}
-                </a>
+                </span>
               )}
             </DialogTitle>
           </DialogHeader>
