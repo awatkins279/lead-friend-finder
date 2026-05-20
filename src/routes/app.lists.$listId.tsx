@@ -1188,6 +1188,7 @@ function CallWorkstation({
   const genScriptFn = useServerFn(generateCallScript);
   const getTokenFn = useServerFn(getTwilioToken);
   const startCallFn = useServerFn(startCall);
+  const startRingOutFn = useServerFn(startRingOutCall);
   const endCallFn = useServerFn(endCall);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
@@ -1195,8 +1196,21 @@ function CallWorkstation({
   const [outcomeBusy, setOutcomeBusy] = useState(false);
   const [notes, setNotes] = useState("");
 
-  // ---- In-app calling (Twilio Voice SDK) ----
-  const [phoneAccount, setPhoneAccount] = useState<{ id: string; label: string; from_number: string | null } | null>(null);
+  // ---- Phone accounts (filtered to fully-configured / ready) ----
+  type ReadyAccount = {
+    id: string;
+    label: string;
+    provider: string;
+    from_number: string | null;
+    credentials: Record<string, string>;
+    twilio_twiml_app_sid: string | null;
+    is_default: boolean;
+  };
+  const [readyAccounts, setReadyAccounts] = useState<ReadyAccount[]>([]);
+  const [phoneAccountId, setPhoneAccountId] = useState<string | null>(null);
+  const phoneAccount = readyAccounts.find((a) => a.id === phoneAccountId) ?? null;
+
+  // ---- In-call state ----
   const [device, setDevice] = useState<any>(null);
   const [connection, setConnection] = useState<any>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "ringing" | "in_progress" | "ending">("idle");
@@ -1204,17 +1218,26 @@ function CallWorkstation({
   const [callStart, setCallStart] = useState<number | null>(null);
   const [muted, setMuted] = useState(false);
 
-  // Load default phone account
+  // Load all phone accounts, keep only the "ready" ones (same rule as Sending Accounts)
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("user_phone_accounts")
-        .select("id,label,from_number,is_default")
+        .select("id,label,provider,from_number,credentials,twilio_twiml_app_sid,is_default,created_at")
         .order("is_default", { ascending: false })
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (data) setPhoneAccount({ id: data.id, label: data.label, from_number: data.from_number });
+        .order("created_at", { ascending: true });
+      const ready = (data ?? []).filter((a: any) => {
+        const prov = a.provider ?? "twilio";
+        if (prov === "twilio") {
+          return !!a.from_number && a.from_number !== "+10000000000" && !!a.twilio_twiml_app_sid;
+        }
+        const spec = PROVIDER_SPECS[prov];
+        if (!spec) return false;
+        const creds = (a.credentials ?? {}) as Record<string, string>;
+        return spec.fields.every((f) => !f.required || !!creds[f.key]?.trim());
+      }) as ReadyAccount[];
+      setReadyAccounts(ready);
+      if (ready.length > 0) setPhoneAccountId(ready[0].id);
     })();
   }, []);
 
@@ -1227,8 +1250,8 @@ function CallWorkstation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const ensureDevice = async () => {
-    if (!phoneAccount) throw new Error("No phone account configured. Set one up in Sending Accounts.");
+  const ensureTwilioDevice = async () => {
+    if (!phoneAccount) throw new Error("No phone account selected");
     if (device) return device;
     const { token } = await getTokenFn({ data: { phoneAccountId: phoneAccount.id } });
     const { Device } = await import("@twilio/voice-sdk");
@@ -1240,10 +1263,29 @@ function CallWorkstation({
 
   const startInAppCall = async () => {
     if (!active?.lead?.phone) return toast.error("No phone number on this lead");
-    if (!phoneAccount) return toast.error("No phone account — set one up in Sending Accounts");
+    if (!phoneAccount) return toast.error("No ready phone account — finish setup in Sending Accounts");
     try {
       setCallStatus("connecting");
-      const d = await ensureDevice();
+
+      if (phoneAccount.provider === "ringcentral") {
+        // RingCentral: your phone rings first, then bridges to the prospect.
+        const { callId: newCallId } = await startRingOutFn({
+          data: {
+            listId,
+            leadId: active.lead_id,
+            phoneAccountId: phoneAccount.id,
+            toNumber: active.lead.phone,
+          },
+        });
+        setCallId(newCallId);
+        setCallStatus("ringing");
+        setCallStart(Date.now());
+        toast.success(`RingCentral is calling ${phoneAccount.credentials.ring_to_number} — answer to connect`);
+        return;
+      }
+
+      // Twilio (browser WebRTC)
+      const d = await ensureTwilioDevice();
       const { callId: newCallId } = await startCallFn({
         data: {
           listId,
