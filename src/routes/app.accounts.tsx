@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAccountDialog";
+import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/accounts")({
@@ -41,7 +42,7 @@ type PhoneProvider = {
 
 const PHONE_PROVIDERS: PhoneProvider[] = [
   { id: "twilio", name: "Twilio", description: "Programmable Voice — most popular, pay-as-you-go.", available: true },
-  { id: "ringcentral", name: "RingCentral", description: "Business phone system with RingOut API.", available: false },
+  { id: "ringcentral", name: "RingCentral", description: "Business phone system with RingOut API.", available: true },
   { id: "vonage", name: "Vonage", description: "Voice API (formerly Nexmo).", available: false },
   { id: "plivo", name: "Plivo", description: "Twilio alternative, cheaper international rates.", available: false },
   { id: "telnyx", name: "Telnyx", description: "Carrier-grade voice API.", available: false },
@@ -53,6 +54,7 @@ function AccountsPage() {
   const [accounts, setAccounts] = useState<PhoneAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<PhoneAccountRow | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -89,12 +91,23 @@ function AccountsPage() {
 
   const pickProvider = (p: PhoneProvider) => {
     if (!p.available) {
-      toast.info(`${p.name} support is coming soon. Twilio is available today.`);
+      toast.info(`${p.name} support is coming soon.`);
       return;
     }
     setPickerOpen(false);
     setEditing(null);
-    setOpen(true);
+    if (p.id === "twilio") {
+      setOpen(true);
+    } else {
+      setProviderOpen(p.id);
+    }
+  };
+
+  const openEdit = (a: PhoneAccountRow) => {
+    setEditing(a);
+    const prov = (a as unknown as { provider?: string }).provider ?? "twilio";
+    if (prov === "twilio") setOpen(true);
+    else setProviderOpen(prov);
   };
 
   const accountCount = accounts.length;
@@ -145,16 +158,25 @@ function AccountsPage() {
           ) : (
             <div className="space-y-3">
               {accounts.map((a) => {
+                const prov = ((a as unknown as { provider?: string }).provider ?? "twilio") as string;
+                const isTwilio = prov === "twilio";
                 const needsNumber = !a.from_number || a.from_number === PLACEHOLDER;
                 const needsTwiml = !a.twilio_twiml_app_sid;
-                const ready = !needsNumber && !needsTwiml;
+                const creds = ((a as unknown as { credentials?: Record<string, string> }).credentials) ?? {};
+                const spec = PROVIDER_SPECS[prov];
+                const missingCustom =
+                  !isTwilio && spec
+                    ? spec.fields.some((f) => f.required && !creds[f.key])
+                    : false;
+                const ready = isTwilio ? !needsNumber && !needsTwiml : !missingCustom;
+                const providerLabel = isTwilio ? "Twilio" : (spec?.name ?? prov);
                 return (
                   <Card key={a.id} className="flex items-center justify-between p-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-primary" />
                         <span className="font-medium">{a.label}</span>
-                        <Badge variant="outline" className="text-[10px]">Twilio</Badge>
+                        <Badge variant="outline" className="text-[10px]">{providerLabel}</Badge>
                         {ready ? (
                           <Badge variant="secondary" className="gap-1">
                             <CheckCircle2 className="h-3 w-3" /> Ready
@@ -167,21 +189,13 @@ function AccountsPage() {
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         From: {needsNumber ? <em>not set yet</em> : a.from_number}
-                        {" · "}TwiML App: {needsTwiml ? <em>not set</em> : a.twilio_twiml_app_sid}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground/70">
-                        {a.twilio_account_sid}
+                        {isTwilio && (
+                          <>{" · "}TwiML App: {needsTwiml ? <em>not set</em> : a.twilio_twiml_app_sid}</>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditing(a);
-                          setOpen(true);
-                        }}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => openEdit(a)}>
                         <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => remove(a.id)}>
@@ -263,6 +277,17 @@ function AccountsPage() {
           userId={userId}
           open={open}
           onOpenChange={setOpen}
+          onSaved={load}
+          existing={editing}
+        />
+      )}
+
+      {userId && providerOpen && PROVIDER_SPECS[providerOpen] && (
+        <ProviderAccountDialog
+          userId={userId}
+          provider={PROVIDER_SPECS[providerOpen]}
+          open={!!providerOpen}
+          onOpenChange={(o) => !o && setProviderOpen(null)}
           onSaved={load}
           existing={editing}
         />

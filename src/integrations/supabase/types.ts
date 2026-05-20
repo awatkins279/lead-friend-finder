@@ -480,42 +480,48 @@ export type Database = {
       user_phone_accounts: {
         Row: {
           created_at: string
-          from_number: string
+          credentials: Json
+          from_number: string | null
           id: string
           is_default: boolean
           label: string
-          twilio_account_sid: string
-          twilio_api_key_secret: string
-          twilio_api_key_sid: string
-          twilio_auth_token: string
+          provider: string
+          twilio_account_sid: string | null
+          twilio_api_key_secret: string | null
+          twilio_api_key_sid: string | null
+          twilio_auth_token: string | null
           twilio_twiml_app_sid: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          from_number: string
+          credentials?: Json
+          from_number?: string | null
           id?: string
           is_default?: boolean
           label?: string
-          twilio_account_sid: string
-          twilio_api_key_secret: string
-          twilio_api_key_sid: string
-          twilio_auth_token?: string
+          provider?: string
+          twilio_account_sid?: string | null
+          twilio_api_key_secret?: string | null
+          twilio_api_key_sid?: string | null
+          twilio_auth_token?: string | null
           twilio_twiml_app_sid?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
-          from_number?: string
+          credentials?: Json
+          from_number?: string | null
           id?: string
           is_default?: boolean
           label?: string
-          twilio_account_sid?: string
-          twilio_api_key_secret?: string
-          twilio_api_key_sid?: string
-          twilio_auth_token?: string
+          provider?: string
+          twilio_account_sid?: string | null
+          twilio_api_key_secret?: string | null
+          twilio_api_key_sid?: string | null
+          twilio_auth_token?: string | null
           twilio_twiml_app_sid?: string | null
           updated_at?: string
           user_id?: string

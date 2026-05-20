@@ -198,8 +198,8 @@ export const getTwilioToken = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !acc) throw new Error("Phone account not found");
-    if (!acc.twilio_twiml_app_sid) {
-      throw new Error("Phone account is missing the TwiML App SID. Add it in Sending Accounts.");
+    if (!acc.twilio_twiml_app_sid || !acc.twilio_account_sid || !acc.twilio_api_key_sid || !acc.twilio_api_key_secret) {
+      throw new Error("Twilio account is missing credentials. Edit it in Sending Accounts.");
     }
 
     const identity = data.identity ?? `rep-${userId.slice(0, 8)}`;
