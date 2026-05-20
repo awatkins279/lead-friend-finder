@@ -54,6 +54,21 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
       const take = Math.min(CHUNK, limit - ids.length);
       let q: any = supabase.from("leads").select("id");
 
+      const nameQ = (filters.name ?? "").trim();
+      if (nameQ) {
+        const parts = nameQ.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+          const first = escapeForOr(parts[0]);
+          const last = escapeForOr(parts.slice(1).join(" "));
+          q = q
+            .or(`first_name.ilike.%${first}%,last_name.ilike.%${first}%`)
+            .or(`first_name.ilike.%${last}%,last_name.ilike.%${last}%`);
+        } else {
+          const t = escapeForOr(nameQ);
+          q = q.or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+        }
+      }
+
       const titles = (filters.titles ?? []).map((t) => t.trim()).filter(Boolean);
       if (titles.length === 1) {
         q = q.ilike("title", `%${titles[0]}%`);
