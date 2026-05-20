@@ -553,6 +553,8 @@ function ListDetailPage() {
           <CallWorkstation
             listId={listId}
             rows={rows ?? []}
+            initialActiveLeadId={pendingCallLeadId}
+            onConsumedInitial={() => setPendingCallLeadId(null)}
             onOpenConfig={() => setCallConfigOpen(true)}
             onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
           />
