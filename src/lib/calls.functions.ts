@@ -117,7 +117,7 @@ Every line should feel like it was written for THIS prospect — reference their
           { role: "user", content: userPrompt },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 6000,
+        max_tokens: 12000,
       }),
     });
 
@@ -127,12 +127,36 @@ Every line should feel like it was written for THIS prospect — reference their
 
     const payload = await res.json();
     const content: string = payload.choices?.[0]?.message?.content ?? "{}";
-    let parsed: any;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
+
+    const tryParseJson = (raw: string): any => {
+      let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const start = s.search(/[\{\[]/);
+      const end = Math.max(s.lastIndexOf("}"), s.lastIndexOf("]"));
+      if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
+      try { return JSON.parse(s); } catch {}
+      // Repair: strip control chars, trailing commas
+      const repaired = s
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
+        .replace(/,\s*([}\]])/g, "$1");
+      try { return JSON.parse(repaired); } catch {}
+      // Last resort: progressively trim trailing chars until it parses
+      for (let i = repaired.length; i > 100; i -= 50) {
+        const candidate = repaired
+          .slice(0, i)
+          .replace(/,\s*$/, "")
+          .replace(/[^\}\]]*$/, "");
+        const closed = candidate + "}".repeat(Math.max(0, (candidate.match(/{/g) || []).length - (candidate.match(/}/g) || []).length));
+        try { return JSON.parse(closed); } catch {}
+      }
+      return null;
+    };
+
+    const parsed = tryParseJson(content);
+    if (!parsed || typeof parsed !== "object") {
+      console.error("AI returned unparseable JSON:", content.slice(0, 500));
       throw new Error("AI returned invalid JSON — try again");
     }
+
 
     const script: CallScript = {
       opener: String(parsed.opener ?? "").slice(0, 800),
