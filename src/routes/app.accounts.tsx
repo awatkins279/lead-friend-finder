@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAccountDialog";
+import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/accounts")({
@@ -41,7 +42,7 @@ type PhoneProvider = {
 
 const PHONE_PROVIDERS: PhoneProvider[] = [
   { id: "twilio", name: "Twilio", description: "Programmable Voice — most popular, pay-as-you-go.", available: true },
-  { id: "ringcentral", name: "RingCentral", description: "Business phone system with RingOut API.", available: false },
+  { id: "ringcentral", name: "RingCentral", description: "Business phone system with RingOut API.", available: true },
   { id: "vonage", name: "Vonage", description: "Voice API (formerly Nexmo).", available: false },
   { id: "plivo", name: "Plivo", description: "Twilio alternative, cheaper international rates.", available: false },
   { id: "telnyx", name: "Telnyx", description: "Carrier-grade voice API.", available: false },
