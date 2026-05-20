@@ -1605,3 +1605,16 @@ function CallWorkstation({
     </div>
   );
 }
+
+function CallTimer({ startedAt }: { startedAt: number | null }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!startedAt) return <>00:00</>;
+  const s = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return <>{mm}:{ss}</>;
+}
