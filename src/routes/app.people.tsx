@@ -94,11 +94,19 @@ type Lead = {
   country: string | null;
   phone: string | null;
   org_name: string | null;
-  org_description: string | null;
-  org_website_url: string | null;
-  org_industry: string | null;
-  org_employee_count: string | null;
+  // Heavy/detail-only fields — only present after lazy-loading in the side sheet
+  org_description?: string | null;
+  org_website_url?: string | null;
+  org_industry?: string | null;
+  org_employee_count?: string | null;
 };
+
+// Columns rendered in the table (fast path)
+const LIST_COLS =
+  "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name";
+// Extra columns only needed in the detail sheet
+const DETAIL_COLS =
+  "org_description,org_website_url,org_industry,org_employee_count";
 
 type Filters = {
   titles: string[];
@@ -201,10 +209,7 @@ function PeoplePage() {
     queryFn: async () => {
       let q: any = supabase
         .from("leads")
-        .select(
-          "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,org_description,org_website_url,org_industry,org_employee_count",
-          { count: "estimated" },
-        );
+        .select(LIST_COLS, { count: "estimated" });
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -218,13 +223,25 @@ function PeoplePage() {
   const total = data?.count ?? 0;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const activeChips = (Object.keys(filters) as (keyof Filters)[]).filter((k) => {
-    const v = filters[k];
-    if (Array.isArray(v)) return v.length > 0;
-    return typeof v === "string" ? v.trim() !== "" : v === true;
-  });
-  const allPageChecked = rows.length > 0 && rows.every((r) => picked.has(r.id));
-  const somePageChecked = rows.some((r) => picked.has(r.id));
+  const activeChips = useMemo(
+    () =>
+      (Object.keys(filters) as (keyof Filters)[]).filter((k) => {
+        const v = filters[k];
+        if (Array.isArray(v)) return v.length > 0;
+        return typeof v === "string" ? v.trim() !== "" : v === true;
+      }),
+    [filters],
+  );
+  const { allPageChecked, somePageChecked } = useMemo(() => {
+    if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
+    let all = true;
+    let some = false;
+    for (const r of rows) {
+      if (picked.has(r.id)) some = true;
+      else all = false;
+    }
+    return { allPageChecked: all, somePageChecked: some && !all };
+  }, [rows, picked]);
 
   const apply = () => setFilters(draft);
   const clear = () => {
@@ -351,7 +368,6 @@ function PeoplePage() {
     }
   };
 
-  const hasSelection = picked.size > 0;
 
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
@@ -543,6 +559,37 @@ function PeoplePage() {
       }),
     [picked, scores, minScore],
   );
+
+  const hasSelection = picked.size > 0;
+
+  // Stable arrays/maps for child dialogs so they don't re-render every keystroke
+  const pickedIds = useMemo(() => Array.from(picked), [picked]);
+  const campaignLeadScores = useMemo(
+    () => new Map(pickedIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
+    [pickedIds, scores],
+  );
+
+  // Lazily fetch heavy detail fields only when the side sheet opens
+  const { data: selectedDetail } = useQuery({
+    enabled: !!selected,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    queryKey: ["lead-detail", selected?.id],
+    queryFn: async () => {
+      if (!selected) return null;
+      const { data, error } = await supabase
+        .from("leads")
+        .select(DETAIL_COLS)
+        .eq("id", selected.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Pick<Lead, "org_description" | "org_website_url" | "org_industry" | "org_employee_count"> | null;
+    },
+  });
+  const selectedFull: Lead | null = selected
+    ? { ...selected, ...(selectedDetail ?? {}) }
+    : null;
 
 
   return (
@@ -947,19 +994,15 @@ function PeoplePage() {
       <AddToListDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        leadIds={Array.from(picked)}
+        leadIds={pickedIds}
         onAdded={() => setPicked(new Set())}
       />
       <AddToListDialog
         mode="campaign"
         open={campaignOpen}
         onOpenChange={setCampaignOpen}
-        leadIds={Array.from(picked)}
-        leadScores={
-          new Map(
-            Array.from(picked).map((id) => [id, scores.get(id)?.score ?? null] as const),
-          )
-        }
+        leadIds={pickedIds}
+        leadScores={campaignLeadScores}
         onAdded={() => setPicked(new Set())}
       />
 
@@ -968,17 +1011,17 @@ function PeoplePage() {
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          {selected && (
+          {selectedFull && (
             <>
               <SheetHeader>
                 <SheetTitle>
-                  {[selected.first_name, selected.last_name].filter(Boolean).join(" ") || "Lead"}
+                  {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}
                 </SheetTitle>
-                <SheetDescription>{selected.title}</SheetDescription>
+                <SheetDescription>{selectedFull.title}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-5 px-4 pb-6 text-sm">
                 {(() => {
-                  const info = scores.get(selected.id);
+                  const info = scores.get(selectedFull.id);
                   return info ? (
                     <Section title="AI IPP analysis">
                       <div className="-mx-1 rounded-md border">
@@ -994,42 +1037,42 @@ function PeoplePage() {
                   );
                 })()}
                 <Section title="Company">
-                  <div className="font-medium">{selected.org_name || "—"}</div>
-                  {selected.org_industry && (
-                    <div className="text-muted-foreground">{selected.org_industry}</div>
+                  <div className="font-medium">{selectedFull.org_name || "—"}</div>
+                  {selectedFull.org_industry && (
+                    <div className="text-muted-foreground">{selectedFull.org_industry}</div>
                   )}
-                  {selected.org_employee_count && (
-                    <div className="text-muted-foreground">{selected.org_employee_count} employees</div>
+                  {selectedFull.org_employee_count && (
+                    <div className="text-muted-foreground">{selectedFull.org_employee_count} employees</div>
                   )}
-                  {selected.org_description && (
+                  {selectedFull.org_description && (
                     <p className="mt-2 line-clamp-6 whitespace-pre-line text-muted-foreground">
-                      {selected.org_description}
+                      {selectedFull.org_description}
                     </p>
                   )}
                 </Section>
                 <Section title="Location">
-                  {[selected.city, selected.state, selected.country].filter(Boolean).join(", ") || "—"}
+                  {[selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ") || "—"}
                 </Section>
                 <Section title="Contact">
                   <div className="space-y-1.5">
-                    {selected.email && (
-                      <Row icon={<Mail className="h-3.5 w-3.5" />} value={selected.email} href={`mailto:${selected.email}`} />
+                    {selectedFull.email && (
+                      <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />
                     )}
-                    {selected.phone && (
-                      <Row icon={<Phone className="h-3.5 w-3.5" />} value={selected.phone} href={`tel:${selected.phone}`} />
+                    {selectedFull.phone && (
+                      <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />
                     )}
-                    {selected.linkedin_url && (
+                    {selectedFull.linkedin_url && (
                       <Row
                         icon={<Linkedin className="h-3.5 w-3.5" />}
                         value="LinkedIn profile"
-                        href={selected.linkedin_url.startsWith("http") ? selected.linkedin_url : `https://${selected.linkedin_url}`}
+                        href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`}
                       />
                     )}
-                    {selected.org_website_url && (
+                    {selectedFull.org_website_url && (
                       <Row
                         icon={<Globe className="h-3.5 w-3.5" />}
-                        value={selected.org_website_url}
-                        href={selected.org_website_url.startsWith("http") ? selected.org_website_url : `https://${selected.org_website_url}`}
+                        value={selectedFull.org_website_url}
+                        href={selectedFull.org_website_url.startsWith("http") ? selectedFull.org_website_url : `https://${selectedFull.org_website_url}`}
                       />
                     )}
                   </div>
