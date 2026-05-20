@@ -208,6 +208,10 @@ function PeoplePage() {
   const queryKey = useMemo(() => ["leads", filters, page], [filters, page]);
 
   const { data, isLoading, isFetching } = useQuery({
+    placeholderData: (prev) => prev,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
     queryKey,
     queryFn: async () => {
       let q: any = supabase
