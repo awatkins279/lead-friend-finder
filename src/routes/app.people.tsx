@@ -994,19 +994,15 @@ function PeoplePage() {
       <AddToListDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        leadIds={Array.from(picked)}
+        leadIds={pickedIds}
         onAdded={() => setPicked(new Set())}
       />
       <AddToListDialog
         mode="campaign"
         open={campaignOpen}
         onOpenChange={setCampaignOpen}
-        leadIds={Array.from(picked)}
-        leadScores={
-          new Map(
-            Array.from(picked).map((id) => [id, scores.get(id)?.score ?? null] as const),
-          )
-        }
+        leadIds={pickedIds}
+        leadScores={campaignLeadScores}
         onAdded={() => setPicked(new Set())}
       />
 
@@ -1015,17 +1011,17 @@ function PeoplePage() {
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          {selected && (
+          {selectedFull && (
             <>
               <SheetHeader>
                 <SheetTitle>
-                  {[selected.first_name, selected.last_name].filter(Boolean).join(" ") || "Lead"}
+                  {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}
                 </SheetTitle>
-                <SheetDescription>{selected.title}</SheetDescription>
+                <SheetDescription>{selectedFull.title}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-5 px-4 pb-6 text-sm">
                 {(() => {
-                  const info = scores.get(selected.id);
+                  const info = scores.get(selectedFull.id);
                   return info ? (
                     <Section title="AI IPP analysis">
                       <div className="-mx-1 rounded-md border">
@@ -1041,42 +1037,42 @@ function PeoplePage() {
                   );
                 })()}
                 <Section title="Company">
-                  <div className="font-medium">{selected.org_name || "—"}</div>
-                  {selected.org_industry && (
-                    <div className="text-muted-foreground">{selected.org_industry}</div>
+                  <div className="font-medium">{selectedFull.org_name || "—"}</div>
+                  {selectedFull.org_industry && (
+                    <div className="text-muted-foreground">{selectedFull.org_industry}</div>
                   )}
-                  {selected.org_employee_count && (
-                    <div className="text-muted-foreground">{selected.org_employee_count} employees</div>
+                  {selectedFull.org_employee_count && (
+                    <div className="text-muted-foreground">{selectedFull.org_employee_count} employees</div>
                   )}
-                  {selected.org_description && (
+                  {selectedFull.org_description && (
                     <p className="mt-2 line-clamp-6 whitespace-pre-line text-muted-foreground">
-                      {selected.org_description}
+                      {selectedFull.org_description}
                     </p>
                   )}
                 </Section>
                 <Section title="Location">
-                  {[selected.city, selected.state, selected.country].filter(Boolean).join(", ") || "—"}
+                  {[selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ") || "—"}
                 </Section>
                 <Section title="Contact">
                   <div className="space-y-1.5">
-                    {selected.email && (
-                      <Row icon={<Mail className="h-3.5 w-3.5" />} value={selected.email} href={`mailto:${selected.email}`} />
+                    {selectedFull.email && (
+                      <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />
                     )}
-                    {selected.phone && (
-                      <Row icon={<Phone className="h-3.5 w-3.5" />} value={selected.phone} href={`tel:${selected.phone}`} />
+                    {selectedFull.phone && (
+                      <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />
                     )}
-                    {selected.linkedin_url && (
+                    {selectedFull.linkedin_url && (
                       <Row
                         icon={<Linkedin className="h-3.5 w-3.5" />}
                         value="LinkedIn profile"
-                        href={selected.linkedin_url.startsWith("http") ? selected.linkedin_url : `https://${selected.linkedin_url}`}
+                        href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`}
                       />
                     )}
-                    {selected.org_website_url && (
+                    {selectedFull.org_website_url && (
                       <Row
                         icon={<Globe className="h-3.5 w-3.5" />}
-                        value={selected.org_website_url}
-                        href={selected.org_website_url.startsWith("http") ? selected.org_website_url : `https://${selected.org_website_url}`}
+                        value={selectedFull.org_website_url}
+                        href={selectedFull.org_website_url.startsWith("http") ? selectedFull.org_website_url : `https://${selectedFull.org_website_url}`}
                       />
                     )}
                   </div>
