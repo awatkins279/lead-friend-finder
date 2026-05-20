@@ -1333,10 +1333,15 @@ function CallWorkstation({
   };
 
   useEffect(() => {
+    if (initialActiveLeadId && rows.some((r) => r.lead_id === initialActiveLeadId)) {
+      setActiveId(initialActiveLeadId);
+      onConsumedInitial?.();
+      return;
+    }
     if (activeId || rows.length === 0) return;
     const firstWithPhone = rows.find((r) => r.lead?.phone);
     setActiveId((firstWithPhone ?? rows[0]).lead_id);
-  }, [rows, activeId]);
+  }, [rows, activeId, initialActiveLeadId, onConsumedInitial]);
 
   useEffect(() => {
     setNotes("");
