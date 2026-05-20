@@ -19,6 +19,8 @@ import { toast } from "sonner";
 
 type ListRow = { id: string; name: string; sender_name: string | null };
 
+const CAMPAIGN_ADD_LIMIT = 10000;
+
 export function AddToListDialog({
   open,
   onOpenChange,
@@ -102,6 +104,10 @@ export function AddToListDialog({
       toast.error(showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
       return;
     }
+    if (isCampaign && idsToAdd.length > CAMPAIGN_ADD_LIMIT) {
+      toast.error(`You can add up to ${CAMPAIGN_ADD_LIMIT.toLocaleString()} leads to a campaign at one time.`);
+      return;
+    }
     setBusy(true);
     try {
       let listId = selectedId;
@@ -154,7 +160,7 @@ export function AddToListDialog({
           </DialogTitle>
           <DialogDescription>
             {isCampaign
-              ? "Enroll these prospects into a configured campaign."
+              ? `Enroll these prospects into a configured campaign. Up to ${CAMPAIGN_ADD_LIMIT.toLocaleString()} can be added at once.`
               : "Group these prospects so you can research them and draft personalized emails."}
           </DialogDescription>
         </DialogHeader>
