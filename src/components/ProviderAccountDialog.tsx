@@ -195,6 +195,7 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
       { key: "client_id", label: "Client ID", required: true },
       { key: "client_secret", label: "Client Secret", type: "password", required: true },
       { key: "jwt", label: "JWT credential", type: "password", required: true, helper: "Long-lived JWT issued for the calling user." },
+      { key: "ring_to_number", label: "Your phone to ring (E.164)", placeholder: "+15551234567", required: true, helper: "RingCentral calls this number first, then bridges to the prospect when you answer." },
     ],
   },
   vonage: {
