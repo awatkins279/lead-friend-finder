@@ -94,11 +94,19 @@ type Lead = {
   country: string | null;
   phone: string | null;
   org_name: string | null;
-  org_description: string | null;
-  org_website_url: string | null;
-  org_industry: string | null;
-  org_employee_count: string | null;
+  // Heavy/detail-only fields — only present after lazy-loading in the side sheet
+  org_description?: string | null;
+  org_website_url?: string | null;
+  org_industry?: string | null;
+  org_employee_count?: string | null;
 };
+
+// Columns rendered in the table (fast path)
+const LIST_COLS =
+  "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name";
+// Extra columns only needed in the detail sheet
+const DETAIL_COLS =
+  "org_description,org_website_url,org_industry,org_employee_count";
 
 type Filters = {
   titles: string[];
