@@ -1480,23 +1480,47 @@ function CallWorkstation({
                   <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{active.research.reasoning}</p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 <Button size="sm" variant="ghost" onClick={() => goTo(-1)} disabled={activeIndex <= 0}>
                   ← Prev
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => goTo(1)} disabled={activeIndex >= rows.length - 1}>
                   Next →
                 </Button>
+
+                {readyAccounts.length > 1 && callStatus === "idle" && (
+                  <Select value={phoneAccountId ?? undefined} onValueChange={setPhoneAccountId}>
+                    <SelectTrigger className="h-9 w-[180px] text-xs">
+                      <SelectValue placeholder="Choose phone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {readyAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id} className="text-xs">
+                          {a.label} · {a.provider}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
                 {active.lead?.phone ? (
                   callStatus === "idle" ? (
-                    <Button
-                      size="sm"
-                      onClick={startInAppCall}
-                      disabled={!phoneAccount}
-                      title={phoneAccount ? `Call using ${phoneAccount.label}` : "Set up a phone account first"}
-                    >
-                      <PhoneIcon className="mr-1.5 h-4 w-4" /> Call {active.lead.phone}
-                    </Button>
+                    readyAccounts.length === 0 ? (
+                      <Link
+                        to="/app/accounts"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                      >
+                        <AlertCircle className="h-3.5 w-3.5" /> Finish phone setup to call
+                      </Link>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={startInAppCall}
+                        title={`Call using ${phoneAccount?.label ?? "phone"}`}
+                      >
+                        <PhoneIcon className="mr-1.5 h-4 w-4" /> Call {active.lead.phone}
+                      </Button>
+                    )
                   ) : (
                     <div className="flex items-center gap-2 rounded-md border bg-emerald-50 px-2 py-1">
                       <span className="relative flex h-2 w-2">
@@ -1505,13 +1529,15 @@ function CallWorkstation({
                       </span>
                       <span className="text-xs font-medium text-emerald-900">
                         {callStatus === "connecting" && "Connecting…"}
-                        {callStatus === "ringing" && "Ringing…"}
+                        {callStatus === "ringing" && (phoneAccount?.provider === "ringcentral" ? "Ringing your phone…" : "Ringing…")}
                         {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
                         {callStatus === "ending" && "Ending…"}
                       </span>
-                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection}>
-                        {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                      </Button>
+                      {phoneAccount?.provider !== "ringcentral" && (
+                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection}>
+                          {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                        </Button>
+                      )}
                       <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => finishCall()}>
                         <PhoneOff className="mr-1 h-3.5 w-3.5" /> Hang up
                       </Button>
@@ -1519,11 +1545,6 @@ function CallWorkstation({
                   )
                 ) : (
                   <span className="text-xs text-muted-foreground">No phone on file</span>
-                )}
-                {!phoneAccount && callStatus === "idle" && (
-                  <Link to="/app/accounts" className="text-[11px] text-primary underline">
-                    Set up phone
-                  </Link>
                 )}
               </div>
             </div>
