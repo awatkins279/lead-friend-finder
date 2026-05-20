@@ -717,18 +717,56 @@ function PeoplePage() {
               <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Building2 className="h-3.5 w-3.5" /> Company size
               </Label>
-              <select
-                value={draft.companySize}
-                onChange={(e) => setDraft({ ...draft, companySize: e.target.value })}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="">Any size</option>
-                {SIZE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label} employees
-                  </option>
-                ))}
-              </select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <span className={draft.companySize.length === 0 ? "text-muted-foreground" : ""}>
+                      {draft.companySize.length === 0
+                        ? "Any size"
+                        : draft.companySize.length === 1
+                          ? `${SIZE_OPTIONS.find((o) => o.value === draft.companySize[0])?.label} employees`
+                          : `${draft.companySize.length} ranges selected`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-56 p-2">
+                  <div className="max-h-72 space-y-1 overflow-y-auto">
+                    {SIZE_OPTIONS.map((o) => {
+                      const checked = draft.companySize.includes(o.value);
+                      return (
+                        <label
+                          key={o.value}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => {
+                              const next = v
+                                ? [...draft.companySize, o.value]
+                                : draft.companySize.filter((x) => x !== o.value);
+                              setDraft({ ...draft, companySize: next });
+                            }}
+                          />
+                          {o.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {draft.companySize.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDraft({ ...draft, companySize: [] })}
+                      className="mt-2 w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2 pt-2">
