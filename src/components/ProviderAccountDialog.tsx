@@ -78,11 +78,11 @@ export function ProviderAccountDialog({
     }
     setSaving(true);
 
-    const payload: Record<string, unknown> = {
+    const payload = {
       label,
       provider: provider.id,
       from_number: fromNumber || null,
-      credentials: values,
+      credentials: values as Record<string, string>,
     };
 
     const { error } = existing
