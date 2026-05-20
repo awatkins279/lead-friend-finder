@@ -810,23 +810,12 @@ function LeadDrawer({
                 busy={scriptBusy}
                 onGenerate={() => genScript(false)}
                 onRegenerate={() => genScript(true)}
-                onOpenCallMode={() => setCallMode(true)}
+                onOpenCallMode={() => row && onEnterCallMode(row.lead_id)}
               />
             </div>
           </>
         )}
       </SheetContent>
-
-      {row && script && (
-        <CallModeView
-          open={callMode}
-          onOpenChange={setCallMode}
-          script={script}
-          leadName={[row.lead?.first_name, row.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
-          leadSub={`${row.lead?.title ?? ""}${row.lead?.org_name ? ` · ${row.lead.org_name}` : ""}`}
-          phone={row.lead?.phone ?? null}
-        />
-      )}
     </Sheet>
   );
 }
