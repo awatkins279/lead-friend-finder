@@ -168,6 +168,20 @@ function escapeForOr(v: string) {
 
 function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any; in: any }>(q: T, f: Filters): T {
   let r: any = q;
+  const nameQ = (f.name ?? "").trim();
+  if (nameQ) {
+    const parts = nameQ.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const first = escapeForOr(parts[0]);
+      const last = escapeForOr(parts.slice(1).join(" "));
+      r = r
+        .or(`first_name.ilike.%${first}%,last_name.ilike.%${first}%`)
+        .or(`first_name.ilike.%${last}%,last_name.ilike.%${last}%`);
+    } else {
+      const t = escapeForOr(nameQ);
+      r = r.or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+    }
+  }
   const titles = (f.titles ?? []).map((t) => t.trim()).filter(Boolean);
   if (titles.length === 1) {
     r = r.ilike("title", `%${titles[0]}%`);
