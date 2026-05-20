@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const FiltersSchema = z.object({
+  name: z.string().max(200).optional().default(""),
   titles: z.array(z.string().max(200)).max(50).optional().default([]),
   company: z.string().max(200).optional().default(""),
   industry: z.string().max(200).optional().default(""),
