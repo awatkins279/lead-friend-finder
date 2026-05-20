@@ -27,10 +27,10 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { filters, limit } = data;
 
-    // Keyset-paginate on the server in big chunks. One round trip from the
-    // browser; many small fast queries inside the worker (PostgREST → PG over
-    // local network), avoiding 50 cross-internet round trips.
-    const CHUNK = 5000;
+    // Keyset-paginate on the server in API-safe chunks. This backend caps a
+    // single REST response at ~1000 rows, so requesting more causes the loop
+    // to stop after the first batch and selection gets stuck at 1000.
+    const CHUNK = 1000;
     const ids: string[] = [];
     let cursor: string | null = null;
 
