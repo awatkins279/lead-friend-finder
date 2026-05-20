@@ -158,16 +158,25 @@ function AccountsPage() {
           ) : (
             <div className="space-y-3">
               {accounts.map((a) => {
+                const prov = ((a as unknown as { provider?: string }).provider ?? "twilio") as string;
+                const isTwilio = prov === "twilio";
                 const needsNumber = !a.from_number || a.from_number === PLACEHOLDER;
                 const needsTwiml = !a.twilio_twiml_app_sid;
-                const ready = !needsNumber && !needsTwiml;
+                const creds = ((a as unknown as { credentials?: Record<string, string> }).credentials) ?? {};
+                const spec = PROVIDER_SPECS[prov];
+                const missingCustom =
+                  !isTwilio && spec
+                    ? spec.fields.some((f) => f.required && !creds[f.key])
+                    : false;
+                const ready = isTwilio ? !needsNumber && !needsTwiml : !missingCustom;
+                const providerLabel = isTwilio ? "Twilio" : (spec?.name ?? prov);
                 return (
                   <Card key={a.id} className="flex items-center justify-between p-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-primary" />
                         <span className="font-medium">{a.label}</span>
-                        <Badge variant="outline" className="text-[10px]">Twilio</Badge>
+                        <Badge variant="outline" className="text-[10px]">{providerLabel}</Badge>
                         {ready ? (
                           <Badge variant="secondary" className="gap-1">
                             <CheckCircle2 className="h-3 w-3" /> Ready
@@ -180,21 +189,13 @@ function AccountsPage() {
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         From: {needsNumber ? <em>not set yet</em> : a.from_number}
-                        {" · "}TwiML App: {needsTwiml ? <em>not set</em> : a.twilio_twiml_app_sid}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground/70">
-                        {a.twilio_account_sid}
+                        {isTwilio && (
+                          <>{" · "}TwiML App: {needsTwiml ? <em>not set</em> : a.twilio_twiml_app_sid}</>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditing(a);
-                          setOpen(true);
-                        }}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => openEdit(a)}>
                         <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => remove(a.id)}>
