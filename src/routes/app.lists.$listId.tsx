@@ -112,6 +112,7 @@ function ListDetailPage() {
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"email" | "calling">("email");
+  const [pendingCallLeadId, setPendingCallLeadId] = useState<string | null>(null);
   const [confirmScripts, setConfirmScripts] = useState(false);
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
@@ -552,6 +553,8 @@ function ListDetailPage() {
           <CallWorkstation
             listId={listId}
             rows={rows ?? []}
+            initialActiveLeadId={pendingCallLeadId}
+            onConsumedInitial={() => setPendingCallLeadId(null)}
             onOpenConfig={() => setCallConfigOpen(true)}
             onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
           />
@@ -578,6 +581,11 @@ function ListDetailPage() {
         listId={listId}
         row={open}
         onClose={() => setOpen(null)}
+        onEnterCallMode={(leadId) => {
+          setPendingCallLeadId(leadId);
+          setActiveTab("calling");
+          setOpen(null);
+        }}
         onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
       />
 
@@ -607,24 +615,25 @@ function LeadDrawer({
   row,
   onClose,
   onChanged,
+  onEnterCallMode,
 }: {
   listId: string;
   row: Row | null;
   onClose: () => void;
   onChanged: () => void;
+  onEnterCallMode: (leadId: string) => void;
 }) {
   const [emails, setEmails] = useState<EmailInSequence[]>([]);
   const [activeStep, setActiveStep] = useState("1");
   const [script, setScript] = useState<CallScript | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
-  const [callMode, setCallMode] = useState(false);
   const genScriptFn = useServerFn(generateCallScript);
 
   useEffect(() => {
     setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
     setScript(row?.call_script ?? null);
-    setCallMode(false);
+    
   }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body, row?.call_script]);
 
   const genScript = async (force = false) => {
@@ -801,23 +810,12 @@ function LeadDrawer({
                 busy={scriptBusy}
                 onGenerate={() => genScript(false)}
                 onRegenerate={() => genScript(true)}
-                onOpenCallMode={() => setCallMode(true)}
+                onOpenCallMode={() => row && onEnterCallMode(row.lead_id)}
               />
             </div>
           </>
         )}
       </SheetContent>
-
-      {row && script && (
-        <CallModeView
-          open={callMode}
-          onOpenChange={setCallMode}
-          script={script}
-          leadName={[row.lead?.first_name, row.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
-          leadSub={`${row.lead?.title ?? ""}${row.lead?.org_name ? ` · ${row.lead.org_name}` : ""}`}
-          phone={row.lead?.phone ?? null}
-        />
-      )}
     </Sheet>
   );
 }
@@ -1177,11 +1175,15 @@ function IppBreakdownPanel({ research, scored }: { research: Row["research"]; sc
 function CallWorkstation({
   listId,
   rows,
+  initialActiveLeadId,
+  onConsumedInitial,
   onOpenConfig,
   onChanged,
 }: {
   listId: string;
   rows: Row[];
+  initialActiveLeadId?: string | null;
+  onConsumedInitial?: () => void;
   onOpenConfig: () => void;
   onChanged: () => void;
 }) {
@@ -1331,10 +1333,15 @@ function CallWorkstation({
   };
 
   useEffect(() => {
+    if (initialActiveLeadId && rows.some((r) => r.lead_id === initialActiveLeadId)) {
+      setActiveId(initialActiveLeadId);
+      onConsumedInitial?.();
+      return;
+    }
     if (activeId || rows.length === 0) return;
     const firstWithPhone = rows.find((r) => r.lead?.phone);
     setActiveId((firstWithPhone ?? rows[0]).lead_id);
-  }, [rows, activeId]);
+  }, [rows, activeId, initialActiveLeadId, onConsumedInitial]);
 
   useEffect(() => {
     setNotes("");
