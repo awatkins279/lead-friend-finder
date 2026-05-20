@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Phone } from "lucide-react";
+import { Phone, Eye, EyeOff, X } from "lucide-react";
 import { toast } from "sonner";
 import type { PhoneAccountRow } from "@/components/PhoneAccountDialog";
 
@@ -22,6 +23,7 @@ export type ProviderField = {
   type?: "text" | "password";
   required?: boolean;
   helper?: string;
+  multiline?: boolean;
 };
 
 export type ProviderSpec = {
@@ -51,6 +53,7 @@ export function ProviderAccountDialog({
   const [label, setLabel] = useState(`My ${provider.name}`);
   const [fromNumber, setFromNumber] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
+  const [shown, setShown] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -65,6 +68,7 @@ export function ProviderAccountDialog({
       setFromNumber("");
       setValues({});
     }
+    setShown({});
   }, [open, existing, provider.name]);
 
   const save = async () => {
@@ -129,17 +133,71 @@ export function ProviderAccountDialog({
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {provider.fields.map((f) => (
-              <Field key={f.key} label={`${f.label}${f.required ? "" : " (optional)"}`} helper={f.helper}>
-                <Input
-                  type={f.type ?? "text"}
-                  value={values[f.key] ?? ""}
-                  placeholder={f.placeholder}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                />
-              </Field>
-            ))}
+          <div className="grid grid-cols-1 gap-3">
+            {provider.fields.map((f) => {
+              const isPassword = f.type === "password";
+              const isShown = !!shown[f.key];
+              const value = values[f.key] ?? "";
+              const setValue = (v: string) =>
+                setValues((prev) => ({ ...prev, [f.key]: v }));
+
+              return (
+                <Field
+                  key={f.key}
+                  label={`${f.label}${f.required ? "" : " (optional)"}`}
+                  helper={f.helper}
+                  actions={
+                    <div className="flex items-center gap-1">
+                      {isPassword && (
+                        <button
+                          type="button"
+                          onClick={() => setShown((s) => ({ ...s, [f.key]: !s[f.key] }))}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          {isShown ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                          {isShown ? "Hide" : "Show"}
+                        </button>
+                      )}
+                      {value && (
+                        <button
+                          type="button"
+                          onClick={() => setValue("")}
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  }
+                >
+                  {f.multiline ? (
+                    <Textarea
+                      rows={5}
+                      value={value}
+                      placeholder={f.placeholder}
+                      onChange={(e) => setValue(e.target.value)}
+                      className={`font-mono text-xs ${
+                        isPassword && !isShown ? "[-webkit-text-security:disc] [text-security:disc]" : ""
+                      } break-all`}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                    />
+                  ) : (
+                    <Input
+                      type={isPassword && !isShown ? "password" : "text"}
+                      value={value}
+                      placeholder={f.placeholder}
+                      onChange={(e) => setValue(e.target.value)}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                    />
+                  )}
+                </Field>
+              );
+            })}
           </div>
         </div>
 
@@ -157,15 +215,20 @@ export function ProviderAccountDialog({
 function Field({
   label,
   helper,
+  actions,
   children,
 }: {
   label: string;
   helper?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-medium">{label}</Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium">{label}</Label>
+        {actions}
+      </div>
       {children}
       {helper && <p className="text-[11px] text-muted-foreground">{helper}</p>}
     </div>
@@ -185,16 +248,16 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
           <li>Go to <a className="underline" href="https://developers.ringcentral.com" target="_blank" rel="noreferrer">developers.ringcentral.com</a> → Console → Apps</li>
           <li>Create an app — type <em>REST API App</em>, auth <em>JWT</em>, platform type <em>Server-only (No UI)</em></li>
           <li>Add permissions: <code>RingOut</code>, <code>ReadAccounts</code>, <code>ReadCallLog</code></li>
-          <li>Copy the <em>Client ID</em> and <em>Client Secret</em>; generate a <em>JWT credential</em> for your user</li>
+          <li>Copy the <em>Client ID</em> and <em>Client Secret</em>; generate a <em>JWT credential</em> from your profile menu (top-right avatar → Credentials)</li>
           <li>Use server URL <code>https://platform.ringcentral.com</code> (or <code>https://platform.devtest.ringcentral.com</code> for sandbox)</li>
         </ol>
       </>
     ),
     fields: [
-      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true },
+      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true, helper: "Must start with https://. Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox." },
       { key: "client_id", label: "Client ID", required: true },
       { key: "client_secret", label: "Client Secret", type: "password", required: true },
-      { key: "jwt", label: "JWT credential", type: "password", required: true, helper: "Long-lived JWT issued for the calling user." },
+      { key: "jwt", label: "JWT credential", type: "password", required: true, multiline: true, helper: "Paste the full JWT — usually 500+ characters on one long line, looks like xxx.yyy.zzz. Use Show/Clear above if you need to re-paste." },
       { key: "ring_to_number", label: "Your phone to ring (E.164)", placeholder: "+15551234567", required: true, helper: "RingCentral calls this number first, then bridges to the prospect when you answer." },
     ],
   },
@@ -203,7 +266,7 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
     name: "Vonage",
     fields: [
       { key: "application_id", label: "Application ID", required: true },
-      { key: "private_key", label: "Private key (PEM)", type: "password", required: true },
+      { key: "private_key", label: "Private key (PEM)", type: "password", required: true, multiline: true, helper: "Paste the full PEM block including the BEGIN/END lines." },
       { key: "api_key", label: "API key", required: true },
       { key: "api_secret", label: "API secret", type: "password", required: true },
     ],
