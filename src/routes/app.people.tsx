@@ -259,9 +259,16 @@ function PeoplePage() {
   const selectAllMatching = async () => {
     setBulkBusy(true);
     try {
-      const ids = await fetchMatchingIds(filters, Math.min(total || MAX_BULK, MAX_BULK));
+      const requested = Math.min(total || MAX_BULK, MAX_BULK);
+      const ids = await fetchMatchingIds(filters, requested);
       setPicked(new Set(ids));
-      toast.success(`${ids.length.toLocaleString()} leads selected`);
+      if (ids.length < requested) {
+        toast.info(
+          `Only ${ids.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+        );
+      } else {
+        toast.success(`${ids.length.toLocaleString()} leads selected`);
+      }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
     } finally {
@@ -281,7 +288,13 @@ function PeoplePage() {
     try {
       const ids = await fetchMatchingIds(filters, n);
       setPicked(new Set(ids));
-      toast.success(`${ids.length.toLocaleString()} leads selected`);
+      if (ids.length < n) {
+        toast.info(
+          `Only ${ids.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+        );
+      } else {
+        toast.success(`${ids.length.toLocaleString()} leads selected`);
+      }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
     } finally {
