@@ -281,6 +281,17 @@ function AccountsPage() {
           existing={editing}
         />
       )}
+
+      {userId && providerOpen && PROVIDER_SPECS[providerOpen] && (
+        <ProviderAccountDialog
+          userId={userId}
+          provider={PROVIDER_SPECS[providerOpen]}
+          open={!!providerOpen}
+          onOpenChange={(o) => !o && setProviderOpen(null)}
+          onSaved={load}
+          existing={editing}
+        />
+      )}
     </div>
   );
 }
