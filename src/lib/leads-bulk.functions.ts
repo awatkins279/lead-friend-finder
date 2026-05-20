@@ -33,10 +33,6 @@ const Input = z.object({
   limit: z.number().int().min(1).max(50000),
 });
 
-const Input = z.object({
-  filters: FiltersSchema,
-  limit: z.number().int().min(1).max(50000),
-});
 
 function escapeForOr(v: string) {
   return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
