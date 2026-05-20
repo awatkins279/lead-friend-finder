@@ -65,8 +65,12 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
         const t = filters.location.trim();
         q = q.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
       }
-      if (filters.companySize && SIZE_BUCKETS[filters.companySize]) {
-        q = q.in("org_employee_count", SIZE_BUCKETS[filters.companySize]);
+      const sizes = filters.companySize ?? [];
+      if (sizes.length > 0) {
+        const raw = Array.from(
+          new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])),
+        );
+        if (raw.length > 0) q = q.in("org_employee_count", raw);
       }
       if (filters.hasPhone) q = q.not("phone", "is", null).neq("phone", "");
       if (filters.hasEmail) q = q.not("email", "is", null).neq("email", "");
