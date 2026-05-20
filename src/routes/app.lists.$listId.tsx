@@ -633,7 +633,7 @@ function LeadDrawer({
     setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
     setScript(row?.call_script ?? null);
-    setCallMode(false);
+    
   }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body, row?.call_script]);
 
   const genScript = async (force = false) => {
