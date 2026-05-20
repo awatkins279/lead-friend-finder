@@ -347,7 +347,8 @@ export const startRingOutCall = createServerFn({ method: "POST" })
     if (acc.provider !== "ringcentral") throw new Error("Account is not RingCentral");
 
     const creds = (acc.credentials ?? {}) as Record<string, string>;
-    const serverUrl = (creds.server_url || "https://platform.ringcentral.com").replace(/\/$/, "");
+    const rawServerUrl = (creds.server_url || "").trim();
+    const serverUrl = (/^https?:\/\//i.test(rawServerUrl) ? rawServerUrl : "https://platform.ringcentral.com").replace(/\/$/, "");
     const clientId = creds.client_id;
     const clientSecret = creds.client_secret;
     const jwt = creds.jwt;
