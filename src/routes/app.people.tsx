@@ -223,13 +223,25 @@ function PeoplePage() {
   const total = data?.count ?? 0;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const activeChips = (Object.keys(filters) as (keyof Filters)[]).filter((k) => {
-    const v = filters[k];
-    if (Array.isArray(v)) return v.length > 0;
-    return typeof v === "string" ? v.trim() !== "" : v === true;
-  });
-  const allPageChecked = rows.length > 0 && rows.every((r) => picked.has(r.id));
-  const somePageChecked = rows.some((r) => picked.has(r.id));
+  const activeChips = useMemo(
+    () =>
+      (Object.keys(filters) as (keyof Filters)[]).filter((k) => {
+        const v = filters[k];
+        if (Array.isArray(v)) return v.length > 0;
+        return typeof v === "string" ? v.trim() !== "" : v === true;
+      }),
+    [filters],
+  );
+  const { allPageChecked, somePageChecked } = useMemo(() => {
+    if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
+    let all = true;
+    let some = false;
+    for (const r of rows) {
+      if (picked.has(r.id)) some = true;
+      else all = false;
+    }
+    return { allPageChecked: all, somePageChecked: some && !all };
+  }, [rows, picked]);
 
   const apply = () => setFilters(draft);
   const clear = () => {
