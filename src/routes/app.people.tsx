@@ -113,6 +113,7 @@ type Filters = {
   company: string;
   location: string;
   industry: string;
+  companySize: string;
   hasPhone: boolean;
   hasEmail: boolean;
 };
@@ -122,9 +123,44 @@ const EMPTY: Filters = {
   company: "",
   location: "",
   industry: "",
+  companySize: "",
   hasPhone: false,
   hasEmail: false,
 };
+
+// Maps user-facing size bucket → raw strings present in org_employee_count.
+// Source data uses many notations (commas, "to" vs "+"), so we enumerate.
+const SIZE_BUCKETS: Record<string, string[]> = {
+  "1-10": ["1", "1 to 10", "2 to 10"],
+  "11-25": ["11 to 25"],
+  "11-50": ["11 to 50"],
+  "26-50": ["26 to 50"],
+  "51-100": ["51 to 100"],
+  "51-200": ["51 to 200"],
+  "101-250": ["101 to 250"],
+  "201-500": ["201 to 500"],
+  "251-500": ["251 to 500"],
+  "501-1000": ["501 to 1000", "501 to 1,000"],
+  "1001-2500": ["1001 to 5000", "1,001 to 5,000"],
+  "2501-5000": ["1001 to 5000", "1,001 to 5,000"],
+  "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+"],
+};
+
+const SIZE_OPTIONS: { value: string; label: string }[] = [
+  { value: "1-10", label: "1-10" },
+  { value: "11-25", label: "11-25" },
+  { value: "11-50", label: "11-50" },
+  { value: "26-50", label: "26-50" },
+  { value: "51-100", label: "51-100" },
+  { value: "51-200", label: "51-200" },
+  { value: "101-250", label: "101-250" },
+  { value: "201-500", label: "201-500" },
+  { value: "251-500", label: "251-500" },
+  { value: "501-1000", label: "501-1,000" },
+  { value: "1001-2500", label: "1,001-2,500" },
+  { value: "2501-5000", label: "2,501-5,000" },
+  { value: "5000+", label: "5,000+" },
+];
 
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
@@ -134,7 +170,7 @@ function escapeForOr(v: string) {
   return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any }>(q: T, f: Filters): T {
+function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any; in: any }>(q: T, f: Filters): T {
   let r: any = q;
   const titles = (f.titles ?? []).map((t) => t.trim()).filter(Boolean);
   if (titles.length === 1) {
@@ -148,6 +184,9 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   if (f.location.trim()) {
     const t = f.location.trim();
     r = r.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
+  }
+  if (f.companySize && SIZE_BUCKETS[f.companySize]) {
+    r = r.in("org_employee_count", SIZE_BUCKETS[f.companySize]);
   }
   if (f.hasPhone) r = r.not("phone", "is", null).neq("phone", "");
   if (f.hasEmail) r = r.not("email", "is", null).neq("email", "");
