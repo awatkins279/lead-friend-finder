@@ -100,7 +100,7 @@ type Lead = {
 };
 
 type Filters = {
-  title: string;
+  titles: string[];
   company: string;
   location: string;
   industry: string;
@@ -109,7 +109,7 @@ type Filters = {
 };
 
 const EMPTY: Filters = {
-  title: "",
+  titles: [],
   company: "",
   location: "",
   industry: "",
@@ -120,9 +120,20 @@ const EMPTY: Filters = {
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
 
+function escapeForOr(v: string) {
+  // PostgREST .or() uses commas as separators; escape them in user input.
+  return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
 function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any }>(q: T, f: Filters): T {
   let r: any = q;
-  if (f.title.trim()) r = r.ilike("title", `%${f.title.trim()}%`);
+  const titles = (f.titles ?? []).map((t) => t.trim()).filter(Boolean);
+  if (titles.length === 1) {
+    r = r.ilike("title", `%${titles[0]}%`);
+  } else if (titles.length > 1) {
+    const expr = titles.map((t) => `title.ilike.%${escapeForOr(t)}%`).join(",");
+    r = r.or(expr);
+  }
   if (f.company.trim()) r = r.ilike("org_name", `%${f.company.trim()}%`);
   if (f.industry.trim()) r = r.ilike("org_industry", `%${f.industry.trim()}%`);
   if (f.location.trim()) {
@@ -216,6 +227,7 @@ function PeoplePage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = (Object.keys(filters) as (keyof Filters)[]).filter((k) => {
     const v = filters[k];
+    if (Array.isArray(v)) return v.length > 0;
     return typeof v === "string" ? v.trim() !== "" : v === true;
   });
   const allPageChecked = rows.length > 0 && rows.every((r) => picked.has(r.id));
@@ -584,13 +596,11 @@ function PeoplePage() {
           </div>
 
           <div className="space-y-5">
-            <Field
-              icon={<Briefcase className="h-3.5 w-3.5" />}
-              label="Job title"
-              placeholder="e.g. VP of Sales"
-              value={draft.title}
-              onChange={(v) => setDraft({ ...draft, title: v })}
+            <TitleMultiSelect
+              values={draft.titles}
+              onChange={(next) => setDraft({ ...draft, titles: next })}
             />
+
             <Field
               icon={<Building2 className="h-3.5 w-3.5" />}
               label="Company"
@@ -739,20 +749,25 @@ function PeoplePage() {
         <section className="flex-1 overflow-y-auto">
           {activeChips.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b bg-background px-6 py-3">
-              {activeChips.map((k) => (
-                <Badge key={k} variant="secondary" className="gap-1">
-                  {k}: {String(filters[k])}
-                  <button
-                    onClick={() => {
-                      const next = { ...filters, [k]: typeof filters[k] === "boolean" ? false : "" } as Filters;
-                      setFilters(next);
-                      setDraft(next);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
+              {activeChips.map((k) => {
+                const v = filters[k];
+                const display = Array.isArray(v) ? v.join(", ") : String(v);
+                const emptyVal: any = Array.isArray(v) ? [] : typeof v === "boolean" ? false : "";
+                return (
+                  <Badge key={k} variant="secondary" className="gap-1">
+                    {k}: {display}
+                    <button
+                      onClick={() => {
+                        const next = { ...filters, [k]: emptyVal } as Filters;
+                        setFilters(next);
+                        setDraft(next);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
             </div>
           )}
 
@@ -1043,6 +1058,203 @@ function Field({
         {icon} {label}
       </Label>
       <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+const COMMON_TITLES = [
+  "CEO", "Chief Executive Officer", "COO", "Chief Operating Officer", "CFO", "Chief Financial Officer",
+  "CTO", "Chief Technology Officer", "CIO", "Chief Information Officer", "CMO", "Chief Marketing Officer",
+  "CRO", "Chief Revenue Officer", "CHRO", "Chief People Officer", "CPO", "Chief Product Officer",
+  "Chief of Staff", "Founder", "Co-Founder", "Owner", "President", "Vice President",
+  "VP of Sales", "VP of Marketing", "VP of Engineering", "VP of Product", "VP of Operations",
+  "VP of Finance", "VP of People", "VP of Customer Success", "VP of Business Development",
+  "SVP", "EVP", "Managing Director", "General Manager", "Director",
+  "Director of Sales", "Director of Marketing", "Director of Engineering", "Director of Operations",
+  "Director of Product", "Director of Finance", "Director of HR", "Director of Customer Success",
+  "Head of Sales", "Head of Marketing", "Head of Growth", "Head of Engineering", "Head of Product",
+  "Head of Operations", "Head of People", "Head of Partnerships",
+  "Sales Manager", "Marketing Manager", "Product Manager", "Engineering Manager", "Operations Manager",
+  "Account Manager", "Account Executive", "Sales Development Representative", "SDR", "BDR",
+  "Business Development Representative", "Customer Success Manager", "Project Manager", "Program Manager",
+  "Marketing Director", "Brand Manager", "Content Manager", "SEO Manager", "Growth Marketing Manager",
+  "Digital Marketing Manager", "Digital Marketing Specialist", "Marketing Specialist", "Marketing Coordinator",
+  "Social Media Manager", "Demand Generation Manager", "Performance Marketing Manager",
+  "Software Engineer", "Senior Software Engineer", "Staff Engineer", "Principal Engineer",
+  "Frontend Engineer", "Backend Engineer", "Full Stack Engineer", "DevOps Engineer", "Data Engineer",
+  "Data Scientist", "Data Analyst", "Machine Learning Engineer", "AI Engineer", "Solutions Architect",
+  "Sales Engineer", "Solutions Engineer", "Technical Account Manager",
+  "Recruiter", "Talent Acquisition Manager", "HR Manager", "HR Business Partner",
+  "Financial Analyst", "Controller", "Accountant", "Operations Analyst",
+  "Realtor", "Real Estate Agent", "Broker", "Loan Officer", "Mortgage Broker",
+  "Attorney", "Lawyer", "Paralegal", "Partner", "Associate",
+  "Physician", "Doctor", "Dentist", "Nurse Practitioner", "Practice Manager",
+  "Consultant", "Senior Consultant", "Principal Consultant", "Partner Consultant",
+  "Insurance Agent", "Financial Advisor", "Wealth Manager",
+];
+
+function fuzzyScore(query: string, target: string): number {
+  if (!query) return 1;
+  const q = query.toLowerCase();
+  const t = target.toLowerCase();
+  if (t === q) return 1000;
+  if (t.startsWith(q)) return 500;
+  const idx = t.indexOf(q);
+  if (idx >= 0) return 300 - idx;
+  // subsequence match
+  let ti = 0;
+  let matched = 0;
+  for (let qi = 0; qi < q.length; qi++) {
+    const ch = q[qi];
+    while (ti < t.length && t[ti] !== ch) ti++;
+    if (ti >= t.length) return 0;
+    matched++;
+    ti++;
+  }
+  return matched > 0 ? 50 : 0;
+}
+
+function TitleMultiSelect({
+  values,
+  onChange,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const suggestions = useMemo(() => {
+    const selected = new Set(values.map((v) => v.toLowerCase()));
+    const scored = COMMON_TITLES
+      .filter((t) => !selected.has(t.toLowerCase()))
+      .map((t) => ({ t, s: fuzzyScore(query.trim(), t) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 12)
+      .map((x) => x.t);
+    return scored;
+  }, [query, values]);
+
+  const addTitle = (t: string) => {
+    const v = t.trim();
+    if (!v) return;
+    if (values.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+    onChange([...values, v]);
+    setQuery("");
+  };
+
+  const removeTitle = (t: string) => {
+    onChange(values.filter((x) => x !== t));
+  };
+
+  const showCustomAdd =
+    query.trim().length > 0 &&
+    !suggestions.some((s) => s.toLowerCase() === query.trim().toLowerCase()) &&
+    !values.some((v) => v.toLowerCase() === query.trim().toLowerCase());
+
+  return (
+    <div className="space-y-2" ref={containerRef}>
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Briefcase className="h-3.5 w-3.5" /> Job title
+        </Label>
+        {values.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange([]);
+              setQuery("");
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      <div className="relative">
+        <div
+          className="flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm focus-within:ring-1 focus-within:ring-ring"
+          onClick={() => setOpen(true)}
+        >
+          {values.map((t) => (
+            <Badge key={t} variant="secondary" className="gap-1">
+              {t}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeTitle(t);
+                }}
+                aria-label={`Remove ${t}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && query.trim()) {
+                e.preventDefault();
+                addTitle(suggestions[0] ?? query);
+              } else if (e.key === "Backspace" && !query && values.length > 0) {
+                removeTitle(values[values.length - 1]);
+              } else if (e.key === "Escape") {
+                setOpen(false);
+              }
+            }}
+            placeholder={values.length === 0 ? "Search job titles…" : ""}
+            className="flex-1 min-w-[8ch] bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+
+        {open && (suggestions.length > 0 || showCustomAdd) && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  addTitle(s);
+                }}
+                className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+              >
+                {s}
+              </button>
+            ))}
+            {showCustomAdd && (
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  addTitle(query);
+                }}
+                className="block w-full rounded px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent"
+              >
+                Add "{query.trim()}"
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
