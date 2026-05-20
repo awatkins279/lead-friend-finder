@@ -7,8 +7,30 @@ const FiltersSchema = z.object({
   company: z.string().max(200).optional().default(""),
   industry: z.string().max(200).optional().default(""),
   location: z.string().max(200).optional().default(""),
+  companySize: z.string().max(50).optional().default(""),
   hasPhone: z.boolean().optional().default(false),
   hasEmail: z.boolean().optional().default(false),
+});
+
+const SIZE_BUCKETS: Record<string, string[]> = {
+  "1-10": ["1", "1 to 10", "2 to 10"],
+  "11-25": ["11 to 25"],
+  "11-50": ["11 to 50"],
+  "26-50": ["26 to 50"],
+  "51-100": ["51 to 100"],
+  "51-200": ["51 to 200"],
+  "101-250": ["101 to 250"],
+  "201-500": ["201 to 500"],
+  "251-500": ["251 to 500"],
+  "501-1000": ["501 to 1000", "501 to 1,000"],
+  "1001-2500": ["1001 to 5000", "1,001 to 5,000"],
+  "2501-5000": ["1001 to 5000", "1,001 to 5,000"],
+  "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+"],
+};
+
+const Input = z.object({
+  filters: FiltersSchema,
+  limit: z.number().int().min(1).max(50000),
 });
 
 const Input = z.object({
