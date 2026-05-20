@@ -68,6 +68,9 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
         const t = filters.location.trim();
         q = q.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
       }
+      if (filters.companySize && SIZE_BUCKETS[filters.companySize]) {
+        q = q.in("org_employee_count", SIZE_BUCKETS[filters.companySize]);
+      }
       if (filters.hasPhone) q = q.not("phone", "is", null).neq("phone", "");
       if (filters.hasEmail) q = q.not("email", "is", null).neq("email", "");
 
