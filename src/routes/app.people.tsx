@@ -109,6 +109,7 @@ const DETAIL_COLS =
   "org_description,org_website_url,org_industry,org_employee_count";
 
 type Filters = {
+  name: string;
   titles: string[];
   company: string;
   location: string;
@@ -119,6 +120,7 @@ type Filters = {
 };
 
 const EMPTY: Filters = {
+  name: "",
   titles: [],
   company: "",
   location: "",
