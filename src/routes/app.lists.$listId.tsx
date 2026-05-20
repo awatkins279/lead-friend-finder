@@ -33,7 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { generateCallScript, type CallScript } from "@/lib/calls.functions";
+import { generateCallScript, getTwilioToken, startCall, endCall, type CallScript } from "@/lib/calls.functions";
+import { Phone as PhoneIcon, PhoneOff, MicOff, Mic } from "lucide-react";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -1183,11 +1184,107 @@ function CallWorkstation({
   onChanged: () => void;
 }) {
   const genScriptFn = useServerFn(generateCallScript);
+  const getTokenFn = useServerFn(getTwilioToken);
+  const startCallFn = useServerFn(startCall);
+  const endCallFn = useServerFn(endCall);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
   const [localScripts, setLocalScripts] = useState<Record<string, CallScript>>({});
   const [outcomeBusy, setOutcomeBusy] = useState(false);
   const [notes, setNotes] = useState("");
+
+  // ---- In-app calling (Twilio Voice SDK) ----
+  const [phoneAccount, setPhoneAccount] = useState<{ id: string; label: string; from_number: string | null } | null>(null);
+  const [device, setDevice] = useState<any>(null);
+  const [connection, setConnection] = useState<any>(null);
+  const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "ringing" | "in_progress" | "ending">("idle");
+  const [callId, setCallId] = useState<string | null>(null);
+  const [callStart, setCallStart] = useState<number | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  // Load default phone account
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("user_phone_accounts")
+        .select("id,label,from_number,is_default")
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (data) setPhoneAccount({ id: data.id, label: data.label, from_number: data.from_number });
+    })();
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try { connection?.disconnect?.(); } catch {}
+      try { device?.destroy?.(); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ensureDevice = async () => {
+    if (!phoneAccount) throw new Error("No phone account configured. Set one up in Sending Accounts.");
+    if (device) return device;
+    const { token } = await getTokenFn({ data: { phoneAccountId: phoneAccount.id } });
+    const { Device } = await import("@twilio/voice-sdk");
+    const d = new Device(token, { codecPreferences: ["opus" as any, "pcmu" as any], logLevel: 1 } as any);
+    await d.register();
+    setDevice(d);
+    return d;
+  };
+
+  const startInAppCall = async () => {
+    if (!active?.lead?.phone) return toast.error("No phone number on this lead");
+    if (!phoneAccount) return toast.error("No phone account — set one up in Sending Accounts");
+    try {
+      setCallStatus("connecting");
+      const d = await ensureDevice();
+      const { callId: newCallId } = await startCallFn({
+        data: {
+          listId,
+          leadId: active.lead_id,
+          phoneAccountId: phoneAccount.id,
+          toNumber: active.lead.phone,
+        },
+      });
+      setCallId(newCallId);
+      const conn = await d.connect({ params: { To: active.lead.phone, callId: newCallId } });
+      setConnection(conn);
+      setCallStatus("ringing");
+      conn.on("accept", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
+      conn.on("disconnect", () => finishCall(newCallId));
+      conn.on("cancel", () => finishCall(newCallId));
+      conn.on("error", (e: any) => { toast.error(e?.message ?? "Call error"); finishCall(newCallId); });
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to start call");
+      setCallStatus("idle");
+    }
+  };
+
+  const finishCall = async (idOverride?: string) => {
+    const cid = idOverride ?? callId;
+    setCallStatus("ending");
+    const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
+    try { connection?.disconnect?.(); } catch {}
+    setConnection(null);
+    setMuted(false);
+    if (cid) {
+      try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
+    }
+    setCallId(null);
+    setCallStart(null);
+    setCallStatus("idle");
+  };
+
+  const toggleMute = () => {
+    if (!connection) return;
+    const next = !muted;
+    connection.mute(next);
+    setMuted(next);
+  };
 
   useEffect(() => {
     if (activeId || rows.length === 0) return;
@@ -1347,14 +1444,42 @@ function CallWorkstation({
                   Next →
                 </Button>
                 {active.lead?.phone ? (
-                  <a
-                    href={`tel:${active.lead.phone}`}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90"
-                  >
-                    <Phone className="h-4 w-4" /> {active.lead.phone}
-                  </a>
+                  callStatus === "idle" ? (
+                    <Button
+                      size="sm"
+                      onClick={startInAppCall}
+                      disabled={!phoneAccount}
+                      title={phoneAccount ? `Call using ${phoneAccount.label}` : "Set up a phone account first"}
+                    >
+                      <PhoneIcon className="mr-1.5 h-4 w-4" /> Call {active.lead.phone}
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-md border bg-emerald-50 px-2 py-1">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                      </span>
+                      <span className="text-xs font-medium text-emerald-900">
+                        {callStatus === "connecting" && "Connecting…"}
+                        {callStatus === "ringing" && "Ringing…"}
+                        {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
+                        {callStatus === "ending" && "Ending…"}
+                      </span>
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection}>
+                        {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => finishCall()}>
+                        <PhoneOff className="mr-1 h-3.5 w-3.5" /> Hang up
+                      </Button>
+                    </div>
+                  )
                 ) : (
                   <span className="text-xs text-muted-foreground">No phone on file</span>
+                )}
+                {!phoneAccount && callStatus === "idle" && (
+                  <Link to="/app/accounts" className="text-[11px] text-primary underline">
+                    Set up phone
+                  </Link>
                 )}
               </div>
             </div>
@@ -1479,4 +1604,17 @@ function CallWorkstation({
       </div>
     </div>
   );
+}
+
+function CallTimer({ startedAt }: { startedAt: number | null }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  if (!startedAt) return <>00:00</>;
+  const s = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return <>{mm}:{ss}</>;
 }
