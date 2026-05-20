@@ -368,7 +368,6 @@ function PeoplePage() {
     }
   };
 
-  const hasSelection = picked.size > 0;
 
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
