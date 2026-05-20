@@ -715,6 +715,24 @@ function PeoplePage() {
               onChange={(v) => setDraft({ ...draft, industry: v })}
             />
 
+            <div>
+              <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Building2 className="h-3.5 w-3.5" /> Company size
+              </Label>
+              <select
+                value={draft.companySize}
+                onChange={(e) => setDraft({ ...draft, companySize: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Any size</option>
+                {SIZE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label} employees
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2 pt-2">
               <Toggle
                 label="Has phone number"
