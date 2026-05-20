@@ -113,7 +113,7 @@ type Filters = {
   company: string;
   location: string;
   industry: string;
-  companySize: string;
+  companySize: string[];
   hasPhone: boolean;
   hasEmail: boolean;
 };
@@ -123,7 +123,7 @@ const EMPTY: Filters = {
   company: "",
   location: "",
   industry: "",
-  companySize: "",
+  companySize: [],
   hasPhone: false,
   hasEmail: false,
 };
@@ -132,14 +132,11 @@ const EMPTY: Filters = {
 // Source data uses many notations (commas, "to" vs "+"), so we enumerate.
 const SIZE_BUCKETS: Record<string, string[]> = {
   "1-10": ["1", "1 to 10", "2 to 10"],
-  "11-25": ["11 to 25"],
-  "11-50": ["11 to 50"],
-  "26-50": ["26 to 50"],
-  "51-100": ["51 to 100"],
-  "51-200": ["51 to 200"],
-  "101-250": ["101 to 250"],
-  "201-500": ["201 to 500"],
-  "251-500": ["251 to 500"],
+  "11-25": ["11 to 25", "11 to 50"],
+  "26-50": ["26 to 50", "11 to 50"],
+  "51-100": ["51 to 100", "51 to 200"],
+  "101-250": ["101 to 250", "51 to 200", "201 to 500"],
+  "251-500": ["251 to 500", "201 to 500"],
   "501-1000": ["501 to 1000", "501 to 1,000"],
   "1001-2500": ["1001 to 5000", "1,001 to 5,000"],
   "2501-5000": ["1001 to 5000", "1,001 to 5,000"],
@@ -149,12 +146,9 @@ const SIZE_BUCKETS: Record<string, string[]> = {
 const SIZE_OPTIONS: { value: string; label: string }[] = [
   { value: "1-10", label: "1-10" },
   { value: "11-25", label: "11-25" },
-  { value: "11-50", label: "11-50" },
   { value: "26-50", label: "26-50" },
   { value: "51-100", label: "51-100" },
-  { value: "51-200", label: "51-200" },
   { value: "101-250", label: "101-250" },
-  { value: "201-500", label: "201-500" },
   { value: "251-500", label: "251-500" },
   { value: "501-1000", label: "501-1,000" },
   { value: "1001-2500", label: "1,001-2,500" },
@@ -185,8 +179,12 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
     const t = f.location.trim();
     r = r.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
   }
-  if (f.companySize && SIZE_BUCKETS[f.companySize]) {
-    r = r.in("org_employee_count", SIZE_BUCKETS[f.companySize]);
+  const sizes = f.companySize ?? [];
+  if (sizes.length > 0) {
+    const raw = Array.from(
+      new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])),
+    );
+    if (raw.length > 0) r = r.in("org_employee_count", raw);
   }
   if (f.hasPhone) r = r.not("phone", "is", null).neq("phone", "");
   if (f.hasEmail) r = r.not("email", "is", null).neq("email", "");
