@@ -214,7 +214,7 @@ function PeoplePage() {
         .from("leads")
         .select(
           "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,org_description,org_website_url,org_industry,org_employee_count",
-          { count: "exact" },
+          { count: "estimated" },
         );
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
