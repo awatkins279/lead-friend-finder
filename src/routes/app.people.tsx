@@ -100,7 +100,7 @@ type Lead = {
 };
 
 type Filters = {
-  title: string;
+  titles: string[];
   company: string;
   location: string;
   industry: string;
@@ -109,7 +109,7 @@ type Filters = {
 };
 
 const EMPTY: Filters = {
-  title: "",
+  titles: [],
   company: "",
   location: "",
   industry: "",
@@ -120,9 +120,20 @@ const EMPTY: Filters = {
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
 
+function escapeForOr(v: string) {
+  // PostgREST .or() uses commas as separators; escape them in user input.
+  return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
 function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any }>(q: T, f: Filters): T {
   let r: any = q;
-  if (f.title.trim()) r = r.ilike("title", `%${f.title.trim()}%`);
+  const titles = (f.titles ?? []).map((t) => t.trim()).filter(Boolean);
+  if (titles.length === 1) {
+    r = r.ilike("title", `%${titles[0]}%`);
+  } else if (titles.length > 1) {
+    const expr = titles.map((t) => `title.ilike.%${escapeForOr(t)}%`).join(",");
+    r = r.or(expr);
+  }
   if (f.company.trim()) r = r.ilike("org_name", `%${f.company.trim()}%`);
   if (f.industry.trim()) r = r.ilike("org_industry", `%${f.industry.trim()}%`);
   if (f.location.trim()) {
