@@ -321,3 +321,100 @@ export const endCall = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ---------------------------------------------------------------------------
+// RingCentral RingOut — phones the rep first, bridges to the prospect when answered.
+// ---------------------------------------------------------------------------
+const ringOutInput = z.object({
+  listId: z.string().uuid(),
+  leadId: z.string().min(1),
+  phoneAccountId: z.string().uuid(),
+  toNumber: z.string().min(3).max(32),
+});
+
+export const startRingOutCall = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => ringOutInput.parse(i))
+  .handler(async ({ data, context }): Promise<{ callId: string; ringOutId: string }> => {
+    const { supabase, userId } = context;
+
+    const { data: acc, error: accErr } = await supabase
+      .from("user_phone_accounts")
+      .select("provider, from_number, credentials")
+      .eq("id", data.phoneAccountId)
+      .maybeSingle();
+    if (accErr || !acc) throw new Error("Phone account not found");
+    if (acc.provider !== "ringcentral") throw new Error("Account is not RingCentral");
+
+    const creds = (acc.credentials ?? {}) as Record<string, string>;
+    const serverUrl = (creds.server_url || "https://platform.ringcentral.com").replace(/\/$/, "");
+    const clientId = creds.client_id;
+    const clientSecret = creds.client_secret;
+    const jwt = creds.jwt;
+    const ringTo = creds.ring_to_number;
+    const callerId = acc.from_number;
+
+    if (!clientId || !clientSecret || !jwt || !ringTo) {
+      throw new Error("RingCentral account is missing credentials. Edit it in Sending Accounts.");
+    }
+
+    // 1) Exchange JWT for access token
+    const tokenRes = await fetch(`${serverUrl}/restapi/oauth/token`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+    });
+    if (!tokenRes.ok) {
+      const t = await tokenRes.text();
+      throw new Error(`RingCentral auth failed (${tokenRes.status}): ${t.slice(0, 200)}`);
+    }
+    const tokenJson = await tokenRes.json();
+    const accessToken: string = tokenJson.access_token;
+
+    // 2) Place RingOut
+    const ringOutRes = await fetch(`${serverUrl}/restapi/v1.0/account/~/extension/~/ring-out`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        from: { phoneNumber: ringTo },
+        to: { phoneNumber: data.toNumber },
+        callerId: callerId ? { phoneNumber: callerId } : undefined,
+        playPrompt: false,
+      }),
+    });
+    if (!ringOutRes.ok) {
+      const t = await ringOutRes.text();
+      throw new Error(`RingOut failed (${ringOutRes.status}): ${t.slice(0, 300)}`);
+    }
+    const ringOutJson = await ringOutRes.json();
+
+    // 3) Persist call row
+    const { data: row, error } = await supabase
+      .from("calls")
+      .insert({
+        user_id: userId,
+        list_id: data.listId,
+        lead_id: data.leadId,
+        phone_account_id: data.phoneAccountId,
+        to_number: data.toNumber,
+        from_number: callerId,
+        status: "ringing",
+        twilio_call_sid: String(ringOutJson?.id ?? ""),
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    return { callId: row.id, ringOutId: String(ringOutJson?.id ?? "") };
+  });
