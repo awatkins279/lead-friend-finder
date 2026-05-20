@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const FiltersSchema = z.object({
+  name: z.string().max(200).optional().default(""),
   titles: z.array(z.string().max(200)).max(50).optional().default([]),
   company: z.string().max(200).optional().default(""),
   industry: z.string().max(200).optional().default(""),
@@ -52,6 +53,21 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     while (ids.length < limit) {
       const take = Math.min(CHUNK, limit - ids.length);
       let q: any = supabase.from("leads").select("id");
+
+      const nameQ = (filters.name ?? "").trim();
+      if (nameQ) {
+        const parts = nameQ.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+          const first = escapeForOr(parts[0]);
+          const last = escapeForOr(parts.slice(1).join(" "));
+          q = q
+            .or(`first_name.ilike.%${first}%,last_name.ilike.%${first}%`)
+            .or(`first_name.ilike.%${last}%,last_name.ilike.%${last}%`);
+        } else {
+          const t = escapeForOr(nameQ);
+          q = q.or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
+        }
+      }
 
       const titles = (filters.titles ?? []).map((t) => t.trim()).filter(Boolean);
       if (titles.length === 1) {
