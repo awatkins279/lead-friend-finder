@@ -561,6 +561,37 @@ function PeoplePage() {
     [picked, scores, minScore],
   );
 
+  const hasSelection = picked.size > 0;
+
+  // Stable arrays/maps for child dialogs so they don't re-render every keystroke
+  const pickedIds = useMemo(() => Array.from(picked), [picked]);
+  const campaignLeadScores = useMemo(
+    () => new Map(pickedIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
+    [pickedIds, scores],
+  );
+
+  // Lazily fetch heavy detail fields only when the side sheet opens
+  const { data: selectedDetail } = useQuery({
+    enabled: !!selected,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    queryKey: ["lead-detail", selected?.id],
+    queryFn: async () => {
+      if (!selected) return null;
+      const { data, error } = await supabase
+        .from("leads")
+        .select(DETAIL_COLS)
+        .eq("id", selected.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Pick<Lead, "org_description" | "org_website_url" | "org_industry" | "org_employee_count"> | null;
+    },
+  });
+  const selectedFull: Lead | null = selected
+    ? { ...selected, ...(selectedDetail ?? {}) }
+    : null;
+
 
   return (
     <div className="flex h-screen flex-col">
