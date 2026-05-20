@@ -54,6 +54,7 @@ function AccountsPage() {
   const [accounts, setAccounts] = useState<PhoneAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<PhoneAccountRow | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -90,12 +91,23 @@ function AccountsPage() {
 
   const pickProvider = (p: PhoneProvider) => {
     if (!p.available) {
-      toast.info(`${p.name} support is coming soon. Twilio is available today.`);
+      toast.info(`${p.name} support is coming soon.`);
       return;
     }
     setPickerOpen(false);
     setEditing(null);
-    setOpen(true);
+    if (p.id === "twilio") {
+      setOpen(true);
+    } else {
+      setProviderOpen(p.id);
+    }
+  };
+
+  const openEdit = (a: PhoneAccountRow) => {
+    setEditing(a);
+    const prov = (a as unknown as { provider?: string }).provider ?? "twilio";
+    if (prov === "twilio") setOpen(true);
+    else setProviderOpen(prov);
   };
 
   const accountCount = accounts.length;
