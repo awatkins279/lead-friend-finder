@@ -134,24 +134,39 @@ function ListsPage() {
             </p>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {data.map((l) => (
-              <Card key={l.id} className="group relative flex flex-col gap-3 p-5 transition-shadow hover:shadow-md">
+              <Card
+                key={l.id}
+                className="group relative flex min-h-[260px] flex-col gap-4 overflow-hidden border-border/60 bg-gradient-to-br from-card to-card/60 p-7 shadow-sm transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"
+              >
+                <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 opacity-60 blur-3xl" />
                 <button
                   onClick={() => remove(l.id)}
-                  className="absolute right-3 top-3 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-destructive group-hover:opacity-100"
+                  className="absolute right-4 top-4 z-10 rounded-md p-1.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                   aria-label="Delete list"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
-                <Link to="/app/lists/$listId" params={{ listId: l.id }} className="flex flex-col gap-2">
-                  <h3 className="pr-6 text-base font-semibold">{l.name}</h3>
+                <Link
+                  to="/app/lists/$listId"
+                  params={{ listId: l.id }}
+                  className="relative flex flex-1 flex-col gap-3"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+                    <ListIcon className="h-6 w-6" />
+                  </div>
+                  <h3 className="pr-8 text-2xl font-semibold leading-tight tracking-tight">
+                    {l.name}
+                  </h3>
                   {l.description && (
-                    <p className="line-clamp-2 text-sm text-muted-foreground">{l.description}</p>
+                    <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                      {l.description}
+                    </p>
                   )}
-                  <div className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
-                    <Users className="h-3.5 w-3.5" />
-                    {l.count} {l.count === 1 ? "lead" : "leads"}
+                  <div className="mt-auto flex items-center gap-2 pt-3 text-sm font-medium text-foreground/70">
+                    <Users className="h-4 w-4" />
+                    {l.count.toLocaleString()} {l.count === 1 ? "lead" : "leads"}
                   </div>
                 </Link>
               </Card>
