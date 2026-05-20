@@ -1175,11 +1175,15 @@ function IppBreakdownPanel({ research, scored }: { research: Row["research"]; sc
 function CallWorkstation({
   listId,
   rows,
+  initialActiveLeadId,
+  onConsumedInitial,
   onOpenConfig,
   onChanged,
 }: {
   listId: string;
   rows: Row[];
+  initialActiveLeadId?: string | null;
+  onConsumedInitial?: () => void;
   onOpenConfig: () => void;
   onChanged: () => void;
 }) {
