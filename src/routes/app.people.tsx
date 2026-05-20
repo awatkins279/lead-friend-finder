@@ -702,10 +702,18 @@ function PeoplePage() {
           </div>
 
           <div className="space-y-5">
+            <Field
+              icon={<Search className="h-3.5 w-3.5" />}
+              label="Name"
+              placeholder="Search by first or last name"
+              value={draft.name}
+              onChange={(v) => setDraft({ ...draft, name: v })}
+            />
             <TitleMultiSelect
               values={draft.titles}
               onChange={(next) => setDraft({ ...draft, titles: next })}
             />
+
 
             <Field
               icon={<Building2 className="h-3.5 w-3.5" />}
