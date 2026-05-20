@@ -596,13 +596,11 @@ function PeoplePage() {
           </div>
 
           <div className="space-y-5">
-            <Field
-              icon={<Briefcase className="h-3.5 w-3.5" />}
-              label="Job title"
-              placeholder="e.g. VP of Sales"
-              value={draft.title}
-              onChange={(v) => setDraft({ ...draft, title: v })}
+            <TitleMultiSelect
+              values={draft.titles}
+              onChange={(next) => setDraft({ ...draft, titles: next })}
             />
+
             <Field
               icon={<Building2 className="h-3.5 w-3.5" />}
               label="Company"
