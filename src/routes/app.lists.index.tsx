@@ -159,11 +159,6 @@ function ListsPage() {
                   <h3 className="pr-8 text-2xl font-semibold leading-tight tracking-tight">
                     {l.name}
                   </h3>
-                  {l.description && (
-                    <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                      {l.description}
-                    </p>
-                  )}
                   <div className="mt-auto flex items-center gap-2 pt-3 text-sm font-medium text-foreground/70">
                     <Users className="h-4 w-4" />
                     {l.count.toLocaleString()} {l.count === 1 ? "lead" : "leads"}
