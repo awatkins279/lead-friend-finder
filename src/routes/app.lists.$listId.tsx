@@ -615,17 +615,18 @@ function LeadDrawer({
   row,
   onClose,
   onChanged,
+  onEnterCallMode,
 }: {
   listId: string;
   row: Row | null;
   onClose: () => void;
   onChanged: () => void;
+  onEnterCallMode: (leadId: string) => void;
 }) {
   const [emails, setEmails] = useState<EmailInSequence[]>([]);
   const [activeStep, setActiveStep] = useState("1");
   const [script, setScript] = useState<CallScript | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
-  const [callMode, setCallMode] = useState(false);
   const genScriptFn = useServerFn(generateCallScript);
 
   useEffect(() => {
