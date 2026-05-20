@@ -227,6 +227,7 @@ function PeoplePage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = (Object.keys(filters) as (keyof Filters)[]).filter((k) => {
     const v = filters[k];
+    if (Array.isArray(v)) return v.length > 0;
     return typeof v === "string" ? v.trim() !== "" : v === true;
   });
   const allPageChecked = rows.length > 0 && rows.every((r) => picked.has(r.id));
