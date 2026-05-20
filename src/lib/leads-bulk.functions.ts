@@ -27,12 +27,12 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { filters, limit } = data;
 
-    // Keyset-paginate on the server in API-safe chunks. This backend caps a
-    // single REST response at ~1000 rows, so requesting more causes the loop
-    // to stop after the first batch and selection gets stuck at 1000.
+    // Page through the filtered result set in API-safe chunks. For text-filtered
+    // searches, forcing ORDER BY id made Postgres sort every matching row before
+    // returning the first page, which is what hit statement timeouts.
     const CHUNK = 1000;
     const ids: string[] = [];
-    let cursor: string | null = null;
+    let offset = 0;
 
     while (ids.length < limit) {
       const take = Math.min(CHUNK, limit - ids.length);
@@ -53,16 +53,14 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
       if (filters.hasPhone) q = q.not("phone", "is", null).neq("phone", "");
       if (filters.hasEmail) q = q.not("email", "is", null).neq("email", "");
 
-      q = q.order("id", { ascending: true });
-      if (cursor) q = q.gt("id", cursor);
-      q = q.limit(take);
+      q = q.range(offset, offset + take - 1);
 
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const batch = (rows ?? []) as { id: string }[];
       if (batch.length === 0) break;
       for (const r of batch) ids.push(r.id);
-      cursor = batch[batch.length - 1].id;
+      offset += batch.length;
       if (batch.length < take) break;
     }
 
