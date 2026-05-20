@@ -147,27 +147,11 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
 }
 
 async function fetchMatchingIds(filters: Filters, limit: number): Promise<string[]> {
-  // Keyset pagination on `id` (primary key) — avoids large OFFSETs and sort
-  // costs that trigger Postgres statement timeouts on big result sets.
-  const ids: string[] = [];
-  const chunk = 1000;
-  let cursor: string | null = null;
-  while (ids.length < limit) {
-    const take = Math.min(chunk, limit - ids.length);
-    let q: any = supabase.from("leads").select("id");
-    q = applyFilters(q, filters);
-    q = q.order("id", { ascending: true });
-    if (cursor) q = q.gt("id", cursor);
-    q = q.limit(take);
-    const { data, error } = await q;
-    if (error) throw error;
-    const rows = (data ?? []) as { id: string }[];
-    if (rows.length === 0) break;
-    rows.forEach((r) => ids.push(r.id));
-    cursor = rows[rows.length - 1].id;
-    if (rows.length < take) break;
-  }
-  return ids;
+  // One server round trip; the worker keyset-paginates locally over a fast
+  // PG connection. Avoids dozens of cross-internet round trips from the
+  // browser, which was the main source of slowness for large selections.
+  const res = await fetchMatchingIdsBulk({ data: { filters, limit } });
+  return res.ids;
 }
 
 function PeoplePage() {
