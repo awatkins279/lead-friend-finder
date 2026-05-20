@@ -65,6 +65,7 @@ import {
   getJobSnapshot as getJobSnapshotFn,
   cancelScoringJob as cancelScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
+import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 
 type Signal = { label: string; verdict: "strong" | "partial" | "weak" | "unknown"; note: string };
 type ScoreInfo = {
