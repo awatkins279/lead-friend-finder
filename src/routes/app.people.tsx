@@ -749,20 +749,25 @@ function PeoplePage() {
         <section className="flex-1 overflow-y-auto">
           {activeChips.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b bg-background px-6 py-3">
-              {activeChips.map((k) => (
-                <Badge key={k} variant="secondary" className="gap-1">
-                  {k}: {String(filters[k])}
-                  <button
-                    onClick={() => {
-                      const next = { ...filters, [k]: typeof filters[k] === "boolean" ? false : "" } as Filters;
-                      setFilters(next);
-                      setDraft(next);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
+              {activeChips.map((k) => {
+                const v = filters[k];
+                const display = Array.isArray(v) ? v.join(", ") : String(v);
+                const emptyVal: any = Array.isArray(v) ? [] : typeof v === "boolean" ? false : "";
+                return (
+                  <Badge key={k} variant="secondary" className="gap-1">
+                    {k}: {display}
+                    <button
+                      onClick={() => {
+                        const next = { ...filters, [k]: emptyVal } as Filters;
+                        setFilters(next);
+                        setDraft(next);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
             </div>
           )}
 
