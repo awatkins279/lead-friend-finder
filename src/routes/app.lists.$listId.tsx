@@ -1184,11 +1184,107 @@ function CallWorkstation({
   onChanged: () => void;
 }) {
   const genScriptFn = useServerFn(generateCallScript);
+  const getTokenFn = useServerFn(getTwilioToken);
+  const startCallFn = useServerFn(startCall);
+  const endCallFn = useServerFn(endCall);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
   const [localScripts, setLocalScripts] = useState<Record<string, CallScript>>({});
   const [outcomeBusy, setOutcomeBusy] = useState(false);
   const [notes, setNotes] = useState("");
+
+  // ---- In-app calling (Twilio Voice SDK) ----
+  const [phoneAccount, setPhoneAccount] = useState<{ id: string; label: string; from_number: string | null } | null>(null);
+  const [device, setDevice] = useState<any>(null);
+  const [connection, setConnection] = useState<any>(null);
+  const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "ringing" | "in_progress" | "ending">("idle");
+  const [callId, setCallId] = useState<string | null>(null);
+  const [callStart, setCallStart] = useState<number | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  // Load default phone account
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("user_phone_accounts")
+        .select("id,label,from_number,is_default")
+        .order("is_default", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (data) setPhoneAccount({ id: data.id, label: data.label, from_number: data.from_number });
+    })();
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try { connection?.disconnect?.(); } catch {}
+      try { device?.destroy?.(); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ensureDevice = async () => {
+    if (!phoneAccount) throw new Error("No phone account configured. Set one up in Sending Accounts.");
+    if (device) return device;
+    const { token } = await getTokenFn({ data: { phoneAccountId: phoneAccount.id } });
+    const { Device } = await import("@twilio/voice-sdk");
+    const d = new Device(token, { codecPreferences: ["opus" as any, "pcmu" as any], logLevel: 1 } as any);
+    await d.register();
+    setDevice(d);
+    return d;
+  };
+
+  const startInAppCall = async () => {
+    if (!active?.lead?.phone) return toast.error("No phone number on this lead");
+    if (!phoneAccount) return toast.error("No phone account — set one up in Sending Accounts");
+    try {
+      setCallStatus("connecting");
+      const d = await ensureDevice();
+      const { callId: newCallId } = await startCallFn({
+        data: {
+          listId,
+          leadId: active.lead_id,
+          phoneAccountId: phoneAccount.id,
+          toNumber: active.lead.phone,
+        },
+      });
+      setCallId(newCallId);
+      const conn = await d.connect({ params: { To: active.lead.phone, callId: newCallId } });
+      setConnection(conn);
+      setCallStatus("ringing");
+      conn.on("accept", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
+      conn.on("disconnect", () => finishCall(newCallId));
+      conn.on("cancel", () => finishCall(newCallId));
+      conn.on("error", (e: any) => { toast.error(e?.message ?? "Call error"); finishCall(newCallId); });
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to start call");
+      setCallStatus("idle");
+    }
+  };
+
+  const finishCall = async (idOverride?: string) => {
+    const cid = idOverride ?? callId;
+    setCallStatus("ending");
+    const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
+    try { connection?.disconnect?.(); } catch {}
+    setConnection(null);
+    setMuted(false);
+    if (cid) {
+      try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
+    }
+    setCallId(null);
+    setCallStart(null);
+    setCallStatus("idle");
+  };
+
+  const toggleMute = () => {
+    if (!connection) return;
+    const next = !muted;
+    connection.mute(next);
+    setMuted(next);
+  };
 
   useEffect(() => {
     if (activeId || rows.length === 0) return;
