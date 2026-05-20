@@ -581,6 +581,11 @@ function ListDetailPage() {
         listId={listId}
         row={open}
         onClose={() => setOpen(null)}
+        onEnterCallMode={(leadId) => {
+          setPendingCallLeadId(leadId);
+          setActiveTab("calling");
+          setOpen(null);
+        }}
         onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
       />
 
