@@ -2322,3 +2322,32 @@ function SdrAssignBar({
     </div>
   );
 }
+
+function AiVoicemailStatusBadge({ userId: _userId }: { userId: string }) {
+  const getProfileFn = useServerFn(getVoicemailProfile);
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getProfileFn()
+      .then((p: any) => { if (alive) setOn(Boolean(p?.voice_id)); })
+      .catch(() => { if (alive) setOn(false); });
+    return () => { alive = false; };
+  }, [getProfileFn]);
+  return (
+    <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+      <div className="flex items-center gap-2 text-sm">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="font-medium">AI Voicemail Agent</span>
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+          on ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"
+        }`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+          {on === null ? "…" : on ? "On" : "Off"}
+        </span>
+      </div>
+      <Link to="/app/voicemail-agent" className="text-xs text-primary hover:underline">
+        Configure →
+      </Link>
+    </div>
+  );
+}
