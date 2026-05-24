@@ -33,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { generateCallScript, getTwilioToken, startCall, startRingOutCall, endCall, type CallScript } from "@/lib/calls.functions";
+import { generateCallScript, getTwilioToken, startCall, startRingOutCall, endCall, getRingCentralSipProvision, startRingCentralWebCall, type CallScript } from "@/lib/calls.functions";
 import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot } from "lucide-react";
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
