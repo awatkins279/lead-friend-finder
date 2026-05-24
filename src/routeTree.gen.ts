@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppSdrAgentsRoute = AppSdrAgentsRouteImport.update({
+  id: '/sdr-agents',
+  path: '/sdr-agents',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppSavedRoute = AppSavedRouteImport.update({
   id: '/saved',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/app/accounts': typeof AppAccountsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
+  '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/app/accounts': typeof AppAccountsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
+  '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/app/accounts': typeof AppAccountsRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
+  '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/app/accounts'
     | '/app/people'
     | '/app/saved'
+    | '/app/sdr-agents'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/twilio/recording'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/app/accounts'
     | '/app/people'
     | '/app/saved'
+    | '/app/sdr-agents'
     | '/app/lists/$listId'
     | '/app/lists'
     | '/api/public/twilio/recording'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/app/accounts'
     | '/app/people'
     | '/app/saved'
+    | '/app/sdr-agents'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/twilio/recording'
@@ -191,6 +203,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/sdr-agents': {
+      id: '/app/sdr-agents'
+      path: '/sdr-agents'
+      fullPath: '/app/sdr-agents'
+      preLoaderRoute: typeof AppSdrAgentsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/app/saved': {
       id: '/app/saved'
@@ -255,6 +274,7 @@ interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
+  AppSdrAgentsRoute: typeof AppSdrAgentsRoute
   AppListsListIdRoute: typeof AppListsListIdRoute
   AppListsIndexRoute: typeof AppListsIndexRoute
 }
@@ -263,6 +283,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,
+  AppSdrAgentsRoute: AppSdrAgentsRoute,
   AppListsListIdRoute: AppListsListIdRoute,
   AppListsIndexRoute: AppListsIndexRoute,
 }
@@ -280,13 +301,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

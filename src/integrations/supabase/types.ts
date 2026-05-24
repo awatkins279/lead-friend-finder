@@ -297,6 +297,10 @@ export type Database = {
           name: string
           num_emails: number
           personalization_level: string
+          sdr_agent_id: string | null
+          sdr_booking_url_override: string | null
+          sdr_hard_rules_override: string | null
+          sdr_mode_override: string | null
           sender_company: string | null
           sender_name: string | null
           sender_title: string | null
@@ -315,6 +319,10 @@ export type Database = {
           name: string
           num_emails?: number
           personalization_level?: string
+          sdr_agent_id?: string | null
+          sdr_booking_url_override?: string | null
+          sdr_hard_rules_override?: string | null
+          sdr_mode_override?: string | null
           sender_company?: string | null
           sender_name?: string | null
           sender_title?: string | null
@@ -333,6 +341,10 @@ export type Database = {
           name?: string
           num_emails?: number
           personalization_level?: string
+          sdr_agent_id?: string | null
+          sdr_booking_url_override?: string | null
+          sdr_hard_rules_override?: string | null
+          sdr_mode_override?: string | null
           sender_company?: string | null
           sender_name?: string | null
           sender_title?: string | null
@@ -341,7 +353,15 @@ export type Database = {
           what_selling?: string | null
           word_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lists_sdr_agent_id_fkey"
+            columns: ["sdr_agent_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -476,6 +496,179 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sdr_agents: {
+        Row: {
+          booking_url: string | null
+          confidence_threshold: number
+          created_at: string
+          extra_instructions: string | null
+          formality: number
+          handoff_triggers: string | null
+          hard_rules: string | null
+          id: string
+          inbox_account_id: string | null
+          inbox_email: string | null
+          inbox_provider: string | null
+          key_differentiators: string | null
+          mode: string
+          name: string
+          response_speed: string
+          sdr_display_name: string | null
+          signature: string | null
+          tone: string
+          updated_at: string
+          user_id: string
+          what_selling: string | null
+        }
+        Insert: {
+          booking_url?: string | null
+          confidence_threshold?: number
+          created_at?: string
+          extra_instructions?: string | null
+          formality?: number
+          handoff_triggers?: string | null
+          hard_rules?: string | null
+          id?: string
+          inbox_account_id?: string | null
+          inbox_email?: string | null
+          inbox_provider?: string | null
+          key_differentiators?: string | null
+          mode?: string
+          name: string
+          response_speed?: string
+          sdr_display_name?: string | null
+          signature?: string | null
+          tone?: string
+          updated_at?: string
+          user_id: string
+          what_selling?: string | null
+        }
+        Update: {
+          booking_url?: string | null
+          confidence_threshold?: number
+          created_at?: string
+          extra_instructions?: string | null
+          formality?: number
+          handoff_triggers?: string | null
+          hard_rules?: string | null
+          id?: string
+          inbox_account_id?: string | null
+          inbox_email?: string | null
+          inbox_provider?: string | null
+          key_differentiators?: string | null
+          mode?: string
+          name?: string
+          response_speed?: string
+          sdr_display_name?: string | null
+          signature?: string | null
+          tone?: string
+          updated_at?: string
+          user_id?: string
+          what_selling?: string | null
+        }
+        Relationships: []
+      }
+      sdr_knowledge_chunks: {
+        Row: {
+          agent_id: string
+          chunk_index: number
+          content: string
+          created_at: string
+          doc_id: string
+          id: string
+          token_count: number | null
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          chunk_index: number
+          content: string
+          created_at?: string
+          doc_id: string
+          id?: string
+          token_count?: number | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          doc_id?: string
+          id?: string
+          token_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_knowledge_chunks_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_knowledge_chunks_doc_id_fkey"
+            columns: ["doc_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_knowledge_docs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_knowledge_docs: {
+        Row: {
+          agent_id: string
+          chunk_count: number
+          created_at: string
+          error: string | null
+          filename: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          status: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          chunk_count?: number
+          created_at?: string
+          error?: string | null
+          filename: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          chunk_count?: number
+          created_at?: string
+          error?: string | null
+          filename?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_knowledge_docs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_phone_accounts: {
         Row: {

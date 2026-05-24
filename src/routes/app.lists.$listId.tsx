@@ -34,9 +34,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { generateCallScript, getTwilioToken, startCall, startRingOutCall, endCall, type CallScript } from "@/lib/calls.functions";
-import { Phone as PhoneIcon, PhoneOff, MicOff, Mic } from "lucide-react";
+import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot } from "lucide-react";
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -100,7 +101,7 @@ function effectiveEmails(r: Row): EmailInSequence[] {
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string };
+type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null };
 
 function ListDetailPage() {
   const { listId } = Route.useParams();
@@ -129,7 +130,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id",
         )
         .eq("id", listId)
         .maybeSingle();
@@ -420,6 +421,10 @@ function ListDetailPage() {
           </div>
         </div>
       </header>
+
+      <SdrAssignBar listId={listId} currentAgentId={list?.sdr_agent_id ?? null} onChanged={() => refetchList()} />
+
+
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
         <div className="border-b bg-background px-8">
@@ -1689,4 +1694,70 @@ function CallTimer({ startedAt }: { startedAt: number | null }) {
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");
   return <>{mm}:{ss}</>;
+}
+
+function SdrAssignBar({
+  listId,
+  currentAgentId,
+  onChanged,
+}: {
+  listId: string;
+  currentAgentId: string | null;
+  onChanged: () => void;
+}) {
+  const listFn = useServerFn(listSdrAgents);
+  const assignFn = useServerFn(assignAgentToList);
+  const [agents, setAgents] = useState<Array<{ id: string; name: string; inbox_email: string | null }>>([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    listFn({}).then((r) => setAgents(r.agents as typeof agents)).catch(() => {});
+  }, []);
+
+  const handleChange = async (v: string) => {
+    setSaving(true);
+    try {
+      await assignFn({ data: { list_id: listId, agent_id: v === "none" ? null : v } });
+      toast.success(v === "none" ? "SDR paused for this campaign" : "SDR agent assigned");
+      onChanged();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const value = currentAgentId ?? "none";
+  const active = agents.find((a) => a.id === currentAgentId);
+
+  return (
+    <div className="flex items-center gap-3 border-b bg-background px-8 py-2.5 text-sm">
+      <Bot className="h-4 w-4 text-primary" />
+      <span className="font-medium">AI SDR</span>
+      <Select value={value} onValueChange={handleChange} disabled={saving}>
+        <SelectTrigger className="h-8 w-[260px]">
+          <SelectValue placeholder="Select an agent" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">— None (replies disabled) —</SelectItem>
+          {agents.map((a) => (
+            <SelectItem key={a.id} value={a.id}>
+              {a.name}{a.inbox_email ? ` · ${a.inbox_email}` : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {active ? (
+        <span className="text-xs text-muted-foreground">
+          Active — this agent will reply to inbound emails on this campaign.
+        </span>
+      ) : agents.length === 0 ? (
+        <Link to="/app/sdr-agents" className="text-xs text-primary hover:underline">
+          Create an agent →
+        </Link>
+      ) : (
+        <span className="text-xs text-muted-foreground">No agent assigned. Pick one to enable auto-reply.</span>
+      )}
+    </div>
+  );
 }
