@@ -1320,9 +1320,7 @@ function CallWorkstation({
     setCallStatus("ending");
     const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
     try { connection?.disconnect?.(); } catch {}
-    try { rcSession?.terminate?.(); } catch {}
     setConnection(null);
-    setRcSession(null);
     setMuted(false);
     if (cid) {
       try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
