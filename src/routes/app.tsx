@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Linkedin, Bookmark, LogOut, List as ListIcon, Inbox, Bot, Mail } from "lucide-react";
+import { Users, Linkedin, Bookmark, LogOut, List as ListIcon, Inbox, Bot, Mail, Voicemail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/app")({
@@ -40,6 +40,7 @@ function AppShell() {
     { to: "/app/saved", icon: Bookmark, label: "Saved Searches" },
     { to: "/app/accounts", icon: Mail, label: "Sending Accounts" },
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
+    { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
   ];
 
