@@ -33,10 +33,23 @@ export const listSdrAgents = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("sdr_agents")
-      .select("*, sdr_knowledge_docs(count), lists(count)")
+      .select(
+        "*, sdr_knowledge_docs(count), lists(count), email_accounts(email_address, provider, status)"
+      )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { agents: data ?? [] };
+    const agents = (data ?? []).map((a: Record<string, unknown>) => {
+      const ea = a.email_accounts as
+        | { email_address: string; provider: string; status: string }
+        | null;
+      return {
+        ...a,
+        inbox_email: ea?.email_address ?? null,
+        inbox_provider: ea?.provider ?? null,
+        inbox_status: ea?.status ?? null,
+      };
+    });
+    return { agents };
   });
 
 export const getSdrAgent = createServerFn({ method: "POST" })
