@@ -103,6 +103,7 @@ export function SdrAgentDialog({
 }) {
   const [form, setForm] = useState<AgentForm>(EMPTY);
   const [docs, setDocs] = useState<KnowledgeDoc[]>([]);
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccountOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -115,6 +116,11 @@ export function SdrAgentDialog({
 
   useEffect(() => {
     if (!open) return;
+    supabase
+      .from("email_accounts")
+      .select("id, email_address, display_name, status")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setEmailAccounts((data ?? []) as EmailAccountOption[]));
     if (!agentId) {
       setForm(EMPTY);
       setDocs([]);
