@@ -423,21 +423,27 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          elevenlabs_voice_id: string | null
           email: string | null
           full_name: string | null
           id: string
+          voicemail_settings: Json
         }
         Insert: {
           created_at?: string
+          elevenlabs_voice_id?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          voicemail_settings?: Json
         }
         Update: {
           created_at?: string
+          elevenlabs_voice_id?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          voicemail_settings?: Json
         }
         Relationships: []
       }
@@ -1008,6 +1014,48 @@ export type Database = {
           twilio_twiml_app_sid?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      voicemail_logs: {
+        Row: {
+          audio_seconds: number | null
+          call_id: string | null
+          created_at: string
+          error: string | null
+          id: string
+          lead_id: string
+          list_id: string
+          script: string
+          status: string
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          audio_seconds?: number | null
+          call_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id: string
+          list_id: string
+          script: string
+          status?: string
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          audio_seconds?: number | null
+          call_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          lead_id?: string
+          list_id?: string
+          script?: string
+          status?: string
+          user_id?: string
+          voice_id?: string | null
         }
         Relationships: []
       }
