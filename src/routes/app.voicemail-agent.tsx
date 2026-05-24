@@ -1,14 +1,11 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VoicemailAgent } from "@/components/VoicemailAgent";
 
 export const Route = createFileRoute("/app/voicemail-agent")({
   component: VoicemailAgentPage,
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/login" });
-  },
+  head: () => ({ meta: [{ title: "AI Voicemail Agent — NexusAi" }] }),
 });
 
 function VoicemailAgentPage() {
