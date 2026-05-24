@@ -38,7 +38,8 @@ export const listSdrAgents = createServerFn({ method: "GET" })
       )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    const agents = (data ?? []).map((a: Record<string, unknown>) => {
+    const agents = (data ?? []).map((row) => {
+      const a = row as unknown as Record<string, unknown>;
       const ea = a.email_accounts as
         | { email_address: string; provider: string; status: string }
         | null;
