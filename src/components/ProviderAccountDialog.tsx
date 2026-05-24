@@ -12,8 +12,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Phone, Eye, EyeOff, X } from "lucide-react";
+import { Phone, Eye, EyeOff, X, CheckCircle2, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { getRingCentralAuthUrl } from "@/lib/ringcentral.functions";
 import type { PhoneAccountRow } from "@/components/PhoneAccountDialog";
 
 export type ProviderField = {
@@ -116,6 +118,13 @@ export function ProviderAccountDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2 text-sm">
+          {provider.id === "ringcentral" && existing && (
+            <RingCentralAuthStatus
+              phoneAccountId={existing.id}
+              credentials={values}
+            />
+          )}
+
           {provider.instructions && (
             <div className="rounded-md border bg-muted/40 p-3 text-xs">{provider.instructions}</div>
           )}
@@ -235,6 +244,84 @@ function Field({
   );
 }
 
+function RingCentralAuthStatus({
+  phoneAccountId,
+  credentials,
+}: {
+  phoneAccountId: string;
+  credentials: Record<string, string>;
+}) {
+  const getAuthUrl = useServerFn(getRingCentralAuthUrl);
+  const [busy, setBusy] = useState(false);
+  const connected = !!credentials.refresh_token;
+  const hasCreds = !!(credentials.client_id && credentials.client_secret);
+
+  const signIn = async () => {
+    if (!hasCreds) {
+      toast.error("Save your Client ID and Secret first");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { url } = await getAuthUrl({ data: { phoneAccountId } });
+      const popup = window.open(url, "rc-oauth", "width=600,height=720");
+      if (!popup) {
+        toast.error("Pop-up blocked — allow pop-ups for this site and try again.");
+        setBusy(false);
+        return;
+      }
+      const onMsg = (e: MessageEvent) => {
+        if (e.data?.type === "ringcentral-oauth-done") {
+          window.removeEventListener("message", onMsg);
+          toast.success("Signed in! Reload the Sending Accounts page.");
+          setBusy(false);
+        }
+      };
+      window.addEventListener("message", onMsg);
+      // Failsafe — clear busy state when popup closes
+      const t = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(t);
+          setBusy(false);
+        }
+      }, 500);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to start sign-in");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {connected ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                Signed in to RingCentral
+              </>
+            ) : (
+              <>
+                <LogIn className="h-4 w-4 text-amber-500" />
+                Not signed in yet
+              </>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {connected
+              ? "Your browser can now place calls. Re-sign in if calls start failing."
+              : "Save Client ID + Secret first, then click Sign in to authorize browser calling."}
+          </p>
+        </div>
+        <Button size="sm" onClick={signIn} disabled={busy || !hasCreds}>
+          {busy ? "Opening…" : connected ? "Re-sign in" : "Sign in with RingCentral"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------ Provider specs ------------------------------ */
 
 export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
@@ -243,22 +330,20 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
     name: "RingCentral",
     instructions: (
       <>
-        <p className="font-semibold">How to get these</p>
+        <p className="font-semibold">How to connect</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-muted-foreground">
           <li>Go to <a className="underline" href="https://developers.ringcentral.com" target="_blank" rel="noreferrer">developers.ringcentral.com</a> → Console → Apps</li>
-          <li>Create an app — type <em>REST API App</em>, auth <em>JWT</em>, platform type <em>Server-only (No UI)</em></li>
-          <li>Add permissions: <code>RingOut</code>, <code>ReadAccounts</code>, <code>ReadCallLog</code></li>
-          <li>Copy the <em>Client ID</em> and <em>Client Secret</em>; generate a <em>JWT credential</em> from your profile menu (top-right avatar → Credentials)</li>
-          <li>Use server URL <code>https://platform.ringcentral.com</code> (or <code>https://platform.devtest.ringcentral.com</code> for sandbox)</li>
+          <li>Create a <em>REST API App</em> → platform <em>Browser-Based / SPA</em>, auth <em>3-legged OAuth</em></li>
+          <li>Add scope <code>VoIP Calling</code> (plus <code>Read Accounts</code>, <code>Read Call Log</code>)</li>
+          <li>Set OAuth redirect URI to <code>https://lead-friend-finder.lovable.app/api/ringcentral/oauth/callback</code></li>
+          <li>Paste the <em>Client ID</em> + <em>Client Secret</em> below, click Save, then click <strong>Sign in with RingCentral</strong>.</li>
         </ol>
       </>
     ),
     fields: [
-      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true, helper: "Must start with https://. Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox." },
+      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true, helper: "Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox." },
       { key: "client_id", label: "Client ID", required: true },
       { key: "client_secret", label: "Client Secret", type: "password", required: true },
-      { key: "jwt", label: "JWT credential", type: "password", required: true, multiline: true, helper: "Paste the full JWT — usually 500+ characters on one long line, looks like xxx.yyy.zzz. Use Show/Clear above if you need to re-paste." },
-      { key: "ring_to_number", label: "Your phone to ring (E.164)", placeholder: "+15551234567", required: true, helper: "RingCentral calls this number first, then bridges to the prospect when you answer." },
     ],
   },
   vonage: {
