@@ -1346,8 +1346,15 @@ function CallWorkstation({
     const cid = idOverride ?? callId;
     setCallStatus("ending");
     const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
+    // Twilio
     try { connection?.disconnect?.(); } catch {}
+    // RingCentral — hang up the SIP session and tear down the web phone
+    try { await rcSession?.hangup?.(); } catch {}
+    try { await rcSession?.dispose?.(); } catch {}
+    try { await rcWebPhone?.dispose?.(); } catch {}
     setConnection(null);
+    setRcSession(null);
+    setRcWebPhone(null);
     setMuted(false);
     if (cid) {
       try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
@@ -1357,6 +1364,7 @@ function CallWorkstation({
     setCallStatus("idle");
     setFocusMode(false);
   };
+
 
 
   const toggleMute = () => {
@@ -1390,6 +1398,25 @@ function CallWorkstation({
     const next = rows[activeIndex + delta];
     if (next) setActiveId(next.lead_id);
   };
+
+  // Hang up the current call (if any) and jump to the next prospect in the
+  // queue that has a phone number. Used by the "Next call" button in focus mode.
+  const hangupAndNext = async () => {
+    if (callStatus !== "idle") {
+      await finishCall();
+    }
+    if (activeIndex < 0) return;
+    const nextWithPhone = rows.slice(activeIndex + 1).find((r) => r.lead?.phone);
+    const next = nextWithPhone ?? rows[activeIndex + 1];
+    if (next) {
+      setActiveId(next.lead_id);
+      setFocusMode(true);
+    } else {
+      toast.info("No more prospects in the queue");
+      setFocusMode(false);
+    }
+  };
+
 
   const generate = async (force = false) => {
     if (!active) return;
@@ -1725,10 +1752,13 @@ function CallWorkstation({
         canMute={!!connection}
         onToggleMute={toggleMute}
         onHangUp={() => finishCall()}
-        onExit={() => setFocusMode(false)}
+        onExit={async () => { await finishCall(); }}
+        onNext={hangupAndNext}
+        hasNext={activeIndex >= 0 && activeIndex < rows.length - 1}
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
+
     ) : null}
 
     </>
@@ -1749,6 +1779,8 @@ function FocusCallView({
   onToggleMute,
   onHangUp,
   onExit,
+  onNext,
+  hasNext,
   outcomeBusy,
   onLogOutcome,
 }: {
@@ -1765,9 +1797,12 @@ function FocusCallView({
   onToggleMute: () => void;
   onHangUp: () => void;
   onExit: () => void;
+  onNext: () => void;
+  hasNext: boolean;
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
+
   const outcomes = [
     { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
     { v: "interested", label: "Interested", c: "" },
@@ -1813,11 +1848,15 @@ function FocusCallView({
               </Button>
             </div>
           )}
+          <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
+            Next call →
+          </Button>
           <Button size="sm" variant="outline" onClick={onExit}>
-            <X className="mr-1.5 h-4 w-4" /> Exit focus
+            <X className="mr-1.5 h-4 w-4" /> End &amp; exit
           </Button>
         </div>
       </header>
+
 
       {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
