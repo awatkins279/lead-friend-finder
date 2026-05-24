@@ -90,8 +90,8 @@ export const Route = createFileRoute("/api/public/inbox/ingest")({
               status: "open",
             })
             .eq("id", conversationId);
-          await supabaseAdmin.rpc("noop").catch(() => {});
         }
+
 
         const { error: mErr } = await supabaseAdmin.from("sdr_messages").insert({
           conversation_id: conversationId,
