@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppVoicemailAgentRouteImport } from './routes/app.voicemail-agent'
 import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
@@ -39,6 +40,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppVoicemailAgentRoute = AppVoicemailAgentRouteImport.update({
+  id: '/voicemail-agent',
+  path: '/voicemail-agent',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppSdrAgentsRoute = AppSdrAgentsRouteImport.update({
   id: '/sdr-agents',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
+  '/app/voicemail-agent': typeof AppVoicemailAgentRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
+  '/app/voicemail-agent': typeof AppVoicemailAgentRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
+  '/app/voicemail-agent': typeof AppVoicemailAgentRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/app/people'
     | '/app/saved'
     | '/app/sdr-agents'
+    | '/app/voicemail-agent'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/inbox/ingest'
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/app/people'
     | '/app/saved'
     | '/app/sdr-agents'
+    | '/app/voicemail-agent'
     | '/app/lists/$listId'
     | '/app/lists'
     | '/api/public/inbox/ingest'
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/app/people'
     | '/app/saved'
     | '/app/sdr-agents'
+    | '/app/voicemail-agent'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/inbox/ingest'
@@ -242,6 +254,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/app/voicemail-agent': {
+      id: '/app/voicemail-agent'
+      path: '/voicemail-agent'
+      fullPath: '/app/voicemail-agent'
+      preLoaderRoute: typeof AppVoicemailAgentRouteImport
+      parentRoute: typeof AppRoute
     }
     '/app/sdr-agents': {
       id: '/app/sdr-agents'
@@ -336,6 +355,7 @@ interface AppRouteChildren {
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
   AppSdrAgentsRoute: typeof AppSdrAgentsRoute
+  AppVoicemailAgentRoute: typeof AppVoicemailAgentRoute
   AppListsListIdRoute: typeof AppListsListIdRoute
   AppListsIndexRoute: typeof AppListsIndexRoute
 }
@@ -346,6 +366,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,
   AppSdrAgentsRoute: AppSdrAgentsRoute,
+  AppVoicemailAgentRoute: AppVoicemailAgentRoute,
   AppListsListIdRoute: AppListsListIdRoute,
   AppListsIndexRoute: AppListsIndexRoute,
 }
