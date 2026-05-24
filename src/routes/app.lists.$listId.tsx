@@ -1226,6 +1226,8 @@ function CallWorkstation({
   const [callId, setCallId] = useState<string | null>(null);
   const [callStart, setCallStart] = useState<number | null>(null);
   const [muted, setMuted] = useState(false);
+  const [rcWebPhone, setRcWebPhone] = useState<any>(null);
+  const [rcSession, setRcSession] = useState<any>(null);
 
   // Load all phone accounts, keep only the "ready" ones (same rule as Sending Accounts)
   useEffect(() => {
