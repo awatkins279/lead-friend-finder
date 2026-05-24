@@ -1582,15 +1582,13 @@ function CallWorkstation({
                       </span>
                       <span className="text-xs font-medium text-emerald-900">
                         {callStatus === "connecting" && "Connecting…"}
-                        {callStatus === "ringing" && (phoneAccount?.provider === "ringcentral" ? "Ringing your phone…" : "Ringing…")}
+                        {callStatus === "ringing" && "Ringing…"}
                         {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
                         {callStatus === "ending" && "Ending…"}
                       </span>
-                      {phoneAccount?.provider !== "ringcentral" && (
-                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection}>
-                          {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
-                        </Button>
-                      )}
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection && !rcSession}>
+                        {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                      </Button>
                       <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => finishCall()}>
                         <PhoneOff className="mr-1 h-3.5 w-3.5" /> Hang up
                       </Button>
