@@ -1711,8 +1711,225 @@ function CallWorkstation({
         )}
       </div>
     </div>
+    {focusMode && active && activeScript && (
+      <FocusCallView
+        leadName={[active.lead?.first_name, active.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
+        leadSub={[active.lead?.title, active.lead?.org_name].filter(Boolean).join(" · ")}
+        phone={active.lead?.phone ?? null}
+        script={activeScript}
+        notes={notes}
+        onNotesChange={setNotes}
+        callStatus={callStatus}
+        callStart={callStart}
+        muted={muted}
+        canMute={!!connection}
+        onToggleMute={toggleMute}
+        onHangUp={() => finishCall()}
+        onExit={() => setFocusMode(false)}
+        outcomeBusy={outcomeBusy}
+        onLogOutcome={logOutcome}
+      />
+    )}
+    </>
   );
 }
+
+function FocusCallView({
+  leadName,
+  leadSub,
+  phone,
+  script,
+  notes,
+  onNotesChange,
+  callStatus,
+  callStart,
+  muted,
+  canMute,
+  onToggleMute,
+  onHangUp,
+  onExit,
+  outcomeBusy,
+  onLogOutcome,
+}: {
+  leadName: string;
+  leadSub: string;
+  phone: string | null;
+  script: CallScript;
+  notes: string;
+  onNotesChange: (v: string) => void;
+  callStatus: "idle" | "connecting" | "ringing" | "in_progress" | "ending";
+  callStart: number | null;
+  muted: boolean;
+  canMute: boolean;
+  onToggleMute: () => void;
+  onHangUp: () => void;
+  onExit: () => void;
+  outcomeBusy: boolean;
+  onLogOutcome: (outcome: string) => void;
+}) {
+  const outcomes = [
+    { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
+    { v: "interested", label: "Interested", c: "" },
+    { v: "callback", label: "Callback", c: "" },
+    { v: "voicemail", label: "Voicemail", c: "" },
+    { v: "no_answer", label: "No answer", c: "" },
+    { v: "not_interested", label: "Not interested", c: "" },
+    { v: "wrong_number", label: "Wrong #", c: "" },
+    { v: "dnc", label: "Do not call", c: "" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-background">
+      {/* Top bar */}
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
+        <div className="min-w-0 flex items-baseline gap-3">
+          <h1 className="truncate text-2xl font-bold tracking-tight">{leadName}</h1>
+          {leadSub && <span className="truncate text-sm text-muted-foreground">{leadSub}</span>}
+          {phone && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Phone className="h-4 w-4" /> {phone}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {callStatus !== "idle" && (
+            <div className="flex items-center gap-2 rounded-md border bg-emerald-50 px-3 py-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="text-sm font-semibold text-emerald-900">
+                {callStatus === "connecting" && "Connecting…"}
+                {callStatus === "ringing" && "Ringing…"}
+                {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
+                {callStatus === "ending" && "Ending…"}
+              </span>
+              <Button size="sm" variant="ghost" className="h-8 px-2" onClick={onToggleMute} disabled={!canMute}>
+                {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
+              <Button size="sm" variant="destructive" className="h-8 px-3" onClick={onHangUp}>
+                <PhoneOff className="mr-1 h-4 w-4" /> Hang up
+              </Button>
+            </div>
+          )}
+          <Button size="sm" variant="outline" onClick={onExit}>
+            <X className="mr-1.5 h-4 w-4" /> Exit focus
+          </Button>
+        </div>
+      </header>
+
+      {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
+      <div className="grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
+        {/* Script column */}
+        <section className="col-span-5 flex min-h-0 flex-col rounded-lg border bg-card">
+          <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            Script
+          </div>
+          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Opener</div>
+              <p className="whitespace-pre-wrap rounded-md border border-primary/30 bg-primary/5 p-3 text-lg leading-relaxed">
+                {script.opener}
+              </p>
+            </div>
+            {script.talk_track?.map((s, i) => (
+              <div key={i}>
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{s.heading}</div>
+                <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-base leading-relaxed">{s.body}</p>
+              </div>
+            ))}
+            {script.problem_questions?.length > 0 && (
+              <FocusQList title="Problem questions" items={script.problem_questions} />
+            )}
+            {script.consequence_questions?.length > 0 && (
+              <FocusQList title="Consequence questions" items={script.consequence_questions} />
+            )}
+            {script.solution_questions?.length > 0 && (
+              <FocusQList title="Solution questions" items={script.solution_questions} />
+            )}
+            {script.qualifying_questions?.length > 0 && (
+              <FocusQList title="Qualifying questions" items={script.qualifying_questions} />
+            )}
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Close</div>
+              <p className="whitespace-pre-wrap rounded-md border border-primary/30 bg-primary/5 p-3 text-lg leading-relaxed">
+                {script.close}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Objections column */}
+        <section className="col-span-4 flex min-h-0 flex-col rounded-lg border bg-card">
+          <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            Objection answers
+          </div>
+          <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            {script.objection_map.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No objections configured.</p>
+            ) : (
+              script.objection_map.map((o, i) => (
+                <Card key={i} className="p-3">
+                  <div className="text-base font-semibold">{o.objection}</div>
+                  <div className="mt-1 text-base leading-relaxed text-muted-foreground">{o.response}</div>
+                </Card>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Notes + outcomes column */}
+        <section className="col-span-3 flex min-h-0 flex-col gap-3">
+          <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card">
+            <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
+              Call notes
+            </div>
+            <Textarea
+              placeholder="Type notes as you talk…"
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              className="m-3 flex-1 resize-none text-base leading-relaxed"
+            />
+          </div>
+          <div className="shrink-0 rounded-lg border bg-card p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">Log outcome</div>
+            <div className="grid grid-cols-2 gap-2">
+              {outcomes.map((o) => (
+                <Button
+                  key={o.v}
+                  size="sm"
+                  variant={o.c ? undefined : "outline"}
+                  className={o.c}
+                  disabled={outcomeBusy}
+                  onClick={() => onLogOutcome(o.v)}
+                >
+                  {o.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function FocusQList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <ol className="space-y-1.5">
+        {items.map((q, i) => (
+          <li key={i} className="flex gap-2 rounded-md border bg-muted/30 p-2.5 text-base leading-relaxed">
+            <span className="shrink-0 text-xs font-semibold text-muted-foreground">{i + 1}.</span>
+            <span>{q}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 
 function CallTimer({ startedAt }: { startedAt: number | null }) {
   const [now, setNow] = useState(Date.now());
