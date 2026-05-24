@@ -1240,6 +1240,10 @@ function CallWorkstation({
         if (prov === "twilio") {
           return !!a.from_number && a.from_number !== "+10000000000" && !!a.twilio_twiml_app_sid;
         }
+        if (prov === "ringcentral") {
+          const creds = (a.credentials ?? {}) as Record<string, string>;
+          return !!creds.client_id && !!creds.client_secret && !!creds.refresh_token;
+        }
         const spec = PROVIDER_SPECS[prov];
         if (!spec) return false;
         const creds = (a.credentials ?? {}) as Record<string, string>;
