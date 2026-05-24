@@ -1275,9 +1275,8 @@ function CallWorkstation({
       setCallStatus("connecting");
 
       if (phoneAccount.provider === "ringcentral") {
-        // RingCentral WebRTC — audio runs through the browser's mic/speakers.
-        const wp = await ensureRcWebPhone();
-        const { callId: newCallId } = await startRcWebCallFn({
+        // RingCentral RingOut — calls the rep first, then bridges to the prospect.
+        const { callId: newCallId } = await startRingOutFn({
           data: {
             listId,
             leadId: active.lead_id,
@@ -1286,17 +1285,9 @@ function CallWorkstation({
           },
         });
         setCallId(newCallId);
-        const session = wp.userAgent.invite(active.lead.phone, {
-          fromNumber: phoneAccount.from_number ?? undefined,
-        });
-        setRcSession(session);
-        setCallStatus("ringing");
-        session.on?.("progress", () => setCallStatus("ringing"));
-        session.on?.("accepted", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
-        session.on?.("terminated", () => finishCall(newCallId));
-        session.on?.("failed", (e: any) => { toast.error(e?.message ?? "Call failed"); finishCall(newCallId); });
-        session.on?.("rejected", () => finishCall(newCallId));
-        session.on?.("bye", () => finishCall(newCallId));
+        setCallStatus("in_progress");
+        setCallStart(Date.now());
+        toast.success("RingOut initiated — answer your phone when it rings");
         return;
       }
 
