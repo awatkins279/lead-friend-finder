@@ -1752,10 +1752,13 @@ function CallWorkstation({
         canMute={!!connection}
         onToggleMute={toggleMute}
         onHangUp={() => finishCall()}
-        onExit={() => setFocusMode(false)}
+        onExit={async () => { await finishCall(); }}
+        onNext={hangupAndNext}
+        hasNext={activeIndex >= 0 && activeIndex < rows.length - 1}
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
+
     ) : null}
 
     </>
