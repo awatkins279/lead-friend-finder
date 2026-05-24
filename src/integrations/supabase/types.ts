@@ -360,6 +360,7 @@ export type Database = {
           sender_title: string | null
           updated_at: string
           user_id: string
+          voicemail_audio_url: string | null
           what_selling: string | null
           word_count: number
         }
@@ -382,6 +383,7 @@ export type Database = {
           sender_title?: string | null
           updated_at?: string
           user_id: string
+          voicemail_audio_url?: string | null
           what_selling?: string | null
           word_count?: number
         }
@@ -404,6 +406,7 @@ export type Database = {
           sender_title?: string | null
           updated_at?: string
           user_id?: string
+          voicemail_audio_url?: string | null
           what_selling?: string | null
           word_count?: number
         }

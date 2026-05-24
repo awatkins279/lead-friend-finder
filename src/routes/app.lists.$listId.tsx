@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { enrichLead } from "@/lib/enrich.functions";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, A
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
+import { VoicemailRecorder } from "@/components/VoicemailRecorder";
+
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -102,7 +104,7 @@ function effectiveEmails(r: Row): EmailInSequence[] {
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null };
+type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null };
 
 function ListDetailPage() {
   const { listId } = Route.useParams();
@@ -131,7 +133,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url",
         )
         .eq("id", listId)
         .maybeSingle();
@@ -563,7 +565,10 @@ function ListDetailPage() {
             onConsumedInitial={() => setPendingCallLeadId(null)}
             onOpenConfig={() => setCallConfigOpen(true)}
             onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
+            voicemailAudioPath={list?.voicemail_audio_url ?? null}
+            onVoicemailChanged={() => refetchList()}
           />
+
         </TabsContent>
       </Tabs>
 
@@ -1185,6 +1190,8 @@ function CallWorkstation({
   onConsumedInitial,
   onOpenConfig,
   onChanged,
+  voicemailAudioPath,
+  onVoicemailChanged,
 }: {
   listId: string;
   rows: Row[];
@@ -1192,7 +1199,10 @@ function CallWorkstation({
   onConsumedInitial?: () => void;
   onOpenConfig: () => void;
   onChanged: () => void;
+  voicemailAudioPath: string | null;
+  onVoicemailChanged: () => void;
 }) {
+
   const genScriptFn = useServerFn(generateCallScript);
   const getTokenFn = useServerFn(getTwilioToken);
   const startCallFn = useServerFn(startCall);
@@ -1229,6 +1239,20 @@ function CallWorkstation({
   const [rcWebPhone, setRcWebPhone] = useState<any>(null);
   const [rcSession, setRcSession] = useState<any>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  // Refs used by the voicemail-drop feature so we can restore the mic track
+  // after the prerecorded clip finishes playing.
+  const vmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const vmCtxRef = useRef<AudioContext | null>(null);
+  const vmOriginalTrackRef = useRef<MediaStreamTrack | null>(null);
+  const vmSenderRef = useRef<RTCRtpSender | null>(null);
+  const [voicemailDropping, setVoicemailDropping] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
+
+
 
 
   // Load all phone accounts, keep only the "ready" ones (same rule as Sending Accounts)
@@ -1416,6 +1440,89 @@ function CallWorkstation({
       setFocusMode(false);
     }
   };
+
+  // Find the outbound audio RTP sender for whichever provider is active so we
+  // can swap the live mic feed for our prerecorded voicemail audio.
+  const getOutboundAudioSender = (): RTCRtpSender | null => {
+    try {
+      const rcPc: RTCPeerConnection | undefined =
+        rcSession?.sessionDescriptionHandler?.peerConnection;
+      if (rcPc) return rcPc.getSenders().find((s) => s.track?.kind === "audio") ?? null;
+    } catch {}
+    try {
+      const twPc: RTCPeerConnection | undefined =
+        connection?._mediaHandler?.version?.pc ??
+        connection?.mediaStream?.version?.pc ??
+        connection?._mediaHandler?.pc;
+      if (twPc) return twPc.getSenders().find((s) => s.track?.kind === "audio") ?? null;
+    } catch {}
+    return null;
+  };
+
+  /**
+   * Drop the prerecorded voicemail into the active call:
+   *  1. Fetch a signed URL for the audio file
+   *  2. Replace the outbound mic track with audio piped from an <audio> element
+   *  3. When playback ends, restore the mic, hang up, and advance to the next lead
+   */
+  const dropVoicemailAndNext = async () => {
+    if (!voicemailAudioPath) {
+      toast.error("No voicemail recorded for this campaign yet");
+      return;
+    }
+    const sender = getOutboundAudioSender();
+    if (!sender) {
+      toast.error("Voicemail drop isn't available on this call");
+      return;
+    }
+    setVoicemailDropping(true);
+    try {
+      const { data: signed, error } = await supabase.storage
+        .from("voicemail-drops")
+        .createSignedUrl(voicemailAudioPath, 60);
+      if (error || !signed?.signedUrl) throw error ?? new Error("No signed URL");
+
+      const audio = new Audio(signed.signedUrl);
+      audio.crossOrigin = "anonymous";
+      vmAudioRef.current = audio;
+
+      const ctx = new AudioContext();
+      vmCtxRef.current = ctx;
+      const source = ctx.createMediaElementSource(audio);
+      const dest = ctx.createMediaStreamDestination();
+      source.connect(dest);
+      // Don't connect to ctx.destination — we don't want to hear it locally.
+
+      vmOriginalTrackRef.current = sender.track ?? null;
+      vmSenderRef.current = sender;
+      const vmTrack = dest.stream.getAudioTracks()[0];
+      await sender.replaceTrack(vmTrack);
+
+      audio.onended = async () => {
+        try { await sender.replaceTrack(vmOriginalTrackRef.current); } catch {}
+        try { await ctx.close(); } catch {}
+        vmAudioRef.current = null;
+        vmCtxRef.current = null;
+        vmOriginalTrackRef.current = null;
+        vmSenderRef.current = null;
+        // Hang up the live call and roll to the next prospect
+        await hangupAndNext();
+
+        setVoicemailDropping(false);
+      };
+
+      audio.onerror = () => {
+        toast.error("Couldn't play the voicemail audio");
+        setVoicemailDropping(false);
+      };
+      await audio.play();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to drop voicemail");
+      setVoicemailDropping(false);
+    }
+  };
+
+
 
 
   const generate = async (force = false) => {
@@ -1619,7 +1726,19 @@ function CallWorkstation({
               </div>
             </div>
 
+            {userId && (
+              <div className="border-b bg-muted/30 px-6 py-2">
+                <VoicemailRecorder
+                  listId={listId}
+                  userId={userId}
+                  currentPath={voicemailAudioPath}
+                  onChange={() => onVoicemailChanged()}
+                />
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
+
               {!activeScript ? (
                 <div className="flex h-full items-center justify-center p-12">
                   <Card className="max-w-md p-8 text-center">
@@ -1755,9 +1874,13 @@ function CallWorkstation({
         onExit={async () => { await finishCall(); }}
         onNext={hangupAndNext}
         hasNext={activeIndex >= 0 && activeIndex < rows.length - 1}
+        canDropVoicemail={!!voicemailAudioPath && callStatus === "in_progress" && !voicemailDropping}
+        onDropVoicemail={dropVoicemailAndNext}
+        voicemailDropping={voicemailDropping}
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
+
 
     ) : null}
 
@@ -1781,6 +1904,9 @@ function FocusCallView({
   onExit,
   onNext,
   hasNext,
+  canDropVoicemail,
+  onDropVoicemail,
+  voicemailDropping,
   outcomeBusy,
   onLogOutcome,
 }: {
@@ -1799,9 +1925,13 @@ function FocusCallView({
   onExit: () => void;
   onNext: () => void;
   hasNext: boolean;
+  canDropVoicemail: boolean;
+  onDropVoicemail: () => void;
+  voicemailDropping: boolean;
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
+
 
   const outcomes = [
     { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
@@ -1848,6 +1978,19 @@ function FocusCallView({
               </Button>
             </div>
           )}
+          <Button
+            size="sm"
+            variant="default"
+            onClick={onDropVoicemail}
+            disabled={!canDropVoicemail}
+            title={canDropVoicemail ? "Play prerecorded voicemail, hang up, advance" : "Record a voicemail for this campaign first"}
+          >
+            {voicemailDropping ? (
+              <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Dropping…</>
+            ) : (
+              <>📩 Drop VM + next</>
+            )}
+          </Button>
           <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
             Next call →
           </Button>
@@ -1856,6 +1999,7 @@ function FocusCallView({
           </Button>
         </div>
       </header>
+
 
 
       {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
