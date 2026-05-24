@@ -1446,7 +1446,9 @@ function CallWorkstation({
   const scriptedCount = rows.filter((r) => r.call_script || localScripts[r.lead_id]).length;
 
   return (
+    <>
     <div className="flex h-full overflow-hidden">
+
       <aside className="flex w-80 shrink-0 flex-col border-r bg-muted/20">
         <div className="border-b px-4 py-3">
           <div className="flex items-center justify-between">
