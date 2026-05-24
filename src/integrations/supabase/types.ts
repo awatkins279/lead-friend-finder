@@ -634,6 +634,94 @@ export type Database = {
           },
         ]
       }
+      sdr_conversations: {
+        Row: {
+          agent_id: string | null
+          company: string | null
+          created_at: string
+          email_account_id: string | null
+          id: string
+          intent: string | null
+          intent_confidence: number | null
+          last_direction: string
+          last_message_at: string
+          lead_email: string
+          lead_id: string | null
+          lead_name: string | null
+          list_id: string | null
+          meeting_booked_at: string | null
+          status: string
+          subject: string | null
+          unread_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          company?: string | null
+          created_at?: string
+          email_account_id?: string | null
+          id?: string
+          intent?: string | null
+          intent_confidence?: number | null
+          last_direction?: string
+          last_message_at?: string
+          lead_email: string
+          lead_id?: string | null
+          lead_name?: string | null
+          list_id?: string | null
+          meeting_booked_at?: string | null
+          status?: string
+          subject?: string | null
+          unread_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          company?: string | null
+          created_at?: string
+          email_account_id?: string | null
+          id?: string
+          intent?: string | null
+          intent_confidence?: number | null
+          last_direction?: string
+          last_message_at?: string
+          lead_email?: string
+          lead_id?: string | null
+          lead_name?: string | null
+          list_id?: string | null
+          meeting_booked_at?: string | null
+          status?: string
+          subject?: string | null
+          unread_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_conversations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_conversations_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_conversations_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sdr_knowledge_chunks: {
         Row: {
           agent_id: string
@@ -731,6 +819,140 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_message_attachments: {
+        Row: {
+          created_at: string
+          filename: string
+          id: string
+          message_id: string
+          mime_type: string | null
+          size_bytes: number | null
+          storage_path: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filename: string
+          id?: string
+          message_id: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filename?: string
+          id?: string
+          message_id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          storage_path?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sdr_messages: {
+        Row: {
+          agent_id: string | null
+          ai_generated: boolean
+          body_html: string | null
+          body_text: string | null
+          cc_emails: string[]
+          conversation_id: string
+          created_at: string
+          direction: string
+          email_references: string[]
+          from_email: string
+          from_name: string | null
+          id: string
+          in_reply_to: string | null
+          message_id: string | null
+          raw: Json | null
+          received_at: string | null
+          sent_at: string | null
+          snippet: string | null
+          status: string
+          subject: string | null
+          to_emails: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          ai_generated?: boolean
+          body_html?: string | null
+          body_text?: string | null
+          cc_emails?: string[]
+          conversation_id: string
+          created_at?: string
+          direction: string
+          email_references?: string[]
+          from_email: string
+          from_name?: string | null
+          id?: string
+          in_reply_to?: string | null
+          message_id?: string | null
+          raw?: Json | null
+          received_at?: string | null
+          sent_at?: string | null
+          snippet?: string | null
+          status?: string
+          subject?: string | null
+          to_emails?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          ai_generated?: boolean
+          body_html?: string | null
+          body_text?: string | null
+          cc_emails?: string[]
+          conversation_id?: string
+          created_at?: string
+          direction?: string
+          email_references?: string[]
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          in_reply_to?: string | null
+          message_id?: string | null
+          raw?: Json | null
+          received_at?: string | null
+          sent_at?: string | null
+          snippet?: string | null
+          status?: string
+          subject?: string | null
+          to_emails?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_messages_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_conversations"
             referencedColumns: ["id"]
           },
         ]
