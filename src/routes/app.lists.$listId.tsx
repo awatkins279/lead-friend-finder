@@ -422,6 +422,10 @@ function ListDetailPage() {
         </div>
       </header>
 
+      <SdrAssignBar listId={listId} currentAgentId={list?.sdr_agent_id ?? null} onChanged={() => refetchList()} />
+
+
+
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
         <div className="border-b bg-background px-8">
           <TabsList className="h-11 bg-transparent p-0">
