@@ -1283,8 +1283,17 @@ function CallWorkstation({
       setCallStatus("connecting");
 
       if (phoneAccount.provider === "ringcentral") {
-        // RingCentral RingOut — calls the rep first, then bridges to the prospect.
-        const { callId: newCallId } = await startRingOutFn({
+        // RingCentral browser WebRTC via ringcentral-web-phone
+        const { sipInfo, accessToken: _at } = await getRcCredsFn({
+          data: { phoneAccountId: phoneAccount.id },
+        });
+        const { default: WebPhone } = await import("ringcentral-web-phone");
+        const sip = Array.isArray((sipInfo as any).sipInfo) ? (sipInfo as any).sipInfo[0] : sipInfo;
+        const wp = new (WebPhone as any)({ sipInfo: sip });
+        await wp.start();
+        setRcWebPhone(wp);
+
+        const { callId: newCallId } = await startRcCallFn({
           data: {
             listId,
             leadId: active.lead_id,
@@ -1293,11 +1302,17 @@ function CallWorkstation({
           },
         });
         setCallId(newCallId);
-        setCallStatus("in_progress");
-        setCallStart(Date.now());
-        toast.success("RingOut initiated — answer your phone when it rings");
+        setCallStatus("ringing");
+
+        const callee = active.lead.phone.replace(/[^\d+]/g, "");
+        const callerId = (phoneAccount.from_number || "").replace(/[^\d+]/g, "");
+        const session = await wp.call(callee, callerId || undefined);
+        setRcSession(session);
+        session.once("answered", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
+        session.once("disposed", () => finishCall(newCallId));
         return;
       }
+
 
       // Twilio (browser WebRTC)
       const d = await ensureTwilioDevice();
