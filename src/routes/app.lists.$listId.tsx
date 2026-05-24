@@ -1831,7 +1831,7 @@ function CallWorkstation({
 
             {userId && (
               <div className="space-y-3 border-b bg-muted/30 px-6 py-3">
-                <VoicemailAgent userId={userId} />
+                <AiVoicemailStatusBadge userId={userId} />
                 <VoicemailRecorder
                   listId={listId}
                   userId={userId}
@@ -1840,6 +1840,7 @@ function CallWorkstation({
                 />
               </div>
             )}
+
 
             <div className="flex-1 overflow-y-auto">
 
