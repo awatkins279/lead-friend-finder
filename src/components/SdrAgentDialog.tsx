@@ -48,6 +48,7 @@ type AgentForm = {
   what_selling: string;
   key_differentiators: string;
   extra_instructions: string;
+  email_account_id: string | null;
 };
 
 type KnowledgeDoc = {
@@ -57,6 +58,13 @@ type KnowledgeDoc = {
   status: string;
   error: string | null;
   chunk_count: number;
+};
+
+type EmailAccountOption = {
+  id: string;
+  email_address: string;
+  display_name: string | null;
+  status: string;
 };
 
 const EMPTY: AgentForm = {
@@ -74,6 +82,7 @@ const EMPTY: AgentForm = {
   what_selling: "",
   key_differentiators: "",
   extra_instructions: "",
+  email_account_id: null,
 };
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
