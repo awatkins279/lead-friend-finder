@@ -21,6 +21,7 @@ import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
 import { Route as ApiPublicTwilioVoiceRouteImport } from './routes/api/public/twilio.voice'
 import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/twilio.status'
 import { Route as ApiPublicTwilioRecordingRouteImport } from './routes/api/public/twilio.recording'
+import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -83,6 +84,11 @@ const ApiPublicTwilioRecordingRoute =
     path: '/api/public/twilio/recording',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicInboxIngestRoute = ApiPublicInboxIngestRouteImport.update({
+  id: '/api/public/inbox/ingest',
+  path: '/api/public/inbox/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
   '/api/public/twilio/voice': typeof ApiPublicTwilioVoiceRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
+  '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
   '/api/public/twilio/voice': typeof ApiPublicTwilioVoiceRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
   '/api/public/twilio/voice': typeof ApiPublicTwilioVoiceRoute
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/app/sdr-agents'
     | '/app/lists/$listId'
     | '/app/lists/'
+    | '/api/public/inbox/ingest'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
     | '/api/public/twilio/voice'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/app/sdr-agents'
     | '/app/lists/$listId'
     | '/app/lists'
+    | '/api/public/inbox/ingest'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
     | '/api/public/twilio/voice'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/app/sdr-agents'
     | '/app/lists/$listId'
     | '/app/lists/'
+    | '/api/public/inbox/ingest'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
     | '/api/public/twilio/voice'
@@ -176,6 +188,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
   ApiPublicTwilioRecordingRoute: typeof ApiPublicTwilioRecordingRoute
   ApiPublicTwilioStatusRoute: typeof ApiPublicTwilioStatusRoute
   ApiPublicTwilioVoiceRoute: typeof ApiPublicTwilioVoiceRoute
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTwilioRecordingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/inbox/ingest': {
+      id: '/api/public/inbox/ingest'
+      path: '/api/public/inbox/ingest'
+      fullPath: '/api/public/inbox/ingest'
+      preLoaderRoute: typeof ApiPublicInboxIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -294,6 +314,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
   ApiPublicTwilioRecordingRoute: ApiPublicTwilioRecordingRoute,
   ApiPublicTwilioStatusRoute: ApiPublicTwilioStatusRoute,
   ApiPublicTwilioVoiceRoute: ApiPublicTwilioVoiceRoute,
@@ -301,3 +322,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
