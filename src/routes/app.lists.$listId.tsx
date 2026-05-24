@@ -1220,8 +1220,6 @@ function CallWorkstation({
   // ---- In-call state ----
   const [device, setDevice] = useState<any>(null);
   const [connection, setConnection] = useState<any>(null);
-  const [rcWebPhone, setRcWebPhone] = useState<any>(null);
-  const [rcSession, setRcSession] = useState<any>(null);
   const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "ringing" | "in_progress" | "ending">("idle");
   const [callId, setCallId] = useState<string | null>(null);
   const [callStart, setCallStart] = useState<number | null>(null);
