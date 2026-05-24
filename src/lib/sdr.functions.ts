@@ -20,6 +20,7 @@ const upsertAgentSchema = z.object({
   what_selling: z.string().max(4000).nullish(),
   key_differentiators: z.string().max(4000).nullish(),
   extra_instructions: z.string().max(4000).nullish(),
+  email_account_id: z.string().uuid().nullish(),
 });
 
 const idSchema = z.object({ id: z.string().uuid() });
