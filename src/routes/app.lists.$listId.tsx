@@ -1332,11 +1332,6 @@ function CallWorkstation({
 
   const toggleMute = () => {
     const next = !muted;
-    if (rcSession) {
-      try { next ? rcSession.mute?.() : rcSession.unmute?.(); } catch {}
-      setMuted(next);
-      return;
-    }
     if (!connection) return;
     connection.mute(next);
     setMuted(next);
