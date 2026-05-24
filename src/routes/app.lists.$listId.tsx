@@ -1256,6 +1256,8 @@ function CallWorkstation({
     return () => {
       try { connection?.disconnect?.(); } catch {}
       try { device?.destroy?.(); } catch {}
+      try { rcSession?.terminate?.(); } catch {}
+      try { rcWebPhone?.userAgent?.unregister?.(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1271,6 +1273,26 @@ function CallWorkstation({
     return d;
   };
 
+  const ensureRcWebPhone = async () => {
+    if (!phoneAccount) throw new Error("No phone account selected");
+    if (rcWebPhone) return rcWebPhone;
+    const prov = await getRcSipFn({ data: { phoneAccountId: phoneAccount.id } });
+    const mod: any = await import("ringcentral-web-phone");
+    const WebPhone = mod.default ?? mod;
+    const wp = new WebPhone(
+      { sipInfo: prov.sipInfo, sipFlags: prov.sipFlags, sipErrorCodes: prov.sipErrorCodes },
+      {
+        appKey: prov.appKey,
+        appName: "Lovable SDR",
+        appVersion: "1.0.0",
+        logLevel: 1,
+        audioHelper: { enabled: true },
+      } as any,
+    );
+    setRcWebPhone(wp);
+    return wp;
+  };
+
   const startInAppCall = async () => {
     if (!active?.lead?.phone) return toast.error("No phone number on this lead");
     if (!phoneAccount) return toast.error("No ready phone account — finish setup in Sending Accounts");
@@ -1278,8 +1300,9 @@ function CallWorkstation({
       setCallStatus("connecting");
 
       if (phoneAccount.provider === "ringcentral") {
-        // RingCentral: your phone rings first, then bridges to the prospect.
-        const { callId: newCallId } = await startRingOutFn({
+        // RingCentral WebRTC — audio runs through the browser's mic/speakers.
+        const wp = await ensureRcWebPhone();
+        const { callId: newCallId } = await startRcWebCallFn({
           data: {
             listId,
             leadId: active.lead_id,
@@ -1288,9 +1311,17 @@ function CallWorkstation({
           },
         });
         setCallId(newCallId);
+        const session = wp.userAgent.invite(active.lead.phone, {
+          fromNumber: phoneAccount.from_number ?? undefined,
+        });
+        setRcSession(session);
         setCallStatus("ringing");
-        setCallStart(Date.now());
-        toast.success(`RingCentral is calling ${phoneAccount.credentials.ring_to_number} — answer to connect`);
+        session.on?.("progress", () => setCallStatus("ringing"));
+        session.on?.("accepted", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
+        session.on?.("terminated", () => finishCall(newCallId));
+        session.on?.("failed", (e: any) => { toast.error(e?.message ?? "Call failed"); finishCall(newCallId); });
+        session.on?.("rejected", () => finishCall(newCallId));
+        session.on?.("bye", () => finishCall(newCallId));
         return;
       }
 
@@ -1323,7 +1354,9 @@ function CallWorkstation({
     setCallStatus("ending");
     const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
     try { connection?.disconnect?.(); } catch {}
+    try { rcSession?.terminate?.(); } catch {}
     setConnection(null);
+    setRcSession(null);
     setMuted(false);
     if (cid) {
       try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
@@ -1334,8 +1367,13 @@ function CallWorkstation({
   };
 
   const toggleMute = () => {
-    if (!connection) return;
     const next = !muted;
+    if (rcSession) {
+      try { next ? rcSession.mute?.() : rcSession.unmute?.(); } catch {}
+      setMuted(next);
+      return;
+    }
+    if (!connection) return;
     connection.mute(next);
     setMuted(next);
   };
