@@ -1,104 +1,139 @@
-# AI SDR — Reusable Agents, Assigned to Campaigns
+# Unified Inbox
 
-Change from previous plan: the SDR is a **reusable account-level resource** (like phone accounts on the Accounts tab), not a per-campaign blob. You build one or more "AI SDR Agents" once, then attach an agent to any campaign to turn it on for that list.
+A single Outlook/Gmail-style hub at `/app/inbox` that merges every reply across every connected email account, every domain, and every campaign into one threaded view — with filters, intent labels, and a lightweight analytics strip on top.
 
-## Where it lives in the UI
+Built now against the schema so the moment real inboxes start syncing (after your email-account meeting), threads, replies, and AI SDR drafts populate automatically.
 
-New tab on `/app/accounts` (next to Phone accounts, Provider accounts, Saved searches):
+## 1. Navigation
 
-**"AI SDR Agents"** — list of agents the user has created. Each row: name, persona, inbox connected (gmail/outlook/imap), # campaigns using it, status (ready / needs setup), edit / duplicate / delete.
+- New sidebar entry **Inbox** (Inbox icon) at the top of `/app/*`, above Lists.
+- Route: `src/routes/app.inbox.tsx`.
+- Badge with unread count on the sidebar item.
 
-"+ New SDR Agent" opens a multi-step dialog:
-1. **Identity** — agent name, SDR display name, signature, tone (friendly/consultative/direct/playful), formality slider
-2. **Inbox** — connect Gmail (OAuth), Outlook (OAuth), or IMAP/SMTP. Replies are sent FROM this inbox so threading works.
-3. **Offer template** (defaults, overridable per campaign) — what you sell, top differentiators, hard rules ("never quote pricing"), handoff triggers (refund/legal/angry → human)
-4. **Response behavior** — response speed window (instant / 5–30 min / 30 min–2 hr / 2–8 hr, random within), mode (Draft only / Auto-send w/ approval / Full auto-send), confidence threshold for full-auto, booking link (Calendly/Cal.com)
-5. **Knowledge base** — upload PDFs/DOCX/TXT/MD up to 25 MB each (case studies, pricing sheet, FAQ, product docs). Files are chunked + embedded for RAG. KB is owned by the agent, shared across every campaign it's assigned to.
+## 2. Layout (Outlook-style, 3 panes)
 
-Agent is "ready" once: identity filled + inbox connected. KB optional but recommended.
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  Analytics strip (collapsible): replies · breakdown · top camp.  │
+├────────────┬──────────────────────────┬─────────────────────────┤
+│ Folders &  │ Thread list              │ Thread view             │
+│ filters    │ (sender, snippet, time,  │ (full conversation,     │
+│            │  intent badge, campaign) │  draft/reply composer)  │
+│ • All      │                          │                         │
+│ • Unread   │                          │                         │
+│ • Needs    │                          │                         │
+│   approval │                          │                         │
+│ • Sent     │                          │                         │
+│ • Archived │                          │                         │
+│            │                          │                         │
+│ Filters:   │                          │                         │
+│ Campaign ▾ │                          │                         │
+│ Intent ▾   │                          │                         │
+│ Account ▾  │                          │                         │
+│ Date ▾     │                          │                         │
+│ Search     │                          │                         │
+└────────────┴──────────────────────────┴─────────────────────────┘
+```
 
-## Assigning to a campaign
+- Left rail: folders + faceted filters.
+- Middle: virtualized thread list, infinite scroll, keyboard nav (`j`/`k`, `e` archive, `r` reply).
+- Right: thread with bubbles — inbound (gray, left) vs SDR outbound (primary, right). Header shows lead, company, campaign chip, assigned agent, "via {inbox@domain}". Footer composer: edit AI draft → Approve & send / Regenerate / Send manual reply.
 
-On the campaign page (`/app/lists/$listId`), a new section **"AI SDR"** with a dropdown:
+## 3. Filters & search
 
-> Active SDR agent: `[none ▾]` `[ Sarah — Gmail ▾]`
+- **Campaign**: multi-select from user's lists.
+- **Intent**: Interested, Not interested, Objection, Question, Meeting booked, OOO/auto-reply, Unsubscribe, Other.
+- **Account**: any of their `email_accounts` (so a domain switch is just selecting accounts).
+- **Date**: presets (Today, Last 7d, Last 30d, Last month, Last year, Year before) + custom range.
+- **Search**: subject / body / sender / company (Postgres `ilike` for v1).
 
-Picking an agent flips the campaign to "SDR active" — from that moment forward, any inbound reply to emails sent from this campaign is handled by that agent. Switching to "none" pauses replies (drafts stop being generated; in-flight scheduled sends are cancelled).
+All filters combine and persist in URL search params (TanStack `validateSearch`) so the view is shareable & restorable.
 
-Optional per-campaign overrides (collapsed by default): override hard rules, override booking link, override mode for this campaign only. Falls back to the agent's defaults.
+## 4. Analytics strip (top of inbox)
 
-## Why this shape is better
-- One Gmail connection works across all the user's campaigns.
-- One KB (e.g. company case studies) is shared; no re-uploading per list.
-- Customers selling multiple products can build one agent per product and assign accordingly.
-- Matches how Phone accounts already work in this app — same mental model.
+Compact cards, respects current filter set:
 
-## Inbox UI
+- Replies received (with trend vs previous period)
+- Breakdown donut: Interested / Objection / Not interested / Other
+- Reply rate per campaign (top 5)
+- Avg. time-to-reply (SDR)
+- Meetings booked
 
-`/app/sdr` route (new top-level nav item, shown only if ≥1 agent exists):
-- Threads grouped by agent → campaign → lead
-- Thread view: full conversation, AI's draft, edit / approve / send / regenerate / mark handled
-- "Why this reply" panel: which KB chunks were cited + intent + confidence
+Click any segment → applies as a filter.
 
-## Pipeline (per inbound reply)
+## 5. Data model (additive, no breaking changes)
 
-1. Webhook / 2-min poll picks up new message on a thread we sent from
-2. Look up `campaign → assigned agent` (skip if no agent assigned)
-3. Classify intent (Flash, ~$0.0005): interested / objection / question / OOO / unsubscribe / handoff / other
-4. `unsubscribe` → mark DNC, no reply. `OOO` → reschedule, no reply. `handoff` → notify user, draft only.
-5. RAG: top-5 chunks from that agent's KB
-6. Generate reply (Flash std / GPT-5 premium), with offer + tone + hard rules + RAG + thread history
-7. Save to `sdr_messages` as `draft` or `scheduled` based on agent's mode + confidence
-8. Cron flushes scheduled outbound through the agent's connected inbox
+Three new tables — designed to look identical regardless of which inbox the message came in on, so "unified" is the default state of the data.
 
-## Cost per reply
+```text
+sdr_conversations
+  id, user_id, agent_id (nullable), email_account_id, list_id (campaign),
+  lead_id, lead_email, lead_name, company,
+  subject, last_message_at, last_direction, unread_count,
+  intent, intent_confidence, status (open|needs_approval|snoozed|archived|closed),
+  meeting_booked_at, created_at, updated_at
 
-~$0.005 on Flash → 1k inbound replies/mo ≈ $5 raw AI cost. Customers selling more typically reply more, so usage scales with their success.
+sdr_messages
+  id, conversation_id, user_id,
+  direction (inbound|outbound), from_email, from_name, to_emails[], cc_emails[],
+  subject, body_text, body_html, snippet,
+  message_id (RFC), in_reply_to, references[],
+  sent_at, received_at,
+  ai_generated boolean, agent_id, status (draft|queued|sent|failed|received),
+  raw jsonb
 
-## Technical changes
+sdr_message_attachments  (id, message_id, filename, size, mime, storage_path)
+```
 
-### New DB tables
-- `sdr_agents` — id, user_id, name, persona JSONB, tone, mode, speed_window, confidence_threshold, booking_url, hard_rules, handoff_triggers, default_offer JSONB, inbox_account_id
-- `sdr_inbox_accounts` — id, user_id, provider (gmail/outlook/imap), email_address, encrypted_tokens, oauth_refresh
-- `sdr_knowledge_docs` — id, agent_id, filename, storage_path, status, tokens
-- `sdr_knowledge_chunks` — id, doc_id, agent_id, content, embedding vector(1536) (pgvector)
-- `sdr_conversations` — id, agent_id, list_id, lead_id, thread_id, intent, status, last_inbound_at
-- `sdr_messages` — id, conversation_id, direction, body, subject, ai_generated, kb_citations, confidence, scheduled_for, sent_at
-- `lists` gets `sdr_agent_id uuid null` + optional override columns
+RLS: everything scoped by `user_id`. Indexes on `(user_id, last_message_at desc)`, `(conversation_id, sent_at)`, `(user_id, intent)`, `(user_id, list_id)`.
 
-### New storage bucket
-- `sdr-knowledge` (private), path `{user_id}/{agent_id}/{filename}`
+Existing `sdr_agents`, `email_accounts`, `lists` (campaigns), `leads` already wire in.
 
-### Server functions
-- `listSdrAgents`, `upsertSdrAgent`, `deleteSdrAgent`
-- `connectInbox` (OAuth callback), `disconnectInbox`
-- `uploadKnowledgeDoc` (signed URL) → background `processKnowledgeDoc` (parse → chunk → embed)
-- `assignAgentToList`, `unassignAgentFromList`
-- `getSdrInbox`, `getSdrThread`, `regenerateReply`, `approveAndSendReply`
+## 6. Server functions (`src/lib/inbox.functions.ts`)
 
-### Public routes
-- `/api/public/sdr/gmail-webhook`, `/api/public/sdr/outlook-webhook`
-- `/api/public/sdr/poll` (cron, 2 min — IMAP + fallback)
-- `/api/public/sdr/send-scheduled` (cron, 1 min)
+- `listConversations({ filters, cursor })` — paginated, joins campaign + account + agent for chips.
+- `getConversation({ id })` — full thread + messages + lead context.
+- `setConversationStatus({ id, status })` — archive/snooze/close.
+- `setConversationIntent({ id, intent })` — manual override.
+- `saveDraftReply({ conversationId, body })`, `approveAndSend({ messageId })`, `regenerateReply({ conversationId })` — stub the send path until inboxes connect (writes a `queued` message; the real sender plugs in later).
+- `getInboxAnalytics({ filters })` — counts + breakdown + per-campaign rate, all in one aggregated query.
 
-### Secrets needed at build time
-- Gmail OAuth client ID + secret
-- Outlook OAuth client ID + secret
-- IMAP creds are per-agent, stored encrypted
+## 7. Ingestion stubs (ready, not wired)
 
-## Build order
-1. DB schema + storage bucket
-2. Accounts tab → "AI SDR Agents" list + create/edit dialog (identity + offer + behavior only — no inbox yet)
-3. Knowledge base upload + chunk/embed pipeline
-4. Inbox OAuth (Gmail first, then Outlook, then IMAP)
-5. Campaign page → "Assign SDR agent" dropdown
-6. Classifier + responder + RAG
-7. `/app/sdr` inbox UI
-8. Cron scheduler + scheduled send flush
+Public route `src/routes/api/public/inbox.ingest.ts` accepts a normalized message payload (works for Gmail webhook, Outlook Graph subscription, or IMAP poller) and:
 
-## Open questions (4 quick ones)
+1. Looks up `email_account_id` by recipient.
+2. Resolves campaign + lead via `In-Reply-To` / `References` headers (falls back to from-address match).
+3. Upserts conversation (threaded by RFC references), inserts message, recomputes `unread_count` + `last_message_at`.
+4. Triggers intent classification (Gemini Flash) async → updates `intent`/`intent_confidence`.
+5. If the campaign has an SDR agent assigned and the agent's mode allows it, drafts a reply (RAG over `sdr_knowledge_chunks` you already built) and stores as `draft` or `queued` per agent's mode.
 
-1. **Inbox priority**: ship Gmail OAuth first and add Outlook + IMAP in a follow-up? Or all three in v1?
-2. **Sending**: replies go out through the user's connected inbox (best threading + deliverability) — confirm that's fine vs. routing through Resend/SendGrid?
-3. **KB size cap per agent**: 50 MB / 500 MB / unlimited with usage pricing?
-4. **Default mode for new agents**: Draft-only (safer) or Auto-send with high confidence threshold (more wow)?
+Same endpoint works for every provider once you have credentials — providers just translate their webhook into this shape.
+
+## 8. Empty state (today)
+
+Because no accounts are connected yet, the inbox renders with:
+
+- The full UI shell, folders, filters, analytics cards (all zeros).
+- A friendly empty banner: "No inboxes connected yet — head to Sending accounts → Email to add one. Your SDR replies will start landing here automatically."
+- A "Load sample thread" toggle so you can demo the UI to the company tomorrow with realistic mock data (memory-only, not written to DB).
+
+## 9. Out of scope (next pass, after credentials land)
+
+- Actual Gmail OAuth / Outlook Graph / IMAP poller (separate ticket per provider).
+- Outbound SMTP send pipeline.
+- Attachment upload UI for composing.
+- Mentions / internal notes / multi-user assignment.
+
+---
+
+### Technical notes
+
+- Route: `src/routes/app.inbox.tsx` + child `src/routes/app.inbox.$conversationId.tsx` for deep-linking.
+- New components: `InboxShell`, `InboxFilters`, `ConversationList`, `ConversationView`, `MessageBubble`, `ReplyComposer`, `InboxAnalyticsStrip`, `InboxEmptyState`.
+- Data fetching follows the project's TanStack Query + `createServerFn` pattern with `requireSupabaseAuth`.
+- Realtime: Supabase channel on `sdr_messages` filtered by `user_id` for live updates.
+- Add `ALTER PUBLICATION supabase_realtime ADD TABLE public.sdr_messages, public.sdr_conversations;`.
+- Sidebar unread badge subscribes to the same channel.
+
+Approve this and I'll build it.
