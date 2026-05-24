@@ -22,6 +22,8 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 import { VoicemailRecorder } from "@/components/VoicemailRecorder";
+import { VoicemailAgent } from "@/components/VoicemailAgent";
+import { generateVoicemailScript, synthesizeVoicemail, logVoicemailDrop } from "@/lib/voicemail.functions";
 
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
