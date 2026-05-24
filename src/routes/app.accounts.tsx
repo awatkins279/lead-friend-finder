@@ -358,6 +358,16 @@ function AccountsPage() {
           existing={editing}
         />
       )}
+
+      {userId && (
+        <EmailAccountDialog
+          userId={userId}
+          open={emailOpen}
+          onOpenChange={setEmailOpen}
+          onSaved={load}
+          existing={editingEmail}
+        />
+      )}
     </div>
   );
 }
