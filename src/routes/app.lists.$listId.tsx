@@ -1874,9 +1874,13 @@ function CallWorkstation({
         onExit={async () => { await finishCall(); }}
         onNext={hangupAndNext}
         hasNext={activeIndex >= 0 && activeIndex < rows.length - 1}
+        canDropVoicemail={!!voicemailAudioPath && callStatus === "in_progress" && !voicemailDropping}
+        onDropVoicemail={dropVoicemailAndNext}
+        voicemailDropping={voicemailDropping}
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
+
 
     ) : null}
 
