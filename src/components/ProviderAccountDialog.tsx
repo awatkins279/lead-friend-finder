@@ -243,22 +243,20 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
     name: "RingCentral",
     instructions: (
       <>
-        <p className="font-semibold">How to get these</p>
+        <p className="font-semibold">How to connect</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-muted-foreground">
           <li>Go to <a className="underline" href="https://developers.ringcentral.com" target="_blank" rel="noreferrer">developers.ringcentral.com</a> → Console → Apps</li>
-          <li>Create an app — type <em>REST API App</em>, auth <em>JWT</em>, platform type <em>Server-only (No UI)</em></li>
-          <li>Add permissions: <code>RingOut</code>, <code>ReadAccounts</code>, <code>ReadCallLog</code></li>
-          <li>Copy the <em>Client ID</em> and <em>Client Secret</em>; generate a <em>JWT credential</em> from your profile menu (top-right avatar → Credentials)</li>
-          <li>Use server URL <code>https://platform.ringcentral.com</code> (or <code>https://platform.devtest.ringcentral.com</code> for sandbox)</li>
+          <li>Create a <em>REST API App</em> → platform <em>Browser-Based / SPA</em>, auth <em>3-legged OAuth</em></li>
+          <li>Add scope <code>VoIP Calling</code> (plus <code>Read Accounts</code>, <code>Read Call Log</code>)</li>
+          <li>Set OAuth redirect URI to <code>https://lead-friend-finder.lovable.app/api/ringcentral/oauth/callback</code></li>
+          <li>Paste the <em>Client ID</em> + <em>Client Secret</em> below, click Save, then click <strong>Sign in with RingCentral</strong>.</li>
         </ol>
       </>
     ),
     fields: [
-      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true, helper: "Must start with https://. Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox." },
+      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true, helper: "Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox." },
       { key: "client_id", label: "Client ID", required: true },
       { key: "client_secret", label: "Client Secret", type: "password", required: true },
-      { key: "jwt", label: "JWT credential", type: "password", required: true, multiline: true, helper: "Paste the full JWT — usually 500+ characters on one long line, looks like xxx.yyy.zzz. Use Show/Clear above if you need to re-paste." },
-      { key: "ring_to_number", label: "Your phone to ring (E.164)", placeholder: "+15551234567", required: true, helper: "RingCentral calls this number first, then bridges to the prospect when you answer." },
     ],
   },
   vonage: {
