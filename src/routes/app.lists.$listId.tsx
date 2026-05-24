@@ -1190,6 +1190,8 @@ function CallWorkstation({
   onConsumedInitial,
   onOpenConfig,
   onChanged,
+  voicemailAudioPath,
+  onVoicemailChanged,
 }: {
   listId: string;
   rows: Row[];
@@ -1197,7 +1199,10 @@ function CallWorkstation({
   onConsumedInitial?: () => void;
   onOpenConfig: () => void;
   onChanged: () => void;
+  voicemailAudioPath: string | null;
+  onVoicemailChanged: () => void;
 }) {
+
   const genScriptFn = useServerFn(generateCallScript);
   const getTokenFn = useServerFn(getTwilioToken);
   const startCallFn = useServerFn(startCall);
