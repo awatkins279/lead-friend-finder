@@ -2014,6 +2014,9 @@ function FocusCallView({
   canDropVoicemail,
   onDropVoicemail,
   voicemailDropping,
+  canDropAiVoicemail,
+  onDropAiVoicemail,
+  aiVmDropping,
   outcomeBusy,
   onLogOutcome,
 }: {
@@ -2035,6 +2038,9 @@ function FocusCallView({
   canDropVoicemail: boolean;
   onDropVoicemail: () => void;
   voicemailDropping: boolean;
+  canDropAiVoicemail: boolean;
+  onDropAiVoicemail: () => void;
+  aiVmDropping: boolean;
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
