@@ -40,6 +40,7 @@ function AppShell() {
     { to: "/app/saved", icon: Bookmark, label: "Saved Searches" },
     { to: "/app/accounts", icon: Mail, label: "Sending Accounts" },
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
+    { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
   ];
 
