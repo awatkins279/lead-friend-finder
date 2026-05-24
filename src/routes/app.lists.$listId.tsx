@@ -1830,7 +1830,8 @@ function CallWorkstation({
             </div>
 
             {userId && (
-              <div className="border-b bg-muted/30 px-6 py-2">
+              <div className="space-y-3 border-b bg-muted/30 px-6 py-3">
+                <VoicemailAgent userId={userId} />
                 <VoicemailRecorder
                   listId={listId}
                   userId={userId}
