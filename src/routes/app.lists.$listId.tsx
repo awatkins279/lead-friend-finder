@@ -1779,6 +1779,8 @@ function FocusCallView({
   onToggleMute,
   onHangUp,
   onExit,
+  onNext,
+  hasNext,
   outcomeBusy,
   onLogOutcome,
 }: {
@@ -1795,9 +1797,12 @@ function FocusCallView({
   onToggleMute: () => void;
   onHangUp: () => void;
   onExit: () => void;
+  onNext: () => void;
+  hasNext: boolean;
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
+
   const outcomes = [
     { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
     { v: "interested", label: "Interested", c: "" },
