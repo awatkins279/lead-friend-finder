@@ -15,35 +15,8 @@ const filtersSchema = z.object({
 
 export type InboxFilters = z.infer<typeof filtersSchema>;
 
-const applyFilters = (q: ReturnType<typeof buildBase>, f: InboxFilters) => {
-  if (f.status && f.status !== "all") q = q.eq("status", f.status);
-  if (f.unread_only) q = q.gt("unread_count", 0);
-  if (f.campaign_ids?.length) q = q.in("list_id", f.campaign_ids);
-  if (f.account_ids?.length) q = q.in("email_account_id", f.account_ids);
-  if (f.intents?.length) q = q.in("intent", f.intents);
-  if (f.date_from) q = q.gte("last_message_at", f.date_from);
-  if (f.date_to) q = q.lte("last_message_at", f.date_to);
-  if (f.search) {
-    const s = `%${f.search}%`;
-    q = q.or(
-      `subject.ilike.${s},lead_email.ilike.${s},lead_name.ilike.${s},company.ilike.${s}`,
-    );
-  }
-  return q;
-};
 
-// dummy helper to type the builder
-const buildBase = (sb: { from: (n: string) => { select: (s: string) => unknown } }) =>
-  sb.from("sdr_conversations").select("*") as unknown as {
-    eq: (k: string, v: unknown) => ReturnType<typeof buildBase>;
-    gt: (k: string, v: unknown) => ReturnType<typeof buildBase>;
-    in: (k: string, v: unknown[]) => ReturnType<typeof buildBase>;
-    gte: (k: string, v: unknown) => ReturnType<typeof buildBase>;
-    lte: (k: string, v: unknown) => ReturnType<typeof buildBase>;
-    or: (s: string) => ReturnType<typeof buildBase>;
-    order: (k: string, o: { ascending: boolean }) => ReturnType<typeof buildBase>;
-    limit: (n: number) => Promise<{ data: unknown; error: { message: string } | null }>;
-  };
+
 
 export const listConversations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
