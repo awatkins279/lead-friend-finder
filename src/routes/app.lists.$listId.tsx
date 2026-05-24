@@ -2117,7 +2117,9 @@ function FocusCallView({
             ) : (
               <><Sparkles className="mr-1.5 h-4 w-4" /> AI Voicemail</>
             )}
+          </Button>
           <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
+
             Next call →
           </Button>
           <Button size="sm" variant="outline" onClick={onExit}>
