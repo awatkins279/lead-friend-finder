@@ -1239,6 +1239,20 @@ function CallWorkstation({
   const [rcWebPhone, setRcWebPhone] = useState<any>(null);
   const [rcSession, setRcSession] = useState<any>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  // Refs used by the voicemail-drop feature so we can restore the mic track
+  // after the prerecorded clip finishes playing.
+  const vmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const vmCtxRef = useRef<AudioContext | null>(null);
+  const vmOriginalTrackRef = useRef<MediaStreamTrack | null>(null);
+  const vmSenderRef = useRef<RTCRtpSender | null>(null);
+  const [voicemailDropping, setVoicemailDropping] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
+
+
 
 
   // Load all phone accounts, keep only the "ready" ones (same rule as Sending Accounts)
