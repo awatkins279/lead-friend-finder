@@ -487,6 +487,11 @@ export const getRingCentralSipProvision = createServerFn({ method: "POST" })
     });
     if (!provRes.ok) {
       const t = await provRes.text();
+      if (provRes.status === 403 && t.includes("VoipCalling")) {
+        throw new Error(
+          "Your RingCentral app is missing the 'VoIP Calling' permission. Go to developers.ringcentral.com → your app → Permissions, add 'VoIP Calling', save, and try again. (If the permission isn't available, your app type is Server-only — create a new Browser-based / Web app.)",
+        );
+      }
       throw new Error(`SIP provisioning failed (${provRes.status}): ${t.slice(0, 300)}`);
     }
     const prov = await provRes.json();
