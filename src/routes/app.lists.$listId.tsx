@@ -1726,7 +1726,19 @@ function CallWorkstation({
               </div>
             </div>
 
+            {userId && (
+              <div className="border-b bg-muted/30 px-6 py-2">
+                <VoicemailRecorder
+                  listId={listId}
+                  userId={userId}
+                  currentPath={voicemailAudioPath}
+                  onChange={() => onVoicemailChanged()}
+                />
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto">
+
               {!activeScript ? (
                 <div className="flex h-full items-center justify-center p-12">
                   <Card className="max-w-md p-8 text-center">
