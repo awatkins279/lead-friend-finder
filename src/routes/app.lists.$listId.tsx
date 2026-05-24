@@ -34,9 +34,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { generateCallScript, getTwilioToken, startCall, startRingOutCall, endCall, type CallScript } from "@/lib/calls.functions";
-import { Phone as PhoneIcon, PhoneOff, MicOff, Mic } from "lucide-react";
+import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot } from "lucide-react";
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -100,7 +101,7 @@ function effectiveEmails(r: Row): EmailInSequence[] {
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string };
+type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null };
 
 function ListDetailPage() {
   const { listId } = Route.useParams();
