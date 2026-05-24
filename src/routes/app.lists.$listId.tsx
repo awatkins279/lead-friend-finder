@@ -1505,9 +1505,9 @@ function CallWorkstation({
         vmCtxRef.current = null;
         vmOriginalTrackRef.current = null;
         vmSenderRef.current = null;
-        // Mark this call as a voicemail and advance to the next lead
-        try { await logOutcome("voicemail"); } catch {}
+        // Hang up the live call and roll to the next prospect
         await hangupAndNext();
+
         setVoicemailDropping(false);
       };
 
