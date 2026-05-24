@@ -22,7 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 import { VoicemailRecorder } from "@/components/VoicemailRecorder";
-import { VoicemailAgent } from "@/components/VoicemailAgent";
+import { Link } from "@tanstack/react-router";
 import { generateVoicemailScript, synthesizeVoicemail, logVoicemailDrop } from "@/lib/voicemail.functions";
 
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
