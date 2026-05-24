@@ -1421,7 +1421,9 @@ function CallWorkstation({
       if (error) throw error;
       toast.success(`Logged: ${outcome}`);
       setNotes("");
+      setFocusMode(false);
       goTo(1);
+
     } catch (e: any) {
       toast.error(e.message ?? "Failed to log call");
     } finally {
