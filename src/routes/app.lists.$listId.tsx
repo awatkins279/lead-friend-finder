@@ -1904,6 +1904,9 @@ function FocusCallView({
   onExit,
   onNext,
   hasNext,
+  canDropVoicemail,
+  onDropVoicemail,
+  voicemailDropping,
   outcomeBusy,
   onLogOutcome,
 }: {
@@ -1922,9 +1925,13 @@ function FocusCallView({
   onExit: () => void;
   onNext: () => void;
   hasNext: boolean;
+  canDropVoicemail: boolean;
+  onDropVoicemail: () => void;
+  voicemailDropping: boolean;
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
+
 
   const outcomes = [
     { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
