@@ -1253,8 +1253,6 @@ function CallWorkstation({
     return () => {
       try { connection?.disconnect?.(); } catch {}
       try { device?.destroy?.(); } catch {}
-      try { rcSession?.terminate?.(); } catch {}
-      try { rcWebPhone?.userAgent?.unregister?.(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
