@@ -1346,8 +1346,15 @@ function CallWorkstation({
     const cid = idOverride ?? callId;
     setCallStatus("ending");
     const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
+    // Twilio
     try { connection?.disconnect?.(); } catch {}
+    // RingCentral — hang up the SIP session and tear down the web phone
+    try { await rcSession?.hangup?.(); } catch {}
+    try { await rcSession?.dispose?.(); } catch {}
+    try { await rcWebPhone?.dispose?.(); } catch {}
     setConnection(null);
+    setRcSession(null);
+    setRcWebPhone(null);
     setMuted(false);
     if (cid) {
       try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
@@ -1357,6 +1364,7 @@ function CallWorkstation({
     setCallStatus("idle");
     setFocusMode(false);
   };
+
 
 
   const toggleMute = () => {
