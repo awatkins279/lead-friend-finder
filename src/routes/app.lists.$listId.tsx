@@ -1283,6 +1283,8 @@ function CallWorkstation({
     if (!phoneAccount) return toast.error("No ready phone account — finish setup in Sending Accounts");
     try {
       setCallStatus("connecting");
+      setFocusMode(true);
+
 
       if (phoneAccount.provider === "ringcentral") {
         // RingCentral browser WebRTC via ringcentral-web-phone
