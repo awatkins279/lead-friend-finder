@@ -131,7 +131,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url",
         )
         .eq("id", listId)
         .maybeSingle();
