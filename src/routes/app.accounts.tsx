@@ -53,11 +53,14 @@ const PHONE_PROVIDERS: PhoneProvider[] = [
 function AccountsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<PhoneAccountRow[]>([]);
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<PhoneAccountRow | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [editingEmail, setEditingEmail] = useState<EmailAccountRow | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -66,21 +69,32 @@ function AccountsPage() {
     setUserId(uid);
     if (!uid) {
       setAccounts([]);
+      setEmailAccounts([]);
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("user_phone_accounts")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    setAccounts((data ?? []) as PhoneAccountRow[]);
+    const [{ data: phones, error: phoneErr }, { data: emails, error: emailErr }] = await Promise.all([
+      supabase.from("user_phone_accounts").select("*").order("created_at", { ascending: false }),
+      supabase.from("email_accounts").select("*").order("created_at", { ascending: false }),
+    ]);
+    if (phoneErr) toast.error(phoneErr.message);
+    if (emailErr) toast.error(emailErr.message);
+    setAccounts((phones ?? []) as PhoneAccountRow[]);
+    setEmailAccounts((emails ?? []) as EmailAccountRow[]);
     setLoading(false);
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  const removeEmail = async (id: string) => {
+    if (!confirm("Delete this email account?")) return;
+    const { error } = await supabase.from("email_accounts").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Deleted");
+    load();
+  };
 
   const remove = async (id: string) => {
     if (!confirm("Delete this phone account?")) return;
