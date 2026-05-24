@@ -142,6 +142,7 @@ export function SdrAgentDialog({
           what_selling: a.what_selling ?? "",
           key_differentiators: a.key_differentiators ?? "",
           extra_instructions: a.extra_instructions ?? "",
+          email_account_id: a.email_account_id ?? null,
         });
         setSavedId(a.id);
         setDocs(r.docs as KnowledgeDoc[]);
