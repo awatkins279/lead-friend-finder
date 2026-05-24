@@ -24,6 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAccountDialog";
 import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
+import { EmailAccountDialog, type EmailAccountRow } from "@/components/EmailAccountDialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/accounts")({
