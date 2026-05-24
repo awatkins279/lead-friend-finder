@@ -1848,11 +1848,15 @@ function FocusCallView({
               </Button>
             </div>
           )}
+          <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
+            Next call →
+          </Button>
           <Button size="sm" variant="outline" onClick={onExit}>
-            <X className="mr-1.5 h-4 w-4" /> Exit focus
+            <X className="mr-1.5 h-4 w-4" /> End &amp; exit
           </Button>
         </div>
       </header>
+
 
       {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
