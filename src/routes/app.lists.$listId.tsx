@@ -1978,6 +1978,19 @@ function FocusCallView({
               </Button>
             </div>
           )}
+          <Button
+            size="sm"
+            variant="default"
+            onClick={onDropVoicemail}
+            disabled={!canDropVoicemail}
+            title={canDropVoicemail ? "Play prerecorded voicemail, hang up, advance" : "Record a voicemail for this campaign first"}
+          >
+            {voicemailDropping ? (
+              <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Dropping…</>
+            ) : (
+              <>📩 Drop VM + next</>
+            )}
+          </Button>
           <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
             Next call →
           </Button>
@@ -1986,6 +1999,7 @@ function FocusCallView({
           </Button>
         </div>
       </header>
+
 
 
       {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
