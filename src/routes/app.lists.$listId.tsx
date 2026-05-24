@@ -1250,6 +1250,13 @@ function CallWorkstation({
   const vmSenderRef = useRef<RTCRtpSender | null>(null);
   const [voicemailDropping, setVoicemailDropping] = useState(false);
 
+  // ---- AI Voicemail Agent ----
+  const genVmScriptFn = useServerFn(generateVoicemailScript);
+  const synthVmFn = useServerFn(synthesizeVoicemail);
+  const logVmFn = useServerFn(logVoicemailDrop);
+  const vmScriptsRef = useRef<Map<string, Promise<string>>>(new Map());
+  const [aiVmDropping, setAiVmDropping] = useState(false);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
