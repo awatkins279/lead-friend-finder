@@ -1981,6 +1981,9 @@ function CallWorkstation({
         canDropVoicemail={!!voicemailAudioPath && callStatus === "in_progress" && !voicemailDropping}
         onDropVoicemail={dropVoicemailAndNext}
         voicemailDropping={voicemailDropping}
+        canDropAiVoicemail={callStatus === "in_progress" && !aiVmDropping}
+        onDropAiVoicemail={dropAiVoicemailAndNext}
+        aiVmDropping={aiVmDropping}
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
