@@ -1399,6 +1399,25 @@ function CallWorkstation({
     if (next) setActiveId(next.lead_id);
   };
 
+  // Hang up the current call (if any) and jump to the next prospect in the
+  // queue that has a phone number. Used by the "Next call" button in focus mode.
+  const hangupAndNext = async () => {
+    if (callStatus !== "idle") {
+      await finishCall();
+    }
+    if (activeIndex < 0) return;
+    const nextWithPhone = rows.slice(activeIndex + 1).find((r) => r.lead?.phone);
+    const next = nextWithPhone ?? rows[activeIndex + 1];
+    if (next) {
+      setActiveId(next.lead_id);
+      setFocusMode(true);
+    } else {
+      toast.info("No more prospects in the queue");
+      setFocusMode(false);
+    }
+  };
+
+
   const generate = async (force = false) => {
     if (!active) return;
     setScriptBusy(true);
