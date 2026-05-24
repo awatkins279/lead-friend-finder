@@ -1505,11 +1505,12 @@ function CallWorkstation({
         vmCtxRef.current = null;
         vmOriginalTrackRef.current = null;
         vmSenderRef.current = null;
-        // Log this as a voicemail outcome on the current call before moving on
-        await logOutcome("voicemail", { skipAdvance: true });
+        // Mark this call as a voicemail and advance to the next lead
+        try { await logOutcome("voicemail"); } catch {}
         await hangupAndNext();
         setVoicemailDropping(false);
       };
+
       audio.onerror = () => {
         toast.error("Couldn't play the voicemail audio");
         setVoicemailDropping(false);
