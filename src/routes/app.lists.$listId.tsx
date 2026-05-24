@@ -2104,6 +2104,19 @@ function FocusCallView({
               <>📩 Drop VM + next</>
             )}
           </Button>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={onDropAiVoicemail}
+            disabled={!canDropAiVoicemail}
+            className="bg-primary"
+            title={canDropAiVoicemail ? "Drop AI voicemail in your cloned voice, hang up, advance" : "Available during an active call"}
+          >
+            {aiVmDropping ? (
+              <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Sending…</>
+            ) : (
+              <><Sparkles className="mr-1.5 h-4 w-4" /> AI Voicemail</>
+            )}
           <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
             Next call →
           </Button>
