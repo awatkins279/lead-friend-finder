@@ -1196,7 +1196,8 @@ function CallWorkstation({
   const genScriptFn = useServerFn(generateCallScript);
   const getTokenFn = useServerFn(getTwilioToken);
   const startCallFn = useServerFn(startCall);
-  const startRingOutFn = useServerFn(startRingOutCall);
+  const startRcCallFn = useServerFn(startRingCentralBrowserCall);
+  const getRcCredsFn = useServerFn(getRingCentralWebPhoneCreds);
   const endCallFn = useServerFn(endCall);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
