@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate, Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Linkedin, Bookmark, LogOut, List as ListIcon, Inbox, Bot, Mail } from "lucide-react";
+import { Users, Linkedin, Bookmark, LogOut, List as ListIcon, Inbox, Bot, Mail, Voicemail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/app")({
