@@ -21,6 +21,8 @@ import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, A
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
+import { VoicemailRecorder } from "@/components/VoicemailRecorder";
+
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
