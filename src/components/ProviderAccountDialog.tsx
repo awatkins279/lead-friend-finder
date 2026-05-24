@@ -244,6 +244,84 @@ function Field({
   );
 }
 
+function RingCentralAuthStatus({
+  phoneAccountId,
+  credentials,
+}: {
+  phoneAccountId: string;
+  credentials: Record<string, string>;
+}) {
+  const getAuthUrl = useServerFn(getRingCentralAuthUrl);
+  const [busy, setBusy] = useState(false);
+  const connected = !!credentials.refresh_token;
+  const hasCreds = !!(credentials.client_id && credentials.client_secret);
+
+  const signIn = async () => {
+    if (!hasCreds) {
+      toast.error("Save your Client ID and Secret first");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { url } = await getAuthUrl({ data: { phoneAccountId } });
+      const popup = window.open(url, "rc-oauth", "width=600,height=720");
+      if (!popup) {
+        toast.error("Pop-up blocked — allow pop-ups for this site and try again.");
+        setBusy(false);
+        return;
+      }
+      const onMsg = (e: MessageEvent) => {
+        if (e.data?.type === "ringcentral-oauth-done") {
+          window.removeEventListener("message", onMsg);
+          toast.success("Signed in! Reload the Sending Accounts page.");
+          setBusy(false);
+        }
+      };
+      window.addEventListener("message", onMsg);
+      // Failsafe — clear busy state when popup closes
+      const t = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(t);
+          setBusy(false);
+        }
+      }, 500);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to start sign-in");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {connected ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                Signed in to RingCentral
+              </>
+            ) : (
+              <>
+                <LogIn className="h-4 w-4 text-amber-500" />
+                Not signed in yet
+              </>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {connected
+              ? "Your browser can now place calls. Re-sign in if calls start failing."
+              : "Save Client ID + Secret first, then click Sign in to authorize browser calling."}
+          </p>
+        </div>
+        <Button size="sm" onClick={signIn} disabled={busy || !hasCreds}>
+          {busy ? "Opening…" : connected ? "Re-sign in" : "Sign in with RingCentral"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------ Provider specs ------------------------------ */
 
 export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
