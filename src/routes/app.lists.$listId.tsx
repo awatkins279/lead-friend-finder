@@ -1268,26 +1268,6 @@ function CallWorkstation({
     return d;
   };
 
-  const ensureRcWebPhone = async () => {
-    if (!phoneAccount) throw new Error("No phone account selected");
-    if (rcWebPhone) return rcWebPhone;
-    const prov = await getRcSipFn({ data: { phoneAccountId: phoneAccount.id } });
-    const mod: any = await import("ringcentral-web-phone");
-    const WebPhone = mod.default ?? mod;
-    const wp = new WebPhone(
-      { sipInfo: prov.sipInfo, sipFlags: prov.sipFlags, sipErrorCodes: prov.sipErrorCodes },
-      {
-        appKey: prov.appKey,
-        appName: "Lovable SDR",
-        appVersion: "1.0.0",
-        logLevel: 1,
-        audioHelper: { enabled: true },
-      } as any,
-    );
-    setRcWebPhone(wp);
-    return wp;
-  };
-
   const startInAppCall = async () => {
     if (!active?.lead?.phone) return toast.error("No phone number on this lead");
     if (!phoneAccount) return toast.error("No ready phone account — finish setup in Sending Accounts");
