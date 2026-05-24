@@ -1545,7 +1545,7 @@ function CallWorkstation({
                         {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
                         {callStatus === "ending" && "Ending…"}
                       </span>
-                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection && !rcSession}>
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection}>
                         {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
                       </Button>
                       <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => finishCall()}>
