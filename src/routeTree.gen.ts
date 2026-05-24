@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
+import { Route as AppInboxRouteImport } from './routes/app.inbox'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
 import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
@@ -51,6 +52,11 @@ const AppSavedRoute = AppSavedRouteImport.update({
 const AppPeopleRoute = AppPeopleRouteImport.update({
   id: '/people',
   path: '/people',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInboxRoute = AppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAccountsRoute = AppAccountsRouteImport.update({
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/app/accounts': typeof AppAccountsRoute
+  '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/app/accounts': typeof AppAccountsRoute
+  '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/app/accounts': typeof AppAccountsRoute
+  '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/app/accounts'
+    | '/app/inbox'
     | '/app/people'
     | '/app/saved'
     | '/app/sdr-agents'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/app/accounts'
+    | '/app/inbox'
     | '/app/people'
     | '/app/saved'
     | '/app/sdr-agents'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/app/accounts'
+    | '/app/inbox'
     | '/app/people'
     | '/app/saved'
     | '/app/sdr-agents'
@@ -238,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPeopleRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inbox': {
+      id: '/app/inbox'
+      path: '/inbox'
+      fullPath: '/app/inbox'
+      preLoaderRoute: typeof AppInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/accounts': {
       id: '/app/accounts'
       path: '/accounts'
@@ -292,6 +311,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
+  AppInboxRoute: typeof AppInboxRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
   AppSdrAgentsRoute: typeof AppSdrAgentsRoute
@@ -301,6 +321,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
+  AppInboxRoute: AppInboxRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,
   AppSdrAgentsRoute: AppSdrAgentsRoute,
@@ -322,3 +343,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
