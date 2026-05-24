@@ -565,7 +565,10 @@ function ListDetailPage() {
             onConsumedInitial={() => setPendingCallLeadId(null)}
             onOpenConfig={() => setCallConfigOpen(true)}
             onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
+            voicemailAudioPath={list?.voicemail_audio_url ?? null}
+            onVoicemailChanged={() => refetchList()}
           />
+
         </TabsContent>
       </Tabs>
 
