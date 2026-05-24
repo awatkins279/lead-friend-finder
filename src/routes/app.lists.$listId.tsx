@@ -1355,7 +1355,9 @@ function CallWorkstation({
     setCallId(null);
     setCallStart(null);
     setCallStatus("idle");
+    setFocusMode(false);
   };
+
 
   const toggleMute = () => {
     const next = !muted;
