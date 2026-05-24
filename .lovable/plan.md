@@ -1,83 +1,53 @@
-# Browser-based RingCentral calling (WebRTC)
+## What's actually broken
 
-Today RingCentral calls use **RingOut**: we phone the rep's `ring_to_number`, they pick up their desk/cell phone, then RingCentral bridges to the prospect. We're going to replace that with RingCentral's **WebRTC Web Phone**, so audio runs through the laptop's mic + speakers — same UX the Twilio path already has.
+Looking at the dev server logs, the real error isn't the RingCentral SDK at all — it's a CSS bug in `src/styles.css`:
 
-## How RingCentral WebRTC works
-
-RingCentral does not expose a "browser token" like Twilio. Instead:
-
-1. Server exchanges the existing **JWT** (with `client_id` / `client_secret`) for an OAuth access token.
-2. Server calls `POST /restapi/v1.0/client-info/sip-provision` with that token to mint short-lived **SIP credentials** (username, password, WSS server, domain, auth-id). This is the only safe place for this — it requires the client secret.
-3. Browser passes those SIP credentials into the **`@ringcentral/web-phone`** SDK, which opens a WebSocket → SIP/WSS session to RingCentral's edge and uses WebRTC for the media stream.
-4. `webPhone.userAgent.invite(toNumber)` places the call from the browser. The rep's mic captures their voice; the prospect's audio is piped to the `<audio>` element the SDK manages. Mute, hangup, and DTMF are all SDK methods.
-
-No phone hardware involved. Uses the existing `client_id`, `client_secret`, `jwt`, and `server_url` already stored on the phone account.
-
-## Changes
-
-### Backend — `src/lib/calls.functions.ts`
-
-- Add `getRingCentralSipProvision` server function:
-  - Input: `phoneAccountId`.
-  - Loads the RC account, runs the same JWT → access_token exchange already used by `startRingOutCall`.
-  - Calls `POST {server_url}/restapi/v1.0/client-info/sip-provision` with body `{ sipInfo: [{ transport: "WSS" }] }`.
-  - Returns the JSON SIP-provision payload plus the `access_token` and `from_number` (caller ID).
-- Add `startRingCentralWebCall` server function (mirror of `startCall`): inserts a `calls` row with `provider=ringcentral`, `status=initiated`, returns `callId`. Used so the call shows up in history / outcomes.
-- Keep `startRingOutCall` for now but it will no longer be wired into the UI. (Safe to delete in a follow-up.)
-
-### Frontend — `src/routes/app.lists.$listId.tsx` (`CallWorkstation`)
-
-- Add `bun add @ringcentral/web-phone sip.js` (the SDK pulls SIP.js as a transport).
-- Replace `startRingOutFn` usage with new flow when `phoneAccount.provider === "ringcentral"`:
-  1. Call `getRingCentralSipProvision({ phoneAccountId })`.
-  2. Lazy-import `RingCentralWebPhone` (browser-only).
-  3. Instantiate once, register, store in a ref alongside the existing Twilio `device` state.
-  4. Call `startRingCentralWebCall` to get `callId`.
-  5. `webPhone.userAgent.invite(toNumber, { fromNumber })` → returns a session.
-  6. Wire session events (`progress` → ringing, `accepted` → in_progress, `terminated`/`failed` → `finishCall`) into the same `callStatus` state machine the Twilio path uses.
-- Reuse the existing mute button: route it to `session.mute()` / `unmute()` when the active call is RingCentral, otherwise the current Twilio path.
-- Reuse the existing hang-up: `session.terminate()` on the RingCentral path.
-- Cleanup on unmount: also call `webPhone.userAgent.unregister()` and dispose the audio element.
-
-### UX
-
-- Same in-app call panel; the toast that today says "RingCentral is calling your phone — answer to connect" gets replaced with the normal `Connecting…` → `Ringing…` → `In progress` flow, identical to Twilio.
-- Browser will prompt for mic permission the first time the rep places an RC call.
-
-## Technical details
-
-```text
-JWT (stored) ──► OAuth token ──► /client-info/sip-provision
-                                            │
-                                            ▼
-                                  { sipInfo: [{ wsServers, domain,
-                                                authorizationId,
-                                                username, password }],
-                                    sipFlags, sipErrorCodes }
-                                            │
-                          (returned to browser via server fn)
-                                            ▼
-                            new RingCentralWebPhone(provision,
-                                { appKey: client_id,
-                                  appName: "Lovable SDR",
-                                  appVersion: "1.0.0",
-                                  uuid: <stable per device> })
-                                            │
-                                            ▼
-                            webPhone.userAgent.invite("+1...")
-                                            │
-                                            ▼
-                            WebRTC audio ↔ rep's mic/speakers
+```
+[vite:css][postcss] @import must precede all other statements
 ```
 
-Notes:
-- `ring_to_number` becomes unused for placing calls; it can stay on the account record (still useful for fallback / display).
-- The SIP-provision token is short-lived (~1h); we mint on demand, no caching needed for v1.
-- Server function returns SIP credentials over HTTPS; they're scoped to a single SIP session — same security profile as the Twilio access token we already return today.
-- No new env vars or secrets — uses existing `credentials` on `user_phone_accounts`.
+The file currently has:
+```
+1: @import "tailwindcss" source(none);
+2: @source "../src";          ← non-@import statement
+3: @import "tw-animate-css";  ← @import AFTER a non-import → CSS spec violation
+4: @import url("...Plus Jakarta Sans...");
+5: @import url("...Urbanist + Epilogue...");
+```
 
-## Out of scope
+CSS requires all `@import` rules to come before any other statement. PostCSS rejects the file, the page can't render, and you see the blank screen / "SSR rendering failed". This was likely introduced when fonts were added in an earlier turn — not by the RingCentral work.
 
-- Inbound calls (we only place outbound from a campaign).
-- Call recording (RC web phone supports it; can wire later).
-- Removing `startRingOutCall` / the old "your phone rings first" copy in docs.
+The RingCentral WebRTC code is already correctly lazy-imported inside a click handler, so it never runs during SSR. No code change needed there.
+
+## The fix (one tiny edit)
+
+Reorder the first 5 lines of `src/styles.css` so every `@import` comes first:
+
+```
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans...");
+@import url("https://fonts.googleapis.com/css2?family=Urbanist...");
+@source "../src";
+```
+
+That's it. After this the page will render, and the calling button will work.
+
+## What you need to do on your end (for actually placing a test call)
+
+The browser-calling feature needs your RingCentral account configured as a **WebRTC-capable app**, not just any RingCentral account. Here's how to check:
+
+1. Go to **developers.ringcentral.com** → your app → **Settings**
+2. Under **App Permissions**, make sure these are enabled:
+   - **VoIP Calling** (this is the WebRTC one — without it, browser calls won't work)
+   - **Read Accounts**
+3. Under **Auth**, the grant type must include **JWT**
+4. Then in this app, go to **Sending Accounts** → edit your RingCentral account and confirm these fields are filled:
+   - Client ID
+   - Client Secret
+   - JWT token
+   - "Your phone number" (the caller ID prospects will see)
+
+If **VoIP Calling** isn't an available permission on your app, you'll need to either enable it (some RingCentral plans require contacting their support) or create a new app of type "Browser-Based" / "Web". That's the "RingCentral web thing" you were unsure about — it's a permission/app-type setting inside your existing RingCentral developer account, not a separate product you buy.
+
+Once the CSS fix lands and your app has VoIP Calling enabled, hit a "Call" button on a lead — your browser will ask for mic permission, then dial the prospect with audio in/out through your computer.
