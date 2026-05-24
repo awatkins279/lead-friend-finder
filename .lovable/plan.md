@@ -1,139 +1,83 @@
-# Unified Inbox
+# Browser-based RingCentral calling (WebRTC)
 
-A single Outlook/Gmail-style hub at `/app/inbox` that merges every reply across every connected email account, every domain, and every campaign into one threaded view — with filters, intent labels, and a lightweight analytics strip on top.
+Today RingCentral calls use **RingOut**: we phone the rep's `ring_to_number`, they pick up their desk/cell phone, then RingCentral bridges to the prospect. We're going to replace that with RingCentral's **WebRTC Web Phone**, so audio runs through the laptop's mic + speakers — same UX the Twilio path already has.
 
-Built now against the schema so the moment real inboxes start syncing (after your email-account meeting), threads, replies, and AI SDR drafts populate automatically.
+## How RingCentral WebRTC works
 
-## 1. Navigation
+RingCentral does not expose a "browser token" like Twilio. Instead:
 
-- New sidebar entry **Inbox** (Inbox icon) at the top of `/app/*`, above Lists.
-- Route: `src/routes/app.inbox.tsx`.
-- Badge with unread count on the sidebar item.
+1. Server exchanges the existing **JWT** (with `client_id` / `client_secret`) for an OAuth access token.
+2. Server calls `POST /restapi/v1.0/client-info/sip-provision` with that token to mint short-lived **SIP credentials** (username, password, WSS server, domain, auth-id). This is the only safe place for this — it requires the client secret.
+3. Browser passes those SIP credentials into the **`@ringcentral/web-phone`** SDK, which opens a WebSocket → SIP/WSS session to RingCentral's edge and uses WebRTC for the media stream.
+4. `webPhone.userAgent.invite(toNumber)` places the call from the browser. The rep's mic captures their voice; the prospect's audio is piped to the `<audio>` element the SDK manages. Mute, hangup, and DTMF are all SDK methods.
 
-## 2. Layout (Outlook-style, 3 panes)
+No phone hardware involved. Uses the existing `client_id`, `client_secret`, `jwt`, and `server_url` already stored on the phone account.
 
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│  Analytics strip (collapsible): replies · breakdown · top camp.  │
-├────────────┬──────────────────────────┬─────────────────────────┤
-│ Folders &  │ Thread list              │ Thread view             │
-│ filters    │ (sender, snippet, time,  │ (full conversation,     │
-│            │  intent badge, campaign) │  draft/reply composer)  │
-│ • All      │                          │                         │
-│ • Unread   │                          │                         │
-│ • Needs    │                          │                         │
-│   approval │                          │                         │
-│ • Sent     │                          │                         │
-│ • Archived │                          │                         │
-│            │                          │                         │
-│ Filters:   │                          │                         │
-│ Campaign ▾ │                          │                         │
-│ Intent ▾   │                          │                         │
-│ Account ▾  │                          │                         │
-│ Date ▾     │                          │                         │
-│ Search     │                          │                         │
-└────────────┴──────────────────────────┴─────────────────────────┘
-```
+## Changes
 
-- Left rail: folders + faceted filters.
-- Middle: virtualized thread list, infinite scroll, keyboard nav (`j`/`k`, `e` archive, `r` reply).
-- Right: thread with bubbles — inbound (gray, left) vs SDR outbound (primary, right). Header shows lead, company, campaign chip, assigned agent, "via {inbox@domain}". Footer composer: edit AI draft → Approve & send / Regenerate / Send manual reply.
+### Backend — `src/lib/calls.functions.ts`
 
-## 3. Filters & search
+- Add `getRingCentralSipProvision` server function:
+  - Input: `phoneAccountId`.
+  - Loads the RC account, runs the same JWT → access_token exchange already used by `startRingOutCall`.
+  - Calls `POST {server_url}/restapi/v1.0/client-info/sip-provision` with body `{ sipInfo: [{ transport: "WSS" }] }`.
+  - Returns the JSON SIP-provision payload plus the `access_token` and `from_number` (caller ID).
+- Add `startRingCentralWebCall` server function (mirror of `startCall`): inserts a `calls` row with `provider=ringcentral`, `status=initiated`, returns `callId`. Used so the call shows up in history / outcomes.
+- Keep `startRingOutCall` for now but it will no longer be wired into the UI. (Safe to delete in a follow-up.)
 
-- **Campaign**: multi-select from user's lists.
-- **Intent**: Interested, Not interested, Objection, Question, Meeting booked, OOO/auto-reply, Unsubscribe, Other.
-- **Account**: any of their `email_accounts` (so a domain switch is just selecting accounts).
-- **Date**: presets (Today, Last 7d, Last 30d, Last month, Last year, Year before) + custom range.
-- **Search**: subject / body / sender / company (Postgres `ilike` for v1).
+### Frontend — `src/routes/app.lists.$listId.tsx` (`CallWorkstation`)
 
-All filters combine and persist in URL search params (TanStack `validateSearch`) so the view is shareable & restorable.
+- Add `bun add @ringcentral/web-phone sip.js` (the SDK pulls SIP.js as a transport).
+- Replace `startRingOutFn` usage with new flow when `phoneAccount.provider === "ringcentral"`:
+  1. Call `getRingCentralSipProvision({ phoneAccountId })`.
+  2. Lazy-import `RingCentralWebPhone` (browser-only).
+  3. Instantiate once, register, store in a ref alongside the existing Twilio `device` state.
+  4. Call `startRingCentralWebCall` to get `callId`.
+  5. `webPhone.userAgent.invite(toNumber, { fromNumber })` → returns a session.
+  6. Wire session events (`progress` → ringing, `accepted` → in_progress, `terminated`/`failed` → `finishCall`) into the same `callStatus` state machine the Twilio path uses.
+- Reuse the existing mute button: route it to `session.mute()` / `unmute()` when the active call is RingCentral, otherwise the current Twilio path.
+- Reuse the existing hang-up: `session.terminate()` on the RingCentral path.
+- Cleanup on unmount: also call `webPhone.userAgent.unregister()` and dispose the audio element.
 
-## 4. Analytics strip (top of inbox)
+### UX
 
-Compact cards, respects current filter set:
+- Same in-app call panel; the toast that today says "RingCentral is calling your phone — answer to connect" gets replaced with the normal `Connecting…` → `Ringing…` → `In progress` flow, identical to Twilio.
+- Browser will prompt for mic permission the first time the rep places an RC call.
 
-- Replies received (with trend vs previous period)
-- Breakdown donut: Interested / Objection / Not interested / Other
-- Reply rate per campaign (top 5)
-- Avg. time-to-reply (SDR)
-- Meetings booked
-
-Click any segment → applies as a filter.
-
-## 5. Data model (additive, no breaking changes)
-
-Three new tables — designed to look identical regardless of which inbox the message came in on, so "unified" is the default state of the data.
+## Technical details
 
 ```text
-sdr_conversations
-  id, user_id, agent_id (nullable), email_account_id, list_id (campaign),
-  lead_id, lead_email, lead_name, company,
-  subject, last_message_at, last_direction, unread_count,
-  intent, intent_confidence, status (open|needs_approval|snoozed|archived|closed),
-  meeting_booked_at, created_at, updated_at
-
-sdr_messages
-  id, conversation_id, user_id,
-  direction (inbound|outbound), from_email, from_name, to_emails[], cc_emails[],
-  subject, body_text, body_html, snippet,
-  message_id (RFC), in_reply_to, references[],
-  sent_at, received_at,
-  ai_generated boolean, agent_id, status (draft|queued|sent|failed|received),
-  raw jsonb
-
-sdr_message_attachments  (id, message_id, filename, size, mime, storage_path)
+JWT (stored) ──► OAuth token ──► /client-info/sip-provision
+                                            │
+                                            ▼
+                                  { sipInfo: [{ wsServers, domain,
+                                                authorizationId,
+                                                username, password }],
+                                    sipFlags, sipErrorCodes }
+                                            │
+                          (returned to browser via server fn)
+                                            ▼
+                            new RingCentralWebPhone(provision,
+                                { appKey: client_id,
+                                  appName: "Lovable SDR",
+                                  appVersion: "1.0.0",
+                                  uuid: <stable per device> })
+                                            │
+                                            ▼
+                            webPhone.userAgent.invite("+1...")
+                                            │
+                                            ▼
+                            WebRTC audio ↔ rep's mic/speakers
 ```
 
-RLS: everything scoped by `user_id`. Indexes on `(user_id, last_message_at desc)`, `(conversation_id, sent_at)`, `(user_id, intent)`, `(user_id, list_id)`.
+Notes:
+- `ring_to_number` becomes unused for placing calls; it can stay on the account record (still useful for fallback / display).
+- The SIP-provision token is short-lived (~1h); we mint on demand, no caching needed for v1.
+- Server function returns SIP credentials over HTTPS; they're scoped to a single SIP session — same security profile as the Twilio access token we already return today.
+- No new env vars or secrets — uses existing `credentials` on `user_phone_accounts`.
 
-Existing `sdr_agents`, `email_accounts`, `lists` (campaigns), `leads` already wire in.
+## Out of scope
 
-## 6. Server functions (`src/lib/inbox.functions.ts`)
-
-- `listConversations({ filters, cursor })` — paginated, joins campaign + account + agent for chips.
-- `getConversation({ id })` — full thread + messages + lead context.
-- `setConversationStatus({ id, status })` — archive/snooze/close.
-- `setConversationIntent({ id, intent })` — manual override.
-- `saveDraftReply({ conversationId, body })`, `approveAndSend({ messageId })`, `regenerateReply({ conversationId })` — stub the send path until inboxes connect (writes a `queued` message; the real sender plugs in later).
-- `getInboxAnalytics({ filters })` — counts + breakdown + per-campaign rate, all in one aggregated query.
-
-## 7. Ingestion stubs (ready, not wired)
-
-Public route `src/routes/api/public/inbox.ingest.ts` accepts a normalized message payload (works for Gmail webhook, Outlook Graph subscription, or IMAP poller) and:
-
-1. Looks up `email_account_id` by recipient.
-2. Resolves campaign + lead via `In-Reply-To` / `References` headers (falls back to from-address match).
-3. Upserts conversation (threaded by RFC references), inserts message, recomputes `unread_count` + `last_message_at`.
-4. Triggers intent classification (Gemini Flash) async → updates `intent`/`intent_confidence`.
-5. If the campaign has an SDR agent assigned and the agent's mode allows it, drafts a reply (RAG over `sdr_knowledge_chunks` you already built) and stores as `draft` or `queued` per agent's mode.
-
-Same endpoint works for every provider once you have credentials — providers just translate their webhook into this shape.
-
-## 8. Empty state (today)
-
-Because no accounts are connected yet, the inbox renders with:
-
-- The full UI shell, folders, filters, analytics cards (all zeros).
-- A friendly empty banner: "No inboxes connected yet — head to Sending accounts → Email to add one. Your SDR replies will start landing here automatically."
-- A "Load sample thread" toggle so you can demo the UI to the company tomorrow with realistic mock data (memory-only, not written to DB).
-
-## 9. Out of scope (next pass, after credentials land)
-
-- Actual Gmail OAuth / Outlook Graph / IMAP poller (separate ticket per provider).
-- Outbound SMTP send pipeline.
-- Attachment upload UI for composing.
-- Mentions / internal notes / multi-user assignment.
-
----
-
-### Technical notes
-
-- Route: `src/routes/app.inbox.tsx` + child `src/routes/app.inbox.$conversationId.tsx` for deep-linking.
-- New components: `InboxShell`, `InboxFilters`, `ConversationList`, `ConversationView`, `MessageBubble`, `ReplyComposer`, `InboxAnalyticsStrip`, `InboxEmptyState`.
-- Data fetching follows the project's TanStack Query + `createServerFn` pattern with `requireSupabaseAuth`.
-- Realtime: Supabase channel on `sdr_messages` filtered by `user_id` for live updates.
-- Add `ALTER PUBLICATION supabase_realtime ADD TABLE public.sdr_messages, public.sdr_conversations;`.
-- Sidebar unread badge subscribes to the same channel.
-
-Approve this and I'll build it.
+- Inbound calls (we only place outbound from a campaign).
+- Call recording (RC web phone supports it; can wire later).
+- Removing `startRingOutCall` / the old "your phone rings first" copy in docs.
