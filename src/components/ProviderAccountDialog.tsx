@@ -118,6 +118,13 @@ export function ProviderAccountDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2 text-sm">
+          {provider.id === "ringcentral" && existing && (
+            <RingCentralAuthStatus
+              phoneAccountId={existing.id}
+              credentials={values}
+            />
+          )}
+
           {provider.instructions && (
             <div className="rounded-md border bg-muted/40 p-3 text-xs">{provider.instructions}</div>
           )}
