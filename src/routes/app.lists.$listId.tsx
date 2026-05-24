@@ -1711,10 +1711,10 @@ function CallWorkstation({
         )}
       </div>
     </div>
-    {focusMode && active && activeScript && (
+    {focusMode && active && activeScript ? (
       <FocusCallView
-        leadName={[active.lead?.first_name, active.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
-        leadSub={[active.lead?.title, active.lead?.org_name].filter(Boolean).join(" · ")}
+        leadName={`${active.lead?.first_name ?? ""} ${active.lead?.last_name ?? ""}`.trim() || "Lead"}
+        leadSub={`${active.lead?.title ?? ""}${active.lead?.title && active.lead?.org_name ? " · " : ""}${active.lead?.org_name ?? ""}`}
         phone={active.lead?.phone ?? null}
         script={activeScript}
         notes={notes}
@@ -1729,7 +1729,8 @@ function CallWorkstation({
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
-    )}
+    ) : null}
+
     </>
   );
 }
