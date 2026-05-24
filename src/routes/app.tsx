@@ -34,10 +34,11 @@ function AppShell() {
   }
 
   const nav_items = [
+    { to: "/app/inbox", icon: Inbox, label: "Inbox" },
     { to: "/app/people", icon: Users, label: "People Search" },
     { to: "/app/lists", icon: ListIcon, label: "Campaigns" },
     { to: "/app/saved", icon: Bookmark, label: "Saved Searches" },
-    { to: "/app/accounts", icon: Inbox, label: "Sending Accounts" },
+    { to: "/app/accounts", icon: Mail, label: "Sending Accounts" },
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
   ];
