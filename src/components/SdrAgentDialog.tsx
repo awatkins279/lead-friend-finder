@@ -309,7 +309,35 @@ export function SdrAgentDialog({
                   placeholder={"Sarah Chen\nAcme Co · sarah@acme.com\nacme.com"}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Reply through inbox</Label>
+                <Select
+                  value={form.email_account_id ?? "none"}
+                  onValueChange={(v) =>
+                    update("email_account_id", v === "none" ? null : v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No inbox assigned yet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No inbox assigned</SelectItem>
+                    {emailAccounts.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.email_address}
+                        {e.status !== "active" ? " · pending" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This agent will reply through this inbox. Add accounts in{" "}
+                  <strong>Sending accounts → Email accounts</strong>. Replies
+                  start sending once credentials are connected.
+                </p>
+              </div>
             </TabsContent>
+
 
             <TabsContent value="offer" className="space-y-4 pt-4">
               <div className="space-y-2">
