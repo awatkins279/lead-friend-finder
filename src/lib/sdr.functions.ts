@@ -20,11 +20,27 @@ const upsertAgentSchema = z.object({
   what_selling: z.string().max(4000).nullish(),
   key_differentiators: z.string().max(4000).nullish(),
   extra_instructions: z.string().max(4000).nullish(),
+  email_account_id: z.string().uuid().nullish(),
 });
 
 const idSchema = z.object({ id: z.string().uuid() });
 
 // ============== Agents CRUD ==============
+
+type AgentListRow = {
+  id: string;
+  name: string;
+  sdr_display_name: string | null;
+  tone: string;
+  mode: string;
+  response_speed: string;
+  email_account_id: string | null;
+  inbox_email: string | null;
+  inbox_provider: string | null;
+  inbox_status: string | null;
+  sdr_knowledge_docs: { count: number }[];
+  lists: { count: number }[];
+};
 
 export const listSdrAgents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -32,10 +48,40 @@ export const listSdrAgents = createServerFn({ method: "GET" })
     const { supabase } = context;
     const { data, error } = await supabase
       .from("sdr_agents")
-      .select("*, sdr_knowledge_docs(count), lists(count)")
+      .select(
+        "id, name, sdr_display_name, tone, mode, response_speed, email_account_id, sdr_knowledge_docs(count), lists(count), email_accounts(email_address, provider, status)"
+      )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { agents: data ?? [] };
+    const agents: AgentListRow[] = (data ?? []).map((row) => {
+      const r = row as unknown as {
+        id: string;
+        name: string;
+        sdr_display_name: string | null;
+        tone: string;
+        mode: string;
+        response_speed: string;
+        email_account_id: string | null;
+        sdr_knowledge_docs: { count: number }[];
+        lists: { count: number }[];
+        email_accounts: { email_address: string; provider: string; status: string } | null;
+      };
+      return {
+        id: r.id,
+        name: r.name,
+        sdr_display_name: r.sdr_display_name,
+        tone: r.tone,
+        mode: r.mode,
+        response_speed: r.response_speed,
+        email_account_id: r.email_account_id,
+        inbox_email: r.email_accounts?.email_address ?? null,
+        inbox_provider: r.email_accounts?.provider ?? null,
+        inbox_status: r.email_accounts?.status ?? null,
+        sdr_knowledge_docs: r.sdr_knowledge_docs ?? [],
+        lists: r.lists ?? [],
+      };
+    });
+    return { agents };
   });
 
 export const getSdrAgent = createServerFn({ method: "POST" })

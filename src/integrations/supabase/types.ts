@@ -101,6 +101,60 @@ export type Database = {
           },
         ]
       }
+      email_accounts: {
+        Row: {
+          auth_method: string | null
+          created_at: string
+          display_name: string | null
+          email_address: string
+          id: string
+          imap_host: string | null
+          imap_port: number | null
+          notes: string | null
+          provider: string
+          smtp_host: string | null
+          smtp_port: number | null
+          smtp_username: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth_method?: string | null
+          created_at?: string
+          display_name?: string | null
+          email_address: string
+          id?: string
+          imap_host?: string | null
+          imap_port?: number | null
+          notes?: string | null
+          provider?: string
+          smtp_host?: string | null
+          smtp_port?: number | null
+          smtp_username?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth_method?: string | null
+          created_at?: string
+          display_name?: string | null
+          email_address?: string
+          id?: string
+          imap_host?: string | null
+          imap_port?: number | null
+          notes?: string | null
+          provider?: string
+          smtp_host?: string | null
+          smtp_port?: number | null
+          smtp_username?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           city: string | null
@@ -502,6 +556,7 @@ export type Database = {
           booking_url: string | null
           confidence_threshold: number
           created_at: string
+          email_account_id: string | null
           extra_instructions: string | null
           formality: number
           handoff_triggers: string | null
@@ -525,6 +580,7 @@ export type Database = {
           booking_url?: string | null
           confidence_threshold?: number
           created_at?: string
+          email_account_id?: string | null
           extra_instructions?: string | null
           formality?: number
           handoff_triggers?: string | null
@@ -548,6 +604,7 @@ export type Database = {
           booking_url?: string | null
           confidence_threshold?: number
           created_at?: string
+          email_account_id?: string | null
           extra_instructions?: string | null
           formality?: number
           handoff_triggers?: string | null
@@ -567,7 +624,15 @@ export type Database = {
           user_id?: string
           what_selling?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sdr_agents_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sdr_knowledge_chunks: {
         Row: {

@@ -48,6 +48,7 @@ type AgentForm = {
   what_selling: string;
   key_differentiators: string;
   extra_instructions: string;
+  email_account_id: string | null;
 };
 
 type KnowledgeDoc = {
@@ -57,6 +58,13 @@ type KnowledgeDoc = {
   status: string;
   error: string | null;
   chunk_count: number;
+};
+
+type EmailAccountOption = {
+  id: string;
+  email_address: string;
+  display_name: string | null;
+  status: string;
 };
 
 const EMPTY: AgentForm = {
@@ -74,6 +82,7 @@ const EMPTY: AgentForm = {
   what_selling: "",
   key_differentiators: "",
   extra_instructions: "",
+  email_account_id: null,
 };
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -94,6 +103,7 @@ export function SdrAgentDialog({
 }) {
   const [form, setForm] = useState<AgentForm>(EMPTY);
   const [docs, setDocs] = useState<KnowledgeDoc[]>([]);
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccountOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -106,6 +116,11 @@ export function SdrAgentDialog({
 
   useEffect(() => {
     if (!open) return;
+    supabase
+      .from("email_accounts")
+      .select("id, email_address, display_name, status")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setEmailAccounts((data ?? []) as EmailAccountOption[]));
     if (!agentId) {
       setForm(EMPTY);
       setDocs([]);
@@ -127,6 +142,7 @@ export function SdrAgentDialog({
           what_selling: a.what_selling ?? "",
           key_differentiators: a.key_differentiators ?? "",
           extra_instructions: a.extra_instructions ?? "",
+          email_account_id: a.email_account_id ?? null,
         });
         setSavedId(a.id);
         setDocs(r.docs as KnowledgeDoc[]);
@@ -293,7 +309,35 @@ export function SdrAgentDialog({
                   placeholder={"Sarah Chen\nAcme Co · sarah@acme.com\nacme.com"}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Reply through inbox</Label>
+                <Select
+                  value={form.email_account_id ?? "none"}
+                  onValueChange={(v) =>
+                    update("email_account_id", v === "none" ? null : v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No inbox assigned yet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No inbox assigned</SelectItem>
+                    {emailAccounts.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.email_address}
+                        {e.status !== "active" ? " · pending" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This agent will reply through this inbox. Add accounts in{" "}
+                  <strong>Sending accounts → Email accounts</strong>. Replies
+                  start sending once credentials are connected.
+                </p>
+              </div>
             </TabsContent>
+
 
             <TabsContent value="offer" className="space-y-4 pt-4">
               <div className="space-y-2">

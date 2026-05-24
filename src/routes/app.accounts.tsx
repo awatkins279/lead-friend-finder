@@ -24,6 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAccountDialog";
 import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
+import { EmailAccountDialog, type EmailAccountRow } from "@/components/EmailAccountDialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/accounts")({
@@ -52,11 +53,14 @@ const PHONE_PROVIDERS: PhoneProvider[] = [
 function AccountsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<PhoneAccountRow[]>([]);
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [providerOpen, setProviderOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<PhoneAccountRow | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [editingEmail, setEditingEmail] = useState<EmailAccountRow | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -65,21 +69,32 @@ function AccountsPage() {
     setUserId(uid);
     if (!uid) {
       setAccounts([]);
+      setEmailAccounts([]);
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("user_phone_accounts")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    setAccounts((data ?? []) as PhoneAccountRow[]);
+    const [{ data: phones, error: phoneErr }, { data: emails, error: emailErr }] = await Promise.all([
+      supabase.from("user_phone_accounts").select("*").order("created_at", { ascending: false }),
+      supabase.from("email_accounts").select("*").order("created_at", { ascending: false }),
+    ]);
+    if (phoneErr) toast.error(phoneErr.message);
+    if (emailErr) toast.error(emailErr.message);
+    setAccounts((phones ?? []) as PhoneAccountRow[]);
+    setEmailAccounts((emails ?? []) as EmailAccountRow[]);
     setLoading(false);
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  const removeEmail = async (id: string) => {
+    if (!confirm("Delete this email account?")) return;
+    const { error } = await supabase.from("email_accounts").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("Deleted");
+    load();
+  };
 
   const remove = async (id: string) => {
     if (!confirm("Delete this phone account?")) return;
@@ -213,27 +228,78 @@ function AccountsPage() {
         <TabsContent value="email" className="space-y-4">
           <div className="flex items-start justify-between">
             <p className="text-sm text-muted-foreground">
-              Connect Google accounts to send campaign emails from your own inbox.
+              Register the inboxes your AI SDR will reply through. Credentials &amp; OAuth
+              hook up after — for now you can save addresses and assign them to agents.
             </p>
-            <Button disabled>
-              <Plus className="mr-2 h-4 w-4" /> Connect Google account
+            <Button
+              onClick={() => {
+                setEditingEmail(null);
+                setEmailOpen(true);
+              }}
+              disabled={!userId}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add email account
             </Button>
           </div>
 
-          <Card className="p-12 text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-              <Mail className="h-6 w-6 text-primary" />
+          {loading ? (
+            <Card className="p-8 text-center text-sm text-muted-foreground">Loading…</Card>
+          ) : emailAccounts.length === 0 ? (
+            <Card className="p-12 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                <Mail className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-sm font-medium">No email accounts yet</p>
+              <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
+                Add the inbox addresses you bought / will receive. Your AI SDR agents
+                can be wired to them now and will start sending the moment credentials
+                are connected.
+              </p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {emailAccounts.map((a) => (
+                <Card key={a.id} className="flex items-center justify-between p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{a.email_address}</span>
+                      <Badge variant="outline" className="text-[10px] capitalize">{a.provider}</Badge>
+                      {a.status === "active" ? (
+                        <Badge variant="secondary" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" /> Ready
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 text-amber-600">
+                          <AlertTriangle className="h-3 w-3" /> Credentials pending
+                        </Badge>
+                      )}
+                    </div>
+                    {a.display_name && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Display name: {a.display_name}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingEmail(a);
+                        setEmailOpen(true);
+                      }}
+                    >
+                      <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => removeEmail(a.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
             </div>
-            <p className="text-sm font-medium">Email sending — coming soon</p>
-            <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
-              Google account connection is being wired up. Once enabled, you'll be able to
-              link multiple Gmail / Google Workspace inboxes here and rotate sends across them
-              in your campaigns.
-            </p>
-            <div className="mx-auto mt-5 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
-              <Sparkles className="h-3 w-3" /> Notify me when ready
-            </div>
-          </Card>
+          )}
         </TabsContent>
       </Tabs>
 
@@ -290,6 +356,16 @@ function AccountsPage() {
           onOpenChange={(o) => !o && setProviderOpen(null)}
           onSaved={load}
           existing={editing}
+        />
+      )}
+
+      {userId && (
+        <EmailAccountDialog
+          userId={userId}
+          open={emailOpen}
+          onOpenChange={setEmailOpen}
+          onSaved={load}
+          existing={editingEmail}
         />
       )}
     </div>
