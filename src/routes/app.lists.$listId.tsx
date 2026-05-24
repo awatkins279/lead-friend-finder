@@ -1441,6 +1441,88 @@ function CallWorkstation({
     }
   };
 
+  // Find the outbound audio RTP sender for whichever provider is active so we
+  // can swap the live mic feed for our prerecorded voicemail audio.
+  const getOutboundAudioSender = (): RTCRtpSender | null => {
+    try {
+      const rcPc: RTCPeerConnection | undefined =
+        rcSession?.sessionDescriptionHandler?.peerConnection;
+      if (rcPc) return rcPc.getSenders().find((s) => s.track?.kind === "audio") ?? null;
+    } catch {}
+    try {
+      const twPc: RTCPeerConnection | undefined =
+        connection?._mediaHandler?.version?.pc ??
+        connection?.mediaStream?.version?.pc ??
+        connection?._mediaHandler?.pc;
+      if (twPc) return twPc.getSenders().find((s) => s.track?.kind === "audio") ?? null;
+    } catch {}
+    return null;
+  };
+
+  /**
+   * Drop the prerecorded voicemail into the active call:
+   *  1. Fetch a signed URL for the audio file
+   *  2. Replace the outbound mic track with audio piped from an <audio> element
+   *  3. When playback ends, restore the mic, hang up, and advance to the next lead
+   */
+  const dropVoicemailAndNext = async () => {
+    if (!voicemailAudioPath) {
+      toast.error("No voicemail recorded for this campaign yet");
+      return;
+    }
+    const sender = getOutboundAudioSender();
+    if (!sender) {
+      toast.error("Voicemail drop isn't available on this call");
+      return;
+    }
+    setVoicemailDropping(true);
+    try {
+      const { data: signed, error } = await supabase.storage
+        .from("voicemail-drops")
+        .createSignedUrl(voicemailAudioPath, 60);
+      if (error || !signed?.signedUrl) throw error ?? new Error("No signed URL");
+
+      const audio = new Audio(signed.signedUrl);
+      audio.crossOrigin = "anonymous";
+      vmAudioRef.current = audio;
+
+      const ctx = new AudioContext();
+      vmCtxRef.current = ctx;
+      const source = ctx.createMediaElementSource(audio);
+      const dest = ctx.createMediaStreamDestination();
+      source.connect(dest);
+      // Don't connect to ctx.destination — we don't want to hear it locally.
+
+      vmOriginalTrackRef.current = sender.track ?? null;
+      vmSenderRef.current = sender;
+      const vmTrack = dest.stream.getAudioTracks()[0];
+      await sender.replaceTrack(vmTrack);
+
+      audio.onended = async () => {
+        try { await sender.replaceTrack(vmOriginalTrackRef.current); } catch {}
+        try { await ctx.close(); } catch {}
+        vmAudioRef.current = null;
+        vmCtxRef.current = null;
+        vmOriginalTrackRef.current = null;
+        vmSenderRef.current = null;
+        // Log this as a voicemail outcome on the current call before moving on
+        await logOutcome("voicemail", { skipAdvance: true });
+        await hangupAndNext();
+        setVoicemailDropping(false);
+      };
+      audio.onerror = () => {
+        toast.error("Couldn't play the voicemail audio");
+        setVoicemailDropping(false);
+      };
+      await audio.play();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to drop voicemail");
+      setVoicemailDropping(false);
+    }
+  };
+
+
+
 
   const generate = async (force = false) => {
     if (!active) return;
