@@ -205,6 +205,7 @@ ${settings.extra_instructions ? `- Extra rep instructions: ${settings.extra_inst
 
 RULES (CRITICAL):
 - Sound like a real human left this voicemail. Conversational, relaxed, never templated.
+- ABSOLUTELY NO filler words. Do NOT write "um", "uh", "umm", "uhh", "ah", "ahh", "er", "erm", "hmm", "like" (as a filler), "you know", "I mean". Clean, deliberate speech only.
 - NEVER state the obvious about what their company does ("I see you guys do X").
 - Reference something specific to them naturally — like you actually did your homework, without narrating it.
 - Use the rep's first name and the prospect's first name.
@@ -271,6 +272,13 @@ export const synthesizeVoicemail = createServerFn({ method: "POST" })
       let s = raw.trim();
       // Normalize whitespace
       s = s.replace(/\s+/g, " ");
+      // Strip filler words / disfluencies the model might have slipped in.
+      // Matches "um", "uh", "umm", "uhh", "uhm", "er", "erm", "ah", "ahh",
+      // "hmm" — case-insensitive, with optional trailing punctuation.
+      s = s.replace(/\b(u+m+h?|u+h+m*|e+r+m*|a+h+|h+m+)\b[,.\s]*/gi, "");
+      // Collapse leftover double spaces / orphan punctuation
+      s = s.replace(/\s+([,.!?])/g, "$1");
+      s = s.replace(/\s{2,}/g, " ").trim();
       // Promote em-dashes / hyphenated asides into real breath pauses
       s = s.replace(/\s*[—–-]\s*/g, " — ");
       // Comma -> short pause
@@ -302,7 +310,7 @@ export const synthesizeVoicemail = createServerFn({ method: "POST" })
               style: 0.65,
               use_speaker_boost: true,
               // Slow it down — confident closers don't rush
-              speed: 0.92,
+              speed: 0.82,
             },
           }),
         },
