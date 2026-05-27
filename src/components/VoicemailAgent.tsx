@@ -10,14 +10,23 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Loader2, Mic, Square, Upload, CheckCircle2, Sparkles } from "lucide-react";
+import { Loader2, Mic, Square, Upload, CheckCircle2, Sparkles, Play, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import {
   getVoicemailProfile,
   saveVoicemailSettings,
   cloneVoice,
+  synthesizeVoicemail,
   type VoicemailSettings,
 } from "@/lib/voicemail.functions";
+
+const TEST_SCRIPTS: ((rep: string) => string)[] = [
+  (rep) => `Hey Sarah, this is ${rep}. Saw your team just expanded into the Midwest — congrats on that. The reason I'm calling is we help sales orgs your size cut their outbound prep time by about 80 percent. Figured it might be worth a quick chat. Shoot me a text back or call me when you get a sec.`,
+  (rep) => `Hey it's ${rep}, real quick — I noticed you guys just hired a few more SDRs, so figured the timing might actually be right for this. We're helping teams like yours make their reps productive in week one instead of month three. If that's interesting at all, give me a call back when you get a chance.`,
+  (rep) => `Hi Marcus, ${rep} here. I'll keep this short. Most VPs of sales I talk to are losing 15 to 20 hours a week to manual prospecting work that honestly shouldn't be a human job anymore. If that sounds familiar, I'd love to show you what we built. Grab a slot on my calendar or just call me back.`,
+  (rep) => `Hey, this is ${rep}. I won't waste your time with a pitch — I just had a quick idea I think could save your team a real chunk of time on outbound. If it's worth 10 minutes to hear it out, just text me back and we'll find a time. Talk soon.`,
+  (rep) => `Hey Jen, ${rep} calling. Quick one — we just rolled out something I genuinely think your team would get a lot out of, and I'd rather walk you through it than leave a long voicemail about it. Call me back when you have a sec or shoot me a text. Appreciate it.`,
+];
 
 const SAMPLE_SCRIPT = `Hey this is [name], I was just reaching out because I work with a platform that helps sales teams automate their outbound completely. Everything from personalized emails written for each prospect, to cold calling scripts, to real time coaching on live calls. I know your time is valuable so I will keep this short. If this is something that could be useful for your team I would love to connect. Feel free to call me back or shoot me a text and we can find a time to chat. Looking forward to talking.`;
 
