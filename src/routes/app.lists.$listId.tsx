@@ -1907,49 +1907,6 @@ function CallWorkstation({
                       </div>
                     </div>
 
-                    <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Call notes
-                      </div>
-                      <Textarea
-                        rows={5}
-                        placeholder="Quick notes — saved with the outcome"
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Log outcome
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
-                          { v: "interested", label: "Interested", c: "" },
-                          { v: "callback", label: "Callback", c: "" },
-                          { v: "voicemail", label: "Voicemail", c: "" },
-                          { v: "no_answer", label: "No answer", c: "" },
-                          { v: "not_interested", label: "Not interested", c: "" },
-                          { v: "wrong_number", label: "Wrong #", c: "" },
-                          { v: "dnc", label: "Do not call", c: "" },
-                        ].map((o) => (
-                          <Button
-                            key={o.v}
-                            size="sm"
-                            variant={o.c ? undefined : "outline"}
-                            className={o.c}
-                            disabled={outcomeBusy}
-                            onClick={() => logOutcome(o.v)}
-                          >
-                            {o.label}
-                          </Button>
-                        ))}
-                      </div>
-                      <p className="mt-2 text-[11px] text-muted-foreground">
-                        Logging auto-advances to the next prospect.
-                      </p>
-                    </div>
                   </div>
                 </div>
               )}
