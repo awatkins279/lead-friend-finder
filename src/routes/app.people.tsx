@@ -722,19 +722,21 @@ function PeoplePage() {
               value={draft.company}
               onChange={(v) => setDraft({ ...draft, company: v })}
             />
-            <Field
+            <AutocompleteField
               icon={<MapPin className="h-3.5 w-3.5" />}
               label="Location"
               placeholder="city, state or country"
               value={draft.location}
               onChange={(v) => setDraft({ ...draft, location: v })}
+              options={COMMON_LOCATIONS}
             />
-            <Field
+            <AutocompleteField
               icon={<Building2 className="h-3.5 w-3.5" />}
               label="Industry"
               placeholder="e.g. Software"
               value={draft.industry}
               onChange={(v) => setDraft({ ...draft, industry: v })}
+              options={COMMON_INDUSTRIES}
             />
 
             <div>
