@@ -272,6 +272,13 @@ export const synthesizeVoicemail = createServerFn({ method: "POST" })
       let s = raw.trim();
       // Normalize whitespace
       s = s.replace(/\s+/g, " ");
+      // Strip filler words / disfluencies the model might have slipped in.
+      // Matches "um", "uh", "umm", "uhh", "uhm", "er", "erm", "ah", "ahh",
+      // "hmm" — case-insensitive, with optional trailing punctuation.
+      s = s.replace(/\b(u+m+h?|u+h+m*|e+r+m*|a+h+|h+m+)\b[,.\s]*/gi, "");
+      // Collapse leftover double spaces / orphan punctuation
+      s = s.replace(/\s+([,.!?])/g, "$1");
+      s = s.replace(/\s{2,}/g, " ").trim();
       // Promote em-dashes / hyphenated asides into real breath pauses
       s = s.replace(/\s*[—–-]\s*/g, " — ");
       // Comma -> short pause
