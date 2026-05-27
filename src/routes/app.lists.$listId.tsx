@@ -2173,7 +2173,7 @@ function FocusCallView({
         </section>
 
         {/* Objections column */}
-        <section className="col-span-4 flex min-h-0 flex-col rounded-lg border bg-card">
+        <section className="col-span-5 flex min-h-0 flex-col rounded-lg border bg-card">
           <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
             Objection answers
           </div>
