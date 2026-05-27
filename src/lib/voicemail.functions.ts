@@ -310,7 +310,7 @@ export const synthesizeVoicemail = createServerFn({ method: "POST" })
               style: 0.65,
               use_speaker_boost: true,
               // Slow it down — confident closers don't rush
-              speed: 0.92,
+              speed: 0.82,
             },
           }),
         },
