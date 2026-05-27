@@ -2171,6 +2171,29 @@ function FocusQList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function StatBox({
+  label,
+  value,
+  accent,
+  capitalize,
+}: {
+  label: string;
+  value: string | number;
+  accent?: string;
+  capitalize?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border bg-card px-3.5 py-2.5 shadow-sm transition-colors hover:bg-accent/30">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className={`mt-0.5 text-xl font-semibold leading-tight ${capitalize ? "capitalize" : ""} ${accent ?? "text-foreground"}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 
 function CallTimer({ startedAt }: { startedAt: number | null }) {
   const [now, setNow] = useState(Date.now());
