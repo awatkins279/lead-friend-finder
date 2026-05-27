@@ -386,26 +386,32 @@ function ListDetailPage() {
         <Link to="/app/lists" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> All campaigns
         </Link>
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight">{list?.name ?? "Loading…"}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span>{(rows ?? []).length} prospects</span>
-              <span>·</span>
-              <span>{enrichedCount} researched</span>
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{list?.name ?? "Loading…"}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
+                {(rows ?? []).length} prospects
+              </span>
+              <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
+                {enrichedCount} researched
+              </span>
               {isConfigured && (
                 <>
-                  <span>·</span>
-                  <span>{list?.num_emails} emails</span>
-                  <span>·</span>
-                  <span>~{list?.word_count} words</span>
-                  <span>·</span>
-                  <span>{list?.personalization_level} personalization</span>
+                  <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
+                    {list?.num_emails} emails
+                  </span>
+                  <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
+                    ~{list?.word_count} words
+                  </span>
+                  <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium capitalize text-foreground/80">
+                    {list?.personalization_level} personalization
+                  </span>
                 </>
               )}
             </div>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-4 w-4" /> Campaign config
             </Button>
