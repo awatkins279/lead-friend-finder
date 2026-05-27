@@ -2191,37 +2191,6 @@ function FocusCallView({
           </div>
         </section>
 
-        {/* Notes + outcomes column */}
-        <section className="col-span-3 flex min-h-0 flex-col gap-3">
-          <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card">
-            <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-              Call notes
-            </div>
-            <Textarea
-              placeholder="Type notes as you talk…"
-              value={notes}
-              onChange={(e) => onNotesChange(e.target.value)}
-              className="m-3 flex-1 resize-none text-base leading-relaxed"
-            />
-          </div>
-          <div className="shrink-0 rounded-lg border bg-card p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">Log outcome</div>
-            <div className="grid grid-cols-2 gap-2">
-              {outcomes.map((o) => (
-                <Button
-                  key={o.v}
-                  size="sm"
-                  variant={o.c ? undefined : "outline"}
-                  className={o.c}
-                  disabled={outcomeBusy}
-                  onClick={() => onLogOutcome(o.v)}
-                >
-                  {o.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );
