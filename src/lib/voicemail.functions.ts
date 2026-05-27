@@ -205,6 +205,7 @@ ${settings.extra_instructions ? `- Extra rep instructions: ${settings.extra_inst
 
 RULES (CRITICAL):
 - Sound like a real human left this voicemail. Conversational, relaxed, never templated.
+- ABSOLUTELY NO filler words. Do NOT write "um", "uh", "umm", "uhh", "ah", "ahh", "er", "erm", "hmm", "like" (as a filler), "you know", "I mean". Clean, deliberate speech only.
 - NEVER state the obvious about what their company does ("I see you guys do X").
 - Reference something specific to them naturally — like you actually did your homework, without narrating it.
 - Use the rep's first name and the prospect's first name.
