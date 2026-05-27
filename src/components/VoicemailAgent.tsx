@@ -10,14 +10,23 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Loader2, Mic, Square, Upload, CheckCircle2, Sparkles } from "lucide-react";
+import { Loader2, Mic, Square, Upload, CheckCircle2, Sparkles, Play, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import {
   getVoicemailProfile,
   saveVoicemailSettings,
   cloneVoice,
+  synthesizeVoicemail,
   type VoicemailSettings,
 } from "@/lib/voicemail.functions";
+
+const TEST_SCRIPTS: ((rep: string) => string)[] = [
+  (rep) => `Hey Sarah, this is ${rep}. Saw your team just expanded into the Midwest — congrats on that. The reason I'm calling is we help sales orgs your size cut their outbound prep time by about 80 percent. Figured it might be worth a quick chat. Shoot me a text back or call me when you get a sec.`,
+  (rep) => `Hey it's ${rep}, real quick — I noticed you guys just hired a few more SDRs, so figured the timing might actually be right for this. We're helping teams like yours make their reps productive in week one instead of month three. If that's interesting at all, give me a call back when you get a chance.`,
+  (rep) => `Hi Marcus, ${rep} here. I'll keep this short. Most VPs of sales I talk to are losing 15 to 20 hours a week to manual prospecting work that honestly shouldn't be a human job anymore. If that sounds familiar, I'd love to show you what we built. Grab a slot on my calendar or just call me back.`,
+  (rep) => `Hey, this is ${rep}. I won't waste your time with a pitch — I just had a quick idea I think could save your team a real chunk of time on outbound. If it's worth 10 minutes to hear it out, just text me back and we'll find a time. Talk soon.`,
+  (rep) => `Hey Jen, ${rep} calling. Quick one — we just rolled out something I genuinely think your team would get a lot out of, and I'd rather walk you through it than leave a long voicemail about it. Call me back when you have a sec or shoot me a text. Appreciate it.`,
+];
 
 const SAMPLE_SCRIPT = `Hey this is [name], I was just reaching out because I work with a platform that helps sales teams automate their outbound completely. Everything from personalized emails written for each prospect, to cold calling scripts, to real time coaching on live calls. I know your time is valuable so I will keep this short. If this is something that could be useful for your team I would love to connect. Feel free to call me back or shoot me a text and we can find a time to chat. Looking forward to talking.`;
 
@@ -27,6 +36,34 @@ export function VoicemailAgent({ userId }: { userId: string }) {
   const getProfileFn = useServerFn(getVoicemailProfile);
   const saveFn = useServerFn(saveVoicemailSettings);
   const cloneFn = useServerFn(cloneVoice);
+  const synthFn = useServerFn(synthesizeVoicemail);
+
+  // Test playback state
+  const [testing, setTesting] = useState(false);
+  const [testScript, setTestScript] = useState<string | null>(null);
+  const testAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playTest = async () => {
+    if (!voiceId) {
+      toast.error("Record or upload a voice sample first");
+      return;
+    }
+    setTesting(true);
+    try {
+      const rep = settings.rep_name?.trim() || "Alex";
+      const script = TEST_SCRIPTS[Math.floor(Math.random() * TEST_SCRIPTS.length)](rep);
+      setTestScript(script);
+      const res = await synthFn({ data: { script } });
+      const audio = new Audio(`data:audio/mpeg;base64,${res.audioBase64}`);
+      testAudioRef.current?.pause();
+      testAudioRef.current = audio;
+      await audio.play();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to play test voicemail");
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [voiceId, setVoiceId] = useState<string | null>(null);
@@ -210,6 +247,45 @@ export function VoicemailAgent({ userId }: { userId: string }) {
           <p className="text-sm italic leading-relaxed">{SAMPLE_SCRIPT}</p>
         </div>
       </div>
+
+      {/* Test the cloned voice */}
+      <div className="space-y-3 border-b bg-muted/20 px-6 py-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold">Hear your AI voice in action</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              We'll pick a random sample voicemail and play it back in your cloned voice — so you know exactly what your prospects will hear.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={playTest}
+            disabled={testing || !voiceId}
+            className="shrink-0"
+          >
+            {testing ? (
+              <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating…</>
+            ) : (
+              <><Shuffle className="mr-1.5 h-3.5 w-3.5" /> Play random sample</>
+            )}
+          </Button>
+        </div>
+        {!voiceId && (
+          <p className="text-xs text-muted-foreground italic">
+            Record or upload a voice sample above to unlock the preview.
+          </p>
+        )}
+        {testScript && (
+          <div className="rounded-md border bg-card p-3">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Play className="h-3 w-3" /> Now playing
+            </div>
+            <p className="text-sm leading-relaxed">{testScript}</p>
+          </div>
+        )}
+      </div>
+
+
 
       {/* Settings */}
       <div className="grid grid-cols-1 gap-4 px-6 py-5 md:grid-cols-2">
