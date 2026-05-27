@@ -263,6 +263,27 @@ export const synthesizeVoicemail = createServerFn({ method: "POST" })
     const voiceId = (profile as any)?.elevenlabs_voice_id as string | null;
     if (!voiceId) throw new Error("No voice clone — record a sample first");
 
+    // Belfort-style tonality pass: slow it down, force the model to actually
+    // honor punctuation. We lengthen pauses by upgrading punctuation marks
+    // (commas -> ellipses, periods -> double-stops) and inject breath beats
+    // between sentences. ElevenLabs respects "..." and " — " as real pauses.
+    const shapeForTonality = (raw: string): string => {
+      let s = raw.trim();
+      // Normalize whitespace
+      s = s.replace(/\s+/g, " ");
+      // Promote em-dashes / hyphenated asides into real breath pauses
+      s = s.replace(/\s*[—–-]\s*/g, " — ");
+      // Comma -> short pause
+      s = s.replace(/,\s+/g, "... ");
+      // Sentence-end punctuation -> longer pause + slight reset
+      s = s.replace(/([.!?])\s+(?=[A-Z0-9"'])/g, "$1.. ");
+      // Trim repeats
+      s = s.replace(/\.{4,}/g, "...");
+      return s.trim();
+    };
+
+    const shapedScript = shapeForTonality(data.script);
+
     const callTts = async (): Promise<ArrayBuffer> => {
       const res = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
@@ -270,13 +291,18 @@ export const synthesizeVoicemail = createServerFn({ method: "POST" })
           method: "POST",
           headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: data.script,
-            model_id: "eleven_turbo_v2_5",
+            text: shapedScript,
+            // multilingual_v2 honors prosody / punctuation far better than turbo
+            model_id: "eleven_multilingual_v2",
             voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.8,
-              style: 0.3,
+              // Lower stability = more dynamic range, emotional inflection
+              stability: 0.32,
+              similarity_boost: 0.85,
+              // Higher style = more expressive, Belfort-style swagger
+              style: 0.65,
               use_speaker_boost: true,
+              // Slow it down — confident closers don't rush
+              speed: 0.92,
             },
           }),
         },
