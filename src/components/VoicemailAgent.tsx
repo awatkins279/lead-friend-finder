@@ -248,6 +248,45 @@ export function VoicemailAgent({ userId }: { userId: string }) {
         </div>
       </div>
 
+      {/* Test the cloned voice */}
+      <div className="space-y-3 border-b bg-muted/20 px-6 py-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold">Hear your AI voice in action</h4>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              We'll pick a random sample voicemail and play it back in your cloned voice — so you know exactly what your prospects will hear.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={playTest}
+            disabled={testing || !voiceId}
+            className="shrink-0"
+          >
+            {testing ? (
+              <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating…</>
+            ) : (
+              <><Shuffle className="mr-1.5 h-3.5 w-3.5" /> Play random sample</>
+            )}
+          </Button>
+        </div>
+        {!voiceId && (
+          <p className="text-xs text-muted-foreground italic">
+            Record or upload a voice sample above to unlock the preview.
+          </p>
+        )}
+        {testScript && (
+          <div className="rounded-md border bg-card p-3">
+            <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Play className="h-3 w-3" /> Now playing
+            </div>
+            <p className="text-sm leading-relaxed">{testScript}</p>
+          </div>
+        )}
+      </div>
+
+
+
       {/* Settings */}
       <div className="grid grid-cols-1 gap-4 px-6 py-5 md:grid-cols-2">
         <div className="space-y-1.5">
