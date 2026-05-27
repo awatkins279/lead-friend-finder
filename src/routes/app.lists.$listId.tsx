@@ -386,31 +386,10 @@ function ListDetailPage() {
         <Link to="/app/lists" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-3.5 w-3.5" /> All campaigns
         </Link>
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">{list?.name ?? "Loading…"}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
-                {(rows ?? []).length} prospects
-              </span>
-              <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
-                {enrichedCount} researched
-              </span>
-              {isConfigured && (
-                <>
-                  <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
-                    {list?.num_emails} emails
-                  </span>
-                  <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-foreground/80">
-                    ~{list?.word_count} words
-                  </span>
-                  <span className="inline-flex items-center rounded-full border bg-muted/40 px-2.5 py-0.5 text-xs font-medium capitalize text-foreground/80">
-                    {list?.personalization_level} personalization
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <h1 className="min-w-0 flex-1 truncate text-2xl font-semibold tracking-tight">
+            {list?.name ?? "Loading…"}
+          </h1>
           <div className="flex shrink-0 flex-wrap gap-2">
             <Button variant="outline" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-4 w-4" /> Campaign config
@@ -430,6 +409,23 @@ function ListDetailPage() {
                   : "Generate all sequences"}
             </Button>
           </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <StatBox label="Prospects" value={(rows ?? []).length} accent="text-foreground" />
+          <StatBox label="Researched" value={enrichedCount} accent="text-emerald-600 dark:text-emerald-400" />
+          {isConfigured ? (
+            <>
+              <StatBox label="Emails" value={list?.num_emails ?? 0} accent="text-blue-600 dark:text-blue-400" />
+              <StatBox label="Words" value={`~${list?.word_count ?? 0}`} accent="text-amber-600 dark:text-amber-400" />
+              <StatBox
+                label="Personalization"
+                value={list?.personalization_level ?? "—"}
+                accent="text-violet-600 dark:text-violet-400"
+                capitalize
+              />
+            </>
+          ) : null}
         </div>
       </header>
 
