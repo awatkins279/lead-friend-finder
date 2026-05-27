@@ -36,6 +36,34 @@ export function VoicemailAgent({ userId }: { userId: string }) {
   const getProfileFn = useServerFn(getVoicemailProfile);
   const saveFn = useServerFn(saveVoicemailSettings);
   const cloneFn = useServerFn(cloneVoice);
+  const synthFn = useServerFn(synthesizeVoicemail);
+
+  // Test playback state
+  const [testing, setTesting] = useState(false);
+  const [testScript, setTestScript] = useState<string | null>(null);
+  const testAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playTest = async () => {
+    if (!voiceId) {
+      toast.error("Record or upload a voice sample first");
+      return;
+    }
+    setTesting(true);
+    try {
+      const rep = settings.rep_name?.trim() || "Alex";
+      const script = TEST_SCRIPTS[Math.floor(Math.random() * TEST_SCRIPTS.length)](rep);
+      setTestScript(script);
+      const res = await synthFn({ data: { script } });
+      const audio = new Audio(`data:audio/mpeg;base64,${res.audioBase64}`);
+      testAudioRef.current?.pause();
+      testAudioRef.current = audio;
+      await audio.play();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to play test voicemail");
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [voiceId, setVoiceId] = useState<string | null>(null);
