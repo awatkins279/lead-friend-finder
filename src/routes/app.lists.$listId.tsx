@@ -2134,7 +2134,7 @@ function FocusCallView({
       {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
         {/* Script column */}
-        <section className="col-span-5 flex min-h-0 flex-col rounded-lg border bg-card">
+        <section className="col-span-7 flex min-h-0 flex-col rounded-lg border bg-card">
           <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
             Script
           </div>
