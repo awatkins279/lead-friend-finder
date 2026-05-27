@@ -722,19 +722,21 @@ function PeoplePage() {
               value={draft.company}
               onChange={(v) => setDraft({ ...draft, company: v })}
             />
-            <Field
+            <AutocompleteField
               icon={<MapPin className="h-3.5 w-3.5" />}
               label="Location"
               placeholder="city, state or country"
               value={draft.location}
               onChange={(v) => setDraft({ ...draft, location: v })}
+              options={COMMON_LOCATIONS}
             />
-            <Field
+            <AutocompleteField
               icon={<Building2 className="h-3.5 w-3.5" />}
               label="Industry"
               placeholder="e.g. Software"
               value={draft.industry}
               onChange={(v) => setDraft({ ...draft, industry: v })}
+              options={COMMON_INDUSTRIES}
             />
 
             <div>
@@ -1224,6 +1226,124 @@ function Field({
         {icon} {label}
       </Label>
       <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+const COMMON_INDUSTRIES = [
+  "Software", "Information Technology", "Computer Software", "Internet", "SaaS",
+  "Artificial Intelligence", "Cybersecurity", "Cloud Computing", "Fintech", "E-commerce",
+  "Financial Services", "Banking", "Insurance", "Investment Management", "Venture Capital",
+  "Private Equity", "Accounting", "Real Estate", "Commercial Real Estate", "Construction",
+  "Architecture & Planning", "Healthcare", "Hospital & Health Care", "Medical Devices",
+  "Pharmaceuticals", "Biotechnology", "Mental Health Care", "Telemedicine",
+  "Education", "Higher Education", "E-Learning", "EdTech",
+  "Marketing & Advertising", "Public Relations", "Market Research", "Media Production",
+  "Publishing", "Broadcast Media", "Entertainment", "Music", "Film",
+  "Retail", "Consumer Goods", "Apparel & Fashion", "Cosmetics", "Food & Beverages",
+  "Restaurants", "Hospitality", "Hotels", "Travel", "Leisure & Tourism",
+  "Manufacturing", "Industrial Automation", "Automotive", "Aerospace", "Defense",
+  "Logistics & Supply Chain", "Transportation", "Warehousing", "Maritime",
+  "Energy", "Oil & Gas", "Renewable Energy", "Utilities", "Mining & Metals",
+  "Agriculture", "Farming", "Environmental Services", "Waste Management",
+  "Legal Services", "Law Practice", "Management Consulting", "Business Consulting",
+  "Staffing & Recruiting", "Human Resources", "Professional Training",
+  "Telecommunications", "Wireless", "Semiconductors", "Electronics",
+  "Government", "Non-Profit", "Civic & Social Organization", "Religious Institutions",
+  "Sports", "Fitness", "Wellness", "Beauty", "Veterinary", "Pet Services",
+];
+
+const COMMON_LOCATIONS = [
+  "United States", "United Kingdom", "Canada", "Australia", "Germany", "France",
+  "Netherlands", "Spain", "Italy", "Sweden", "Ireland", "Switzerland", "Denmark",
+  "Norway", "Finland", "Belgium", "Portugal", "Poland", "Austria",
+  "India", "Singapore", "United Arab Emirates", "Israel", "Japan", "Brazil", "Mexico",
+  "New York", "New York, NY", "San Francisco, CA", "Los Angeles, CA", "San Diego, CA",
+  "Seattle, WA", "Portland, OR", "Austin, TX", "Dallas, TX", "Houston, TX",
+  "Chicago, IL", "Boston, MA", "Atlanta, GA", "Miami, FL", "Orlando, FL", "Tampa, FL",
+  "Denver, CO", "Phoenix, AZ", "Las Vegas, NV", "Salt Lake City, UT",
+  "Washington, DC", "Philadelphia, PA", "Pittsburgh, PA", "Detroit, MI", "Minneapolis, MN",
+  "Nashville, TN", "Charlotte, NC", "Raleigh, NC", "Columbus, OH", "Cleveland, OH",
+  "Indianapolis, IN", "Kansas City, MO", "St. Louis, MO",
+  "California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio",
+  "Georgia", "North Carolina", "Michigan", "Massachusetts", "Washington", "Colorado",
+  "Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa",
+  "London", "Manchester", "Edinburgh", "Dublin",
+  "Berlin", "Munich", "Hamburg", "Frankfurt", "Paris", "Lyon", "Amsterdam", "Rotterdam",
+  "Madrid", "Barcelona", "Lisbon", "Milan", "Rome", "Zurich", "Geneva",
+  "Stockholm", "Copenhagen", "Oslo", "Helsinki",
+  "Sydney", "Melbourne", "Brisbane", "Perth",
+  "Dubai", "Abu Dhabi", "Tel Aviv", "Singapore", "Hong Kong", "Tokyo", "Bangalore", "Mumbai", "Delhi",
+];
+
+function AutocompleteField({
+  icon, label, placeholder, value, onChange, options,
+}: {
+  icon: React.ReactNode; label: string; placeholder: string;
+  value: string; onChange: (v: string) => void; options: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const suggestions = useMemo(() => {
+    const q = value.trim();
+    if (!q) return [];
+    return options
+      .map((o) => ({ o, s: fuzzyScore(q, o) }))
+      .filter((x) => x.s > 0 && x.o.toLowerCase() !== q.toLowerCase())
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 10)
+      .map((x) => x.o);
+  }, [value, options]);
+
+  return (
+    <div className="space-y-2" ref={containerRef}>
+      <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        {icon} {label}
+      </Label>
+      <div className="relative">
+        <Input
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+            else if (e.key === "Enter" && suggestions[0]) {
+              e.preventDefault();
+              onChange(suggestions[0]);
+              setOpen(false);
+            }
+          }}
+          placeholder={placeholder}
+        />
+        {open && suggestions.length > 0 && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(s);
+                  setOpen(false);
+                }}
+                className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
