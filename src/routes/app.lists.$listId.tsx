@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { generateCallScript, getTwilioToken, startCall, endCall, type CallScript } from "@/lib/calls.functions";
 import { getRingCentralWebPhoneCreds, startRingCentralBrowserCall } from "@/lib/ringcentral.functions";
-import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot } from "lucide-react";
+import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot, Play, Pause, Minus, Plus, RotateCcw } from "lucide-react";
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
@@ -2132,46 +2132,12 @@ function FocusCallView({
 
       {/* Body */}
       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
-        {/* Script panel */}
+        {/* Script panel — teleprompter */}
         <section className="col-span-7 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-          <div className="relative flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.70_0.18_290)] to-transparent opacity-80" />
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[oklch(0.70_0.18_290)] shadow-[0_0_10px_oklch(0.70_0.18_290)]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.85_0.10_290)]">Script</span>
-            </div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">// live</span>
-          </div>
-
-          <div className="flex-1 space-y-5 overflow-y-auto p-5">
-            <FuturisticBlock label="Opener" highlight>
-              <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.opener}</p>
-            </FuturisticBlock>
-
-            {script.talk_track?.map((s, i) => (
-              <FuturisticBlock key={i} label={s.heading}>
-                <p className="whitespace-pre-wrap text-base leading-relaxed">{s.body}</p>
-              </FuturisticBlock>
-            ))}
-
-            {script.problem_questions?.length > 0 && (
-              <FocusQList title="Problem questions" items={script.problem_questions} />
-            )}
-            {script.consequence_questions?.length > 0 && (
-              <FocusQList title="Consequence questions" items={script.consequence_questions} />
-            )}
-            {script.solution_questions?.length > 0 && (
-              <FocusQList title="Solution questions" items={script.solution_questions} />
-            )}
-            {script.qualifying_questions?.length > 0 && (
-              <FocusQList title="Qualifying questions" items={script.qualifying_questions} />
-            )}
-
-            <FuturisticBlock label="Close" highlight>
-              <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.close}</p>
-            </FuturisticBlock>
-          </div>
+          <Teleprompter script={script} />
         </section>
+
+
 
         {/* Objections panel */}
         <section className="col-span-5 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
@@ -2235,6 +2201,221 @@ function FuturisticBlock({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Teleprompter — auto-scrolling script reader for live calls.
+// Space = play/pause, ↑/↓ = speed, R = reset to top.
+// ---------------------------------------------------------------------------
+function Teleprompter({ script }: { script: CallScript }) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(35); // pixels per second
+  const rafRef = useRef<number | null>(null);
+  const lastTickRef = useRef<number | null>(null);
+
+  // rAF auto-scroll loop
+  useEffect(() => {
+    if (!playing) {
+      lastTickRef.current = null;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    const tick = (t: number) => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      if (lastTickRef.current != null) {
+        const dt = (t - lastTickRef.current) / 1000;
+        el.scrollTop += speed * dt;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) {
+          setPlaying(false);
+          return;
+        }
+      }
+      lastTickRef.current = t;
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [playing, speed]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        setPlaying((p) => !p);
+      } else if (e.code === "ArrowUp") {
+        e.preventDefault();
+        setSpeed((s) => Math.min(120, s + 5));
+      } else if (e.code === "ArrowDown") {
+        e.preventDefault();
+        setSpeed((s) => Math.max(10, s - 5));
+      } else if (e.key === "r" || e.key === "R") {
+        scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        setPlaying(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Wheel / touch = manual control, pause auto-scroll
+  const onUserScroll = () => {
+    if (playing) setPlaying(false);
+  };
+
+  const reset = () => {
+    scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    setPlaying(false);
+  };
+
+  return (
+    <>
+      {/* Control bar */}
+      <div className="relative flex items-center justify-between gap-4 border-b border-white/10 px-5 py-2.5">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.70_0.18_290)] to-transparent opacity-80" />
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[oklch(0.70_0.18_290)] shadow-[0_0_10px_oklch(0.70_0.18_290)]" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.85_0.10_290)]">Teleprompter</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            onClick={() => setSpeed((s) => Math.max(10, s - 5))}
+            className="h-8 w-8 border border-white/10 bg-white/[0.04] p-0 text-foreground hover:bg-white/[0.08]"
+            title="Slower (↓)"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </Button>
+          <div className="flex h-8 min-w-[78px] items-center justify-center rounded-md border border-white/10 bg-white/[0.04] px-2 font-mono text-xs tracking-wider text-[oklch(0.88_0.10_210)]">
+            {speed} px/s
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setSpeed((s) => Math.min(120, s + 5))}
+            className="h-8 w-8 border border-white/10 bg-white/[0.04] p-0 text-foreground hover:bg-white/[0.08]"
+            title="Faster (↑)"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setPlaying((p) => !p)}
+            className="ml-1 h-8 border-0 bg-gradient-to-r from-[oklch(0.70_0.18_290)] to-[oklch(0.78_0.16_210)] px-3 text-white shadow-[0_0_18px_-4px_oklch(0.70_0.18_290/0.9)] hover:opacity-95"
+            title="Play/Pause (Space)"
+          >
+            {playing ? <Pause className="mr-1 h-3.5 w-3.5" /> : <Play className="mr-1 h-3.5 w-3.5" />}
+            {playing ? "Pause" : "Play"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={reset}
+            className="h-8 w-8 border border-white/10 bg-white/[0.04] p-0 text-foreground hover:bg-white/[0.08]"
+            title="Restart (R)"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Teleprompter viewport */}
+      <div className="relative min-h-0 flex-1">
+        {/* Fade top */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-[oklch(0.16_0.04_270)] via-[oklch(0.16_0.04_270/0.85)] to-transparent" />
+        {/* Reading line at ~40% from top */}
+        <div className="pointer-events-none absolute inset-x-0 top-[40%] z-10 flex h-0 items-center">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210/0.7)] to-transparent shadow-[0_0_18px_oklch(0.78_0.16_210/0.7)]" />
+          <span className="mx-2 font-mono text-[9px] uppercase tracking-[0.3em] text-[oklch(0.85_0.10_210)]">read here</span>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210/0.7)] to-transparent shadow-[0_0_18px_oklch(0.78_0.16_210/0.7)]" />
+        </div>
+        {/* Fade bottom */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-[oklch(0.16_0.04_270)] via-[oklch(0.16_0.04_270/0.85)] to-transparent" />
+
+        <div
+          ref={scrollerRef}
+          onWheel={onUserScroll}
+          onTouchMove={onUserScroll}
+          className="h-full overflow-y-auto px-10 py-[40vh] [scrollbar-width:thin]"
+        >
+          <div className="mx-auto max-w-3xl space-y-8 text-balance text-[1.5rem] leading-[1.65] tracking-tight text-foreground">
+            <TpSection label="Opener" highlight>{script.opener}</TpSection>
+            {script.talk_track?.map((s, i) => (
+              <TpSection key={i} label={s.heading}>{s.body}</TpSection>
+            ))}
+            {script.problem_questions?.length > 0 && (
+              <TpQuestions label="Problem questions" items={script.problem_questions} />
+            )}
+            {script.consequence_questions?.length > 0 && (
+              <TpQuestions label="Consequence questions" items={script.consequence_questions} />
+            )}
+            {script.solution_questions?.length > 0 && (
+              <TpQuestions label="Solution questions" items={script.solution_questions} />
+            )}
+            {script.qualifying_questions?.length > 0 && (
+              <TpQuestions label="Qualifying questions" items={script.qualifying_questions} />
+            )}
+            <TpSection label="Close" highlight>{script.close}</TpSection>
+            <div className="pt-8 text-center font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
+              — end of script —
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer hint */}
+      <div className="shrink-0 border-t border-white/10 px-5 py-1.5 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        space play/pause · ↑ ↓ speed · r restart · scroll to take over
+      </div>
+    </>
+  );
+}
+
+function TpSection({ label, highlight, children }: { label: string; highlight?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">
+        <span className="h-px w-8 bg-gradient-to-r from-[oklch(0.70_0.18_290)] to-transparent" />
+        {label}
+      </div>
+      <p
+        className={
+          highlight
+            ? "whitespace-pre-wrap rounded-2xl border border-[oklch(0.70_0.18_290/0.45)] bg-[oklch(0.70_0.18_290/0.08)] p-6 shadow-[0_0_40px_-12px_oklch(0.70_0.18_290/0.8)]"
+            : "whitespace-pre-wrap"
+        }
+      >
+        {children}
+      </p>
+    </div>
+  );
+}
+
+function TpQuestions({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">
+        <span className="h-px w-8 bg-gradient-to-r from-[oklch(0.78_0.16_210)] to-transparent" />
+        {label}
+      </div>
+      <ol className="space-y-3">
+        {items.map((q, i) => (
+          <li key={i} className="flex gap-4">
+            <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[oklch(0.78_0.16_210/0.4)] bg-[oklch(0.78_0.16_210/0.12)] font-mono text-xs font-bold text-[oklch(0.88_0.10_210)]">
+              {i + 1}
+            </span>
+            <span>{q}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+
 
 function FocusQList({ title, items }: { title: string; items: string[] }) {
   return (
