@@ -473,82 +473,14 @@ function ListDetailPage() {
               </p>
             </Card>
           ) : (
-            <div className="space-y-2">
-              {rows.map((r) => {
-                const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
-                const isBusy = busy.has(r.lead_id);
-                const eff = effectiveEmails(r);
-                const emailCount = eff.length;
-                const isLegacy = (!r.emails || r.emails.length === 0) && eff.length > 0;
-                return (
-                  <Card
-                    key={r.lead_id}
-                    className="flex cursor-pointer items-center gap-4 p-4 transition-shadow hover:shadow-sm"
-                    onClick={() => setOpen(r)}
-                  >
-                    <div className="flex w-12 shrink-0 flex-col items-center">
-                      <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${
-                          r.score == null
-                            ? "bg-muted text-muted-foreground"
-                            : r.score >= 75
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                              : r.score >= 50
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-                                : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300"
-                        }`}
-                      >
-                        {r.score ?? "—"}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{name}</span>
-                        {emailCount > 0 && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {emailCount} email{emailCount > 1 ? " sequence" : ""}
-                          </Badge>
-                        )}
-                        {isLegacy && (
-                          <Badge variant="outline" className="text-[10px]">
-                            Regenerate for full sequence
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="truncate text-sm text-muted-foreground">
-                        {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
-                      </div>
-                      <IppTagStrip research={r.research} scored={r.score != null} />
-                      {eff[0]?.subject && (
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
-                          ✉ {eff[0].subject}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        size="sm"
-                        variant={r.status === "enriched" ? "outline" : "default"}
-                        onClick={() => runOne(r.lead_id)}
-                        disabled={isBusy}
-                      >
-                        {isBusy ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <>
-                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                            {r.status === "enriched" ? "Regenerate" : "Generate"}
-                          </>
-                        )}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => remove(r.lead_id)}>
-                        Remove
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+            <ProspectTable
+              listId={listId}
+              rows={rows}
+              busy={busy}
+              onOpenRow={(r) => setOpen(r)}
+              onGenerate={(leadId) => runOne(leadId)}
+              onRemove={(leadId) => remove(leadId)}
+            />
           )}
         </TabsContent>
 
