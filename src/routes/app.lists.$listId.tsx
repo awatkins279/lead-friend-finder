@@ -1874,6 +1874,32 @@ function CallWorkstation({
     </div>
     {focusMode && active && activeScript ? (
       <FocusCallView
+        listId={listId}
+        leadId={active.lead_id}
+        callId={callId}
+        aiCopilotEnabled={aiCopilotEnabled}
+        getRemoteStream={() => {
+          try {
+            const rcPc: RTCPeerConnection | undefined =
+              (window as any).__rcWebPhone?.userAgent?.sessionManager?.sessions?.values?.()?.next?.()?.value
+                ?.sessionDescriptionHandler?.peerConnection;
+            if (rcPc) {
+              const tracks = rcPc.getReceivers().map((r) => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
+              if (tracks.length) return new MediaStream(tracks);
+            }
+          } catch {}
+          try {
+            const twPc: RTCPeerConnection | undefined =
+              connection?._mediaHandler?.version?.pc ??
+              connection?.mediaStream?.version?.pc ??
+              connection?._mediaHandler?.pc;
+            if (twPc) {
+              const tracks = twPc.getReceivers().map((r) => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
+              if (tracks.length) return new MediaStream(tracks);
+            }
+          } catch {}
+          return null;
+        }}
         leadName={`${active.lead?.first_name ?? ""} ${active.lead?.last_name ?? ""}`.trim() || "Lead"}
         leadSub={`${active.lead?.title ?? ""}${active.lead?.title && active.lead?.org_name ? " · " : ""}${active.lead?.org_name ?? ""}`}
         phone={active.lead?.phone ?? null}
