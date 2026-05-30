@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_live_events: {
+        Row: {
+          call_id: string
+          id: string
+          kind: string
+          meta: Json
+          role: string | null
+          text: string | null
+          ts: string
+          user_id: string
+        }
+        Insert: {
+          call_id: string
+          id?: string
+          kind: string
+          meta?: Json
+          role?: string | null
+          text?: string | null
+          ts?: string
+          user_id: string
+        }
+        Update: {
+          call_id?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          role?: string | null
+          text?: string | null
+          ts?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       calls: {
         Row: {
           created_at: string
@@ -100,6 +133,131 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      coaching_knowledge_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          doc_id: string
+          id: string
+          list_id: string
+          token_count: number | null
+          user_id: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          doc_id: string
+          id?: string
+          list_id: string
+          token_count?: number | null
+          user_id: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          doc_id?: string
+          id?: string
+          list_id?: string
+          token_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coaching_knowledge_chunks_doc_id_fkey"
+            columns: ["doc_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_knowledge_docs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coaching_knowledge_docs: {
+        Row: {
+          chunk_count: number
+          created_at: string
+          error: string | null
+          filename: string
+          id: string
+          list_id: string
+          mime_type: string | null
+          size_bytes: number | null
+          status: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chunk_count?: number
+          created_at?: string
+          error?: string | null
+          filename: string
+          id?: string
+          list_id: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chunk_count?: number
+          created_at?: string
+          error?: string | null
+          filename?: string
+          id?: string
+          list_id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coaching_styles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          example_objection_handlers: Json
+          hard_rules: string | null
+          id: string
+          is_default: boolean
+          name: string
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          example_objection_handlers?: Json
+          hard_rules?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          system_prompt: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          example_objection_handlers?: Json
+          hard_rules?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       credit_costs: {
         Row: {
@@ -393,6 +551,8 @@ export type Database = {
       }
       lists: {
         Row: {
+          ai_copilot_enabled: boolean
+          coaching_style_id: string | null
           created_at: string
           cta_type: string
           description: string | null
@@ -416,6 +576,8 @@ export type Database = {
           word_count: number
         }
         Insert: {
+          ai_copilot_enabled?: boolean
+          coaching_style_id?: string | null
           created_at?: string
           cta_type?: string
           description?: string | null
@@ -439,6 +601,8 @@ export type Database = {
           word_count?: number
         }
         Update: {
+          ai_copilot_enabled?: boolean
+          coaching_style_id?: string | null
           created_at?: string
           cta_type?: string
           description?: string | null
@@ -462,6 +626,13 @@ export type Database = {
           word_count?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "lists_coaching_style_id_fkey"
+            columns: ["coaching_style_id"]
+            isOneToOne: false
+            referencedRelation: "coaching_styles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lists_sdr_agent_id_fkey"
             columns: ["sdr_agent_id"]

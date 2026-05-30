@@ -20,6 +20,7 @@ import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
 import { Route as AppInboxRouteImport } from './routes/app.inbox'
+import { Route as AppCoachingStylesRouteImport } from './routes/app.coaching-styles'
 import { Route as AppAdminRouteImport } from './routes/app.admin'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
@@ -86,6 +87,11 @@ const AppInboxRoute = AppInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCoachingStylesRoute = AppCoachingStylesRouteImport.update({
+  id: '/coaching-styles',
+  path: '/coaching-styles',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminRoute = AppAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/admin': typeof AppAdminRoute
+  '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/admin': typeof AppAdminRoute
+  '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/admin': typeof AppAdminRoute
+  '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
   '/app/saved': typeof AppSavedRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/app/accounts'
     | '/app/admin'
+    | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
     | '/app/saved'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/app/accounts'
     | '/app/admin'
+    | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
     | '/app/saved'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/app/accounts'
     | '/app/admin'
+    | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
     | '/app/saved'
@@ -375,6 +387,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInboxRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/coaching-styles': {
+      id: '/app/coaching-styles'
+      path: '/coaching-styles'
+      fullPath: '/app/coaching-styles'
+      preLoaderRoute: typeof AppCoachingStylesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/admin': {
       id: '/app/admin'
       path: '/admin'
@@ -451,6 +470,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppAdminRoute: typeof AppAdminRoute
+  AppCoachingStylesRoute: typeof AppCoachingStylesRoute
   AppInboxRoute: typeof AppInboxRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppSavedRoute: typeof AppSavedRoute
@@ -463,6 +483,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
   AppAdminRoute: AppAdminRoute,
+  AppCoachingStylesRoute: AppCoachingStylesRoute,
   AppInboxRoute: AppInboxRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppSavedRoute: AppSavedRoute,

@@ -14,6 +14,7 @@ import {
   Sparkles,
   ChevronDown,
   Shield,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,6 +74,7 @@ function AppShell() {
     { to: "/app/accounts", icon: Mail, label: "Sending Accounts" },
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
     { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
+    { to: "/app/coaching-styles", icon: GraduationCap, label: "Coaching Styles" },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
     ...(isAdmin ? [{ to: "/app/admin", icon: Shield, label: "Admin" }] : []),
   ];
