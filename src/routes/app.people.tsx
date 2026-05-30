@@ -103,15 +103,13 @@ type Lead = {
   org_employee_count?: string | null;
 };
 
-// Deterministic, colorful initials avatar (DiceBear "initials" — free, no API key).
-// Seeded by first+last name so the same person always gets the same color.
-function avatarUrl(first: string | null, last: string | null, id: string): string {
+// Deterministic placeholder headshot (Pravatar — free, no API key).
+// Seeded by name+id so the same person always gets the same face.
+function avatarUrl(first: string | null, last: string | null, id: string, size = 160): string {
   const seed = encodeURIComponent(
-    `${(first ?? "").trim()} ${(last ?? "").trim()}`.trim() || id,
+    `${(first ?? "").trim()}-${(last ?? "").trim()}-${id}`.toLowerCase(),
   );
-  // Palette tuned to the app's aurora/indigo/teal/pink theme
-  const bg = "6366f1,8b5cf6,ec4899,06b6d4,14b8a6,f59e0b,ef4444,3b82f6,a855f7,10b981";
-  return `https://api.dicebear.com/9.x/initials/svg?seed=${seed}&backgroundColor=${bg}&fontFamily=Inter&fontWeight=600&radius=50`;
+  return `https://i.pravatar.cc/${size}?u=${seed}`;
 }
 
 // Columns rendered in the table (fast path)
