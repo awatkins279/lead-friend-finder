@@ -2286,11 +2286,9 @@ function Teleprompter({ script }: { script: CallScript }) {
   return (
     <>
       {/* Control bar */}
-      <div className="relative flex items-center justify-between gap-4 border-b border-white/10 px-5 py-2.5">
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.70_0.18_290)] to-transparent opacity-80" />
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-[oklch(0.70_0.18_290)] shadow-[0_0_10px_oklch(0.70_0.18_290)]" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.85_0.10_290)]">Teleprompter</span>
+      <div className="relative flex shrink-0 items-center justify-between gap-4 px-5 pt-5 pb-3">
+        <div className="rounded-xl bg-gradient-to-r from-[oklch(0.50_0.22_295)] to-[oklch(0.58_0.20_310)] px-4 py-2 shadow-[0_0_24px_-6px_oklch(0.55_0.22_290/0.9)]">
+          <span className="text-xs font-bold uppercase tracking-[0.25em] text-white">Script</span>
         </div>
         <div className="flex items-center gap-1.5">
           <Button
