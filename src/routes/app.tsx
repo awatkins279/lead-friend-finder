@@ -74,6 +74,7 @@ function AppShell() {
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
     { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
+    ...(isAdmin ? [{ to: "/app/admin", icon: Shield, label: "Admin" }] : []),
   ];
 
   const initials = (email ?? "U")
