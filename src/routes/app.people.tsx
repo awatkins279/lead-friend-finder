@@ -622,6 +622,20 @@ function PeoplePage() {
     [picked, scores, minScore],
   );
 
+  // All scored leads that pass the current threshold (independent of selection).
+  // Used by the "Add qualified to campaign" shortcut under the scoring panel.
+  const scoredEligibleIds = useMemo(() => {
+    const out: string[] = [];
+    scores.forEach((s, id) => {
+      if (s.score >= Math.max(minScore, 1)) out.push(id);
+    });
+    return out;
+  }, [scores, minScore]);
+  const scoredEligibleScores = useMemo(
+    () => new Map(scoredEligibleIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
+    [scoredEligibleIds, scores],
+  );
+
   const hasSelection = picked.size > 0;
 
   // Stable arrays/maps for child dialogs so they don't re-render every keystroke
