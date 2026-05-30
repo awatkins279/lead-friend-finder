@@ -2239,11 +2239,19 @@ function FuturisticBlock({
 function FocusQList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="h-px w-4 bg-gradient-to-r from-[oklch(0.78_0.16_210)] to-transparent" />
+        {title}
+      </div>
       <ol className="space-y-1.5">
         {items.map((q, i) => (
-          <li key={i} className="flex gap-2 rounded-md border bg-muted/30 p-2.5 text-base leading-relaxed">
-            <span className="shrink-0 text-xs font-semibold text-muted-foreground">{i + 1}.</span>
+          <li
+            key={i}
+            className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-base leading-relaxed transition hover:border-[oklch(0.78_0.16_210/0.4)] hover:bg-white/[0.06]"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[oklch(0.78_0.16_210/0.4)] bg-[oklch(0.78_0.16_210/0.12)] font-mono text-[11px] font-bold text-[oklch(0.88_0.10_210)]">
+              {i + 1}
+            </span>
             <span>{q}</span>
           </li>
         ))}
