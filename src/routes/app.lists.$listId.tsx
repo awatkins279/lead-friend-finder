@@ -1962,6 +1962,11 @@ function FocusCallView({
   outcomeBusy,
   onLogOutcome,
 }: {
+  listId: string;
+  leadId: string;
+  callId: string | null;
+  aiCopilotEnabled: boolean;
+  getRemoteStream: () => MediaStream | null;
   leadName: string;
   leadSub: string;
   phone: string | null;
