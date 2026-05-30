@@ -64,6 +64,7 @@ import {
   processNextBatch as processNextBatchFn,
   getJobSnapshot as getJobSnapshotFn,
   cancelScoringJob as cancelScoringJobFn,
+  finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
 import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 
