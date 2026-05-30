@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -26,6 +27,11 @@ import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/t
 import { Route as ApiPublicTwilioRecordingRouteImport } from './routes/api/public/twilio.recording'
 import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/pricing'
     | '/app/accounts'
     | '/app/inbox'
     | '/app/people'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/pricing'
     | '/app/accounts'
     | '/app/inbox'
     | '/app/people'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/pricing'
     | '/app/accounts'
     | '/app/inbox'
     | '/app/people'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
   ApiPublicTwilioRecordingRoute: typeof ApiPublicTwilioRecordingRoute
   ApiPublicTwilioStatusRoute: typeof ApiPublicTwilioStatusRoute
@@ -234,6 +247,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -377,6 +397,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
   ApiPublicTwilioRecordingRoute: ApiPublicTwilioRecordingRoute,
   ApiPublicTwilioStatusRoute: ApiPublicTwilioStatusRoute,
