@@ -8,22 +8,32 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    plan: typeof s.plan === "string" ? s.plan : undefined,
+  }),
   component: LoginPage,
   head: () => ({ meta: [{ title: "Sign in — NexusAi" }] }),
 });
 
 function LoginPage() {
   const nav = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const { plan } = Route.useSearch();
+  const [mode, setMode] = useState<"signin" | "signup">(plan ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const next = () => {
+    if (plan) nav({ to: "/checkout", search: { priceId: plan } as any });
+    else nav({ to: "/app/people" });
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) nav({ to: "/app/people" });
+      if (data.session) next();
     });
-  }, [nav]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +51,7 @@ function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-      nav({ to: "/app/people" });
+      next();
     } catch (err: any) {
       toast.error(err.message ?? "Authentication failed");
     } finally {
