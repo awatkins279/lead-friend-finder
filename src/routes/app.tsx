@@ -36,6 +36,8 @@ function AppShell() {
   const loc = useLocation();
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const fetchIsAdmin = useServerFn(checkIsAdmin);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -47,10 +49,13 @@ function AppShell() {
       else {
         setEmail(data.session.user.email ?? null);
         setReady(true);
+        fetchIsAdmin()
+          .then((r) => setIsAdmin(r.isAdmin))
+          .catch(() => setIsAdmin(false));
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [nav]);
+  }, [nav, fetchIsAdmin]);
 
   if (!ready) {
     return (
