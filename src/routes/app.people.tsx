@@ -669,18 +669,22 @@ function PeoplePage() {
 
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="flex items-center justify-between border-b bg-background px-8 py-5">
+    <div className="flex h-[calc(100vh-2rem)] flex-col gap-4">
+      <header className="glass-panel-strong flex items-center justify-between rounded-2xl px-6 py-5">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">People Search</h1>
-          <p className="text-sm text-muted-foreground">
-            {total.toLocaleString()} contacts in your database
+          <p className="mt-1 text-sm text-muted-foreground font-mono-num">
+            {total.toLocaleString()} results found
           </p>
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" disabled={!hasSelection}>
+              <Button
+                size="sm"
+                disabled={!hasSelection}
+                className="bg-[var(--gradient-aurora)] text-white shadow-[var(--shadow-glow)] hover:opacity-90"
+              >
                 <Sparkles className="mr-2 h-4 w-4" /> Actions
                 <ChevronDown className="ml-1 h-3.5 w-3.5" />
               </Button>
@@ -697,20 +701,27 @@ function PeoplePage() {
           <Button
             variant="outline"
             size="sm"
+            className="border-white/10 bg-white/5 backdrop-blur"
             disabled={exportBusy || (total === 0 && !hasSelection)}
             onClick={exportCsv}
           >
             <Download className="mr-2 h-4 w-4" />
             {exportBusy ? "Exporting…" : "Export"}
           </Button>
-          <Button variant="outline" size="sm" onClick={saveSearch}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-white/10 bg-white/5 backdrop-blur"
+            onClick={saveSearch}
+          >
             <Save className="mr-2 h-4 w-4" /> Save search
           </Button>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-80 shrink-0 overflow-y-auto border-r bg-background p-5">
+      <div className="flex flex-1 gap-4 overflow-hidden">
+        <aside className="glass-panel-strong w-80 shrink-0 overflow-y-auto rounded-2xl p-5">
+
           <div className="mb-4 flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span className="text-sm font-medium">Filters</span>
