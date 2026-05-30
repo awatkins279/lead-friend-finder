@@ -224,6 +224,7 @@ function PeoplePage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  const [scoredCampaignOpen, setScoredCampaignOpen] = useState(false);
 
   const [selectMenuOpen, setSelectMenuOpen] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
