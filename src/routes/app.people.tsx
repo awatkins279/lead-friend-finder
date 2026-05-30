@@ -496,6 +496,12 @@ function PeoplePage() {
 
     await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
 
+    // Force-finalize: if any batches were left stuck, mark them failed and
+    // set the job's terminal status so the UI stops thinking it's still running.
+    try {
+      await finalizeScoringJobCall({ data: { jobId } });
+    } catch {}
+
     // Final snapshot to sync counters + status
     try {
       const snap = await getJobSnapshotCall({ data: { jobId } });
