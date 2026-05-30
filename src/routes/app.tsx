@@ -13,6 +13,7 @@ import {
   Voicemail,
   Sparkles,
   ChevronDown,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { CreditWidget } from "@/components/CreditWidget";
+import { useServerFn } from "@tanstack/react-start";
+import { checkIsAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/app")({
   component: AppShell,
