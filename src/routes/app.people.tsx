@@ -976,9 +976,11 @@ function PeoplePage() {
         </aside>
 
 
-        <section className="flex-1 overflow-y-auto">
+        <section className="glass-panel-strong flex-1 overflow-hidden rounded-2xl">
+          <div className="h-full overflow-y-auto">
           {activeChips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-b bg-background px-6 py-3">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-6 py-3">
+
               {activeChips.map((k) => {
                 const v = filters[k];
                 const display = Array.isArray(v) ? v.join(", ") : String(v);
