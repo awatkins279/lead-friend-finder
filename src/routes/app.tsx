@@ -22,6 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { CreditWidget } from "@/components/CreditWidget";
+
 export const Route = createFileRoute("/app")({
   component: AppShell,
 });
@@ -137,7 +139,8 @@ function AppShell() {
           })}
         </nav>
 
-        {/* Pro Plan card — reserved for customer accounts (hidden for owner) */}
+        {/* Credit widget — shows "Owner • Unlimited" for admins, plan progress for customers */}
+        <CreditWidget />
 
         {/* User pill */}
         <DropdownMenu>
