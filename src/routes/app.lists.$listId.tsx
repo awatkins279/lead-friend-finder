@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { generateCallScript, getTwilioToken, startCall, endCall, type CallScript } from "@/lib/calls.functions";
 import { getRingCentralWebPhoneCreds, startRingCentralBrowserCall } from "@/lib/ringcentral.functions";
-import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot, Play, Pause, Minus, Plus, RotateCcw } from "lucide-react";
+import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot, Play, Pause, Minus, Plus, RotateCcw, Voicemail, MessageSquare } from "lucide-react";
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
