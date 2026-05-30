@@ -1933,6 +1933,11 @@ function CallWorkstation({
 }
 
 function FocusCallView({
+  listId,
+  leadId,
+  callId,
+  aiCopilotEnabled,
+  getRemoteStream,
   leadName,
   leadSub,
   phone,
