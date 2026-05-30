@@ -381,52 +381,48 @@ function ListDetailPage() {
   const isRunning = !!progress && !progress.cancel && progress.done < progress.total;
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="border-b bg-background px-8 py-5">
+    <div className="flex h-screen flex-col bg-[oklch(0.13_0.02_265)]">
+      <header className="border-b border-white/5 bg-[oklch(0.13_0.02_265)] px-8 py-6">
         <Link to="/app/lists" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> All campaigns
+          <ArrowLeft className="h-3.5 w-3.5" /> Campaigns / <span className="truncate">{list?.name ?? "…"}</span>
         </Link>
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <h1 className="min-w-0 flex-1 truncate text-2xl font-semibold tracking-tight">
-            {list?.name ?? "Loading…"}
-          </h1>
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="min-w-0 truncate text-3xl font-semibold tracking-tight text-foreground">
+                {list?.name ?? "Loading…"}
+              </h1>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Active
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Last activity: <LastActivityLabel listId={listId} />
+            </p>
+          </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setConfigOpen(true)}>
-              <Settings2 className="mr-2 h-4 w-4" /> Campaign config
+            <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
+              <Settings2 className="mr-2 h-3.5 w-3.5" /> Campaign config
             </Button>
-            <Button variant="outline" onClick={() => setCallConfigOpen(true)}>
-              <Headphones className="mr-2 h-4 w-4" /> Calling config
+            <Button variant="outline" size="sm" onClick={() => setCallConfigOpen(true)}>
+              <Headphones className="mr-2 h-3.5 w-3.5" /> Calling config
             </Button>
             <Button
+              size="sm"
               onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
               disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
             >
-              {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {isRunning ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
               {isRunning
                 ? "Generating…"
                 : activeTab === "calling"
-                  ? "Generate all call scripts"
+                  ? "Generate all scripts"
                   : "Generate all sequences"}
             </Button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          <StatBox label="Prospects" value={(rows ?? []).length} accent="text-foreground" />
-          <StatBox label="Researched" value={enrichedCount} accent="text-emerald-600 dark:text-emerald-400" />
-          {isConfigured ? (
-            <>
-              <StatBox label="Emails" value={list?.num_emails ?? 0} accent="text-blue-600 dark:text-blue-400" />
-              <StatBox label="Words" value={`~${list?.word_count ?? 0}`} accent="text-amber-600 dark:text-amber-400" />
-              <StatBox
-                label="Personalization"
-                value={list?.personalization_level ?? "—"}
-                accent="text-violet-600 dark:text-violet-400"
-                capitalize
-              />
-            </>
-          ) : null}
-        </div>
+        <CampaignStatStrip listId={listId} totalProspects={(rows ?? []).length} enrichedCount={enrichedCount} />
       </header>
 
       <SdrAssignBar listId={listId} currentAgentId={list?.sdr_agent_id ?? null} onChanged={() => refetchList()} />
