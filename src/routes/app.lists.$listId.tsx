@@ -2017,59 +2017,96 @@ function FocusCallView({
     { v: "dnc", label: "Do not call", c: "" },
   ];
 
+  const statusLabel =
+    callStatus === "connecting" ? "CONNECTING" :
+    callStatus === "ringing" ? "RINGING" :
+    callStatus === "in_progress" ? "IN CALL" :
+    callStatus === "ending" ? "ENDING" : "IDLE";
+
   return (
-    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-background">
+    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-[oklch(0.12_0.04_270)] text-foreground">
+      {/* Ambient aurora background */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,oklch(0.70_0.18_290/0.35),transparent_70%)] blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 h-[560px] w-[560px] rounded-full bg-[radial-gradient(circle_at_center,oklch(0.78_0.16_210/0.30),transparent_70%)] blur-3xl" />
+        <div
+          className="absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              "linear-gradient(oklch(1_0_0/0.6) 1px, transparent 1px), linear-gradient(90deg, oklch(1_0_0/0.6) 1px, transparent 1px)",
+            backgroundSize: "44px 44px",
+            maskImage: "radial-gradient(ellipse at center, black 40%, transparent 85%)",
+          }}
+        />
+      </div>
+
       {/* Top bar */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b px-6 py-3">
-        <div className="min-w-0 flex items-baseline gap-3">
-          <h1 className="truncate text-2xl font-bold tracking-tight">{leadName}</h1>
-          {leadSub && <span className="truncate text-sm text-muted-foreground">{leadSub}</span>}
-          {phone && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Phone className="h-4 w-4" /> {phone}
-            </span>
-          )}
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-white/[0.03] px-6 py-3 backdrop-blur-xl">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[oklch(0.70_0.18_290)] to-[oklch(0.78_0.16_210)] text-sm font-bold text-white shadow-[0_0_24px_-4px_oklch(0.70_0.18_290/0.8)]">
+            {leadName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "—"}
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate bg-gradient-to-r from-white to-[oklch(0.85_0.08_260)] bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+              {leadName}
+            </h1>
+            <div className="mt-0.5 flex items-center gap-3 truncate text-xs text-muted-foreground">
+              {leadSub && <span className="truncate">{leadSub}</span>}
+              {phone && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono tracking-wider text-[oklch(0.85_0.10_210)]">
+                  <Phone className="h-3 w-3" /> {phone}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
+
         <div className="flex shrink-0 items-center gap-2">
           {callStatus !== "idle" && (
-            <div className="flex items-center gap-2 rounded-md border bg-emerald-50 px-3 py-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 shadow-[0_0_24px_-6px_oklch(0.78_0.18_150/0.7)] backdrop-blur">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-80" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_oklch(0.78_0.18_150)]" />
               </span>
-              <span className="text-sm font-semibold text-emerald-900">
-                {callStatus === "connecting" && "Connecting…"}
-                {callStatus === "ringing" && "Ringing…"}
-                {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
-                {callStatus === "ending" && "Ending…"}
-              </span>
-              <Button size="sm" variant="ghost" className="h-8 px-2" onClick={onToggleMute} disabled={!canMute}>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">{statusLabel}</span>
+              {callStatus === "in_progress" && (
+                <span className="font-mono text-base font-semibold tabular-nums text-emerald-100">
+                  <CallTimer startedAt={callStart} />
+                </span>
+              )}
+              <Button size="sm" variant="ghost" className="h-8 px-2 text-emerald-100 hover:bg-emerald-400/10 hover:text-white" onClick={onToggleMute} disabled={!canMute}>
                 {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </Button>
-              <Button size="sm" variant="destructive" className="h-8 px-3" onClick={onHangUp}>
+              <Button
+                size="sm"
+                onClick={onHangUp}
+                className="h-8 border-0 bg-gradient-to-br from-rose-500 to-red-600 px-3 text-white shadow-[0_0_18px_-4px_oklch(0.66_0.22_18/0.9)] hover:from-rose-400 hover:to-red-500"
+              >
                 <PhoneOff className="mr-1 h-4 w-4" /> Hang up
               </Button>
             </div>
           )}
+
           <Button
             size="sm"
-            variant="default"
+            variant="outline"
             onClick={onDropVoicemail}
             disabled={!canDropVoicemail}
+            className="h-9 border-white/15 bg-white/[0.04] text-foreground backdrop-blur hover:bg-white/[0.08]"
             title={canDropVoicemail ? "Play prerecorded voicemail, hang up, advance" : "Record a voicemail for this campaign first"}
           >
             {voicemailDropping ? (
               <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Dropping…</>
             ) : (
-              <>📩 Drop VM + next</>
+              <>📩 Drop VM</>
             )}
           </Button>
+
           <Button
             size="sm"
-            variant="default"
             onClick={onDropAiVoicemail}
             disabled={!canDropAiVoicemail}
-            className="bg-primary"
+            className="h-9 border-0 bg-gradient-to-r from-[oklch(0.70_0.18_290)] to-[oklch(0.78_0.16_210)] text-white shadow-[0_0_22px_-4px_oklch(0.70_0.18_290/0.9)] hover:opacity-95"
             title={canDropAiVoicemail ? "Drop AI voicemail in your cloned voice, hang up, advance" : "Available during an active call"}
           >
             {aiVmDropping ? (
@@ -2078,38 +2115,45 @@ function FocusCallView({
               <><Sparkles className="mr-1.5 h-4 w-4" /> AI Voicemail</>
             )}
           </Button>
-          <Button size="sm" variant="secondary" onClick={onNext} disabled={!hasNext}>
 
+          <Button
+            size="sm"
+            onClick={onNext}
+            disabled={!hasNext}
+            className="h-9 border border-[oklch(0.78_0.16_210/0.5)] bg-[oklch(0.78_0.16_210/0.12)] text-[oklch(0.92_0.08_210)] hover:bg-[oklch(0.78_0.16_210/0.22)]"
+          >
             Next call →
           </Button>
-          <Button size="sm" variant="outline" onClick={onExit}>
-            <X className="mr-1.5 h-4 w-4" /> End &amp; exit
+          <Button size="sm" variant="ghost" onClick={onExit} className="h-9 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground">
+            <X className="mr-1.5 h-4 w-4" /> Exit
           </Button>
         </div>
       </header>
 
-
-
-      {/* Body: 3-column, no page scroll. Each column scrolls internally if needed. */}
-      <div className="grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
-        {/* Script column */}
-        <section className="col-span-7 flex min-h-0 flex-col rounded-lg border bg-card">
-          <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-            Script
-          </div>
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Opener</div>
-              <p className="whitespace-pre-wrap rounded-md border border-primary/30 bg-primary/5 p-3 text-lg leading-relaxed">
-                {script.opener}
-              </p>
+      {/* Body */}
+      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
+        {/* Script panel */}
+        <section className="col-span-7 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
+          <div className="relative flex items-center justify-between border-b border-white/10 px-5 py-3">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.70_0.18_290)] to-transparent opacity-80" />
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[oklch(0.70_0.18_290)] shadow-[0_0_10px_oklch(0.70_0.18_290)]" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.85_0.10_290)]">Script</span>
             </div>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">// live</span>
+          </div>
+
+          <div className="flex-1 space-y-5 overflow-y-auto p-5">
+            <FuturisticBlock label="Opener" highlight>
+              <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.opener}</p>
+            </FuturisticBlock>
+
             {script.talk_track?.map((s, i) => (
-              <div key={i}>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{s.heading}</div>
-                <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-base leading-relaxed">{s.body}</p>
-              </div>
+              <FuturisticBlock key={i} label={s.heading}>
+                <p className="whitespace-pre-wrap text-base leading-relaxed">{s.body}</p>
+              </FuturisticBlock>
             ))}
+
             {script.problem_questions?.length > 0 && (
               <FocusQList title="Problem questions" items={script.problem_questions} />
             )}
@@ -2122,34 +2166,71 @@ function FocusCallView({
             {script.qualifying_questions?.length > 0 && (
               <FocusQList title="Qualifying questions" items={script.qualifying_questions} />
             )}
-            <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Close</div>
-              <p className="whitespace-pre-wrap rounded-md border border-primary/30 bg-primary/5 p-3 text-lg leading-relaxed">
-                {script.close}
-              </p>
-            </div>
+
+            <FuturisticBlock label="Close" highlight>
+              <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.close}</p>
+            </FuturisticBlock>
           </div>
         </section>
 
-        {/* Objections column */}
-        <section className="col-span-5 flex min-h-0 flex-col rounded-lg border bg-card">
-          <div className="border-b px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-            Objection answers
+        {/* Objections panel */}
+        <section className="col-span-5 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
+          <div className="relative flex items-center justify-between border-b border-white/10 px-5 py-3">
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210)] to-transparent opacity-80" />
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[oklch(0.78_0.16_210)] shadow-[0_0_10px_oklch(0.78_0.16_210)]" />
+              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.88_0.10_210)]">Objection answers</span>
+            </div>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">// cheatsheet</span>
           </div>
-          <div className="flex-1 space-y-2 overflow-y-auto p-4">
+          <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
             {script.objection_map.length === 0 ? (
               <p className="text-sm text-muted-foreground">No objections configured.</p>
             ) : (
               script.objection_map.map((o, i) => (
-                <Card key={i} className="p-3">
-                  <div className="text-base font-semibold">{o.objection}</div>
-                  <div className="mt-1 text-base leading-relaxed text-muted-foreground">{o.response}</div>
-                </Card>
+                <div
+                  key={i}
+                  className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:border-[oklch(0.78_0.16_210/0.5)] hover:bg-white/[0.06]"
+                >
+                  <span className="absolute left-0 top-0 h-full w-[2px] bg-gradient-to-b from-[oklch(0.78_0.16_210)] to-transparent opacity-70" />
+                  <div className="text-sm font-semibold text-foreground">{o.objection}</div>
+                  <div className="mt-1 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
+                </div>
               ))
             )}
           </div>
         </section>
+      </div>
+    </div>
+  );
+}
 
+function FuturisticBlock({
+  label,
+  highlight,
+  children,
+}: {
+  label: string;
+  highlight?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="h-px w-4 bg-gradient-to-r from-[oklch(0.70_0.18_290)] to-transparent" />
+        {label}
+      </div>
+      <div
+        className={
+          highlight
+            ? "relative overflow-hidden rounded-xl border border-[oklch(0.70_0.18_290/0.45)] bg-[oklch(0.70_0.18_290/0.08)] p-4 shadow-[0_0_30px_-12px_oklch(0.70_0.18_290/0.8)]"
+            : "rounded-xl border border-white/10 bg-white/[0.04] p-4"
+        }
+      >
+        {highlight && (
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210)] to-transparent" />
+        )}
+        {children}
       </div>
     </div>
   );
@@ -2158,11 +2239,19 @@ function FocusCallView({
 function FocusQList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="h-px w-4 bg-gradient-to-r from-[oklch(0.78_0.16_210)] to-transparent" />
+        {title}
+      </div>
       <ol className="space-y-1.5">
         {items.map((q, i) => (
-          <li key={i} className="flex gap-2 rounded-md border bg-muted/30 p-2.5 text-base leading-relaxed">
-            <span className="shrink-0 text-xs font-semibold text-muted-foreground">{i + 1}.</span>
+          <li
+            key={i}
+            className="flex gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-base leading-relaxed transition hover:border-[oklch(0.78_0.16_210/0.4)] hover:bg-white/[0.06]"
+          >
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[oklch(0.78_0.16_210/0.4)] bg-[oklch(0.78_0.16_210/0.12)] font-mono text-[11px] font-bold text-[oklch(0.88_0.10_210)]">
+              {i + 1}
+            </span>
             <span>{q}</span>
           </li>
         ))}
