@@ -668,551 +668,569 @@ function PeoplePage() {
     : null;
 
 
+  // ===== Filter chip helpers =====
+  const chipBase =
+    "group flex h-[58px] min-w-[150px] flex-col justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 text-left transition hover:border-white/20 hover:bg-white/[0.06]";
+
+  const industryActive = !!draft.industry;
+  const sizeActive = draft.companySize.length > 0;
+  const locationActive = !!draft.location;
+  const titleActive = draft.titles.length > 0;
+  const nameActive = !!draft.name || !!draft.company;
+
+  const sizeLabel =
+    draft.companySize.length === 0
+      ? "Any size"
+      : draft.companySize.length === 1
+        ? SIZE_OPTIONS.find((o) => o.value === draft.companySize[0])?.label ?? "—"
+        : `${draft.companySize.length} selected`;
+
+  // ===== Right-rail AI gauge math =====
+  const scoreVals = Array.from(scores.values()).map((s) => s.score);
+  const totalScore = scoreVals.reduce((a, b) => a + b, 0);
+  const maxScore = Math.max(scoreVals.length * 100, 1);
+  const gaugePct = scoreVals.length === 0 ? 0 : totalScore / maxScore;
+  const aboveThreshold = scoreVals.filter((s) => s >= minScore).length;
+
   return (
-    <div className="flex h-[calc(100vh-2rem)] flex-col gap-4">
-      <header className="glass-panel-strong flex items-center justify-between rounded-2xl px-6 py-5">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">People Search</h1>
-          <p className="mt-1 text-sm text-muted-foreground font-mono-num">
-            {total.toLocaleString()} results found
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                disabled={!hasSelection}
-                className="bg-[var(--gradient-aurora)] text-white shadow-[var(--shadow-glow)] hover:opacity-90"
-              >
-                <Sparkles className="mr-2 h-4 w-4" /> Actions
-                <ChevronDown className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setAddOpen(true)}>
-                <ListPlus className="mr-2 h-4 w-4" /> Add to List
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setCampaignOpen(true)}>
-                <Send className="mr-2 h-4 w-4" /> Add to Campaign
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-white/10 bg-white/5 backdrop-blur"
-            disabled={exportBusy || (total === 0 && !hasSelection)}
-            onClick={exportCsv}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            {exportBusy ? "Exporting…" : "Export"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-white/10 bg-white/5 backdrop-blur"
-            onClick={saveSearch}
-          >
-            <Save className="mr-2 h-4 w-4" /> Save search
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex flex-1 gap-4 overflow-hidden">
-        <aside className="glass-panel-strong w-80 shrink-0 overflow-y-auto rounded-2xl p-5">
-
-          <div className="mb-4 flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            <span className="text-sm font-medium">Filters</span>
-            {activeChips.length > 0 && (
-              <button
-                onClick={clear}
-                className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            <Field
-              icon={<Search className="h-3.5 w-3.5" />}
-              label="Name"
-              placeholder="Search by first or last name"
-              value={draft.name}
-              onChange={(v) => setDraft({ ...draft, name: v })}
-            />
-            <TitleMultiSelect
-              values={draft.titles}
-              onChange={(next) => setDraft({ ...draft, titles: next })}
-            />
-
-
-            <Field
-              icon={<Building2 className="h-3.5 w-3.5" />}
-              label="Company"
-              placeholder="e.g. Acme Corp"
-              value={draft.company}
-              onChange={(v) => setDraft({ ...draft, company: v })}
-            />
-            <AutocompleteField
-              icon={<MapPin className="h-3.5 w-3.5" />}
-              label="Location"
-              placeholder="city, state or country"
-              value={draft.location}
-              onChange={(v) => setDraft({ ...draft, location: v })}
-              options={COMMON_LOCATIONS}
-            />
-            <AutocompleteField
-              icon={<Building2 className="h-3.5 w-3.5" />}
-              label="Industry"
-              placeholder="e.g. Software"
-              value={draft.industry}
-              onChange={(v) => setDraft({ ...draft, industry: v })}
-              options={COMMON_INDUSTRIES}
-            />
-
-            <div>
-              <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Building2 className="h-3.5 w-3.5" /> Company size
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <span className={draft.companySize.length === 0 ? "text-muted-foreground" : ""}>
-                      {draft.companySize.length === 0
-                        ? "Any size"
-                        : draft.companySize.length === 1
-                          ? `${SIZE_OPTIONS.find((o) => o.value === draft.companySize[0])?.label} employees`
-                          : `${draft.companySize.length} ranges selected`}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-56 p-2">
-                  <div className="max-h-72 space-y-1 overflow-y-auto">
-                    {SIZE_OPTIONS.map((o) => {
-                      const checked = draft.companySize.includes(o.value);
-                      return (
-                        <label
-                          key={o.value}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(v) => {
-                              const next = v
-                                ? [...draft.companySize, o.value]
-                                : draft.companySize.filter((x) => x !== o.value);
-                              setDraft({ ...draft, companySize: next });
-                            }}
-                          />
-                          {o.label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {draft.companySize.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setDraft({ ...draft, companySize: [] })}
-                      className="mt-2 w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Toggle
-                label="Has phone number"
-                checked={draft.hasPhone}
-                onChange={(v) => setDraft({ ...draft, hasPhone: v })}
-              />
-              <Toggle
-                label="Has email"
-                checked={draft.hasEmail}
-                onChange={(v) => setDraft({ ...draft, hasEmail: v })}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button className="flex-1" onClick={apply}>
-                <Search className="mr-2 h-4 w-4" /> Apply
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-md border bg-muted/30 p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <Target className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">AI lead scoring</span>
-            </div>
-            <p className="mb-2 text-xs text-muted-foreground">
-              Tell the AI what you're selling and who you want. It'll score each lead 0–100 on buying likelihood.
+    <div className="flex h-[calc(100vh-2rem)] gap-4 overflow-hidden">
+      {/* MAIN COLUMN */}
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden">
+        {/* Header */}
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">People Search</h1>
+            <p className="mt-1 text-sm text-muted-foreground font-mono-num">
+              {total.toLocaleString()} results found
             </p>
-            <Textarea
-              rows={4}
-              value={scoringContext}
-              onChange={(e) => setScoringContext(e.target.value)}
-              placeholder="e.g. We sell AI contact-center software to mid-market companies (200-5000 employees) with large customer support teams. Looking for VP/Dir of CX, Support, or Ops."
-              className="text-xs"
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/10 bg-white/5 backdrop-blur"
+              onClick={saveSearch}
+            >
+              <Save className="mr-2 h-4 w-4" /> Save Search
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="border-white/10 bg-white/5 backdrop-blur"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAddOpen(true)} disabled={!hasSelection}>
+                  <ListPlus className="mr-2 h-4 w-4" /> Add to List
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCampaignOpen(true)} disabled={!hasSelection}>
+                  <Send className="mr-2 h-4 w-4" /> Add to Campaign
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv} disabled={exportBusy || (total === 0 && !hasSelection)}>
+                  <Download className="mr-2 h-4 w-4" /> {exportBusy ? "Exporting…" : "Export CSV"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+
+        {/* Horizontal filter chip row */}
+        <div className="flex flex-wrap items-stretch gap-2.5">
+          {/* Industry */}
+          <Popover onOpenChange={(o) => !o && apply()}>
+            <PopoverTrigger asChild>
+              <button className={chipBase}>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Company Industry</span>
+                <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
+                  <span className="truncate">{industryActive ? draft.industry : "Any industry"}</span>
+                  {industryActive && (
+                    <X
+                      className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, industry: "" }; setFilters(next); setDraft(next); }}
+                    />
+                  )}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-3">
+              <AutocompleteField
+                icon={<Building2 className="h-3.5 w-3.5" />}
+                label="Industry"
+                placeholder="e.g. Software"
+                value={draft.industry}
+                onChange={(v) => setDraft({ ...draft, industry: v })}
+                options={COMMON_INDUSTRIES}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Company Size */}
+          <Popover onOpenChange={(o) => !o && apply()}>
+            <PopoverTrigger asChild>
+              <button className={chipBase}>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Company Size</span>
+                <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
+                  <span className="truncate">{sizeLabel}</span>
+                  {sizeActive && (
+                    <X
+                      className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, companySize: [] }; setFilters(next); setDraft(next); }}
+                    />
+                  )}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2">
+              <div className="max-h-72 space-y-1 overflow-y-auto">
+                {SIZE_OPTIONS.map((o) => {
+                  const checked = draft.companySize.includes(o.value);
+                  return (
+                    <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const next = v ? [...draft.companySize, o.value] : draft.companySize.filter((x) => x !== o.value);
+                          setDraft({ ...draft, companySize: next });
+                        }}
+                      />
+                      {o.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Location */}
+          <Popover onOpenChange={(o) => !o && apply()}>
+            <PopoverTrigger asChild>
+              <button className={chipBase}>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Location</span>
+                <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
+                  <span className="truncate">{locationActive ? draft.location : "Anywhere"}</span>
+                  {locationActive && (
+                    <X
+                      className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, location: "" }; setFilters(next); setDraft(next); }}
+                    />
+                  )}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-3">
+              <AutocompleteField
+                icon={<MapPin className="h-3.5 w-3.5" />}
+                label="Location"
+                placeholder="city, state or country"
+                value={draft.location}
+                onChange={(v) => setDraft({ ...draft, location: v })}
+                options={COMMON_LOCATIONS}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* Title */}
+          <Popover onOpenChange={(o) => !o && apply()}>
+            <PopoverTrigger asChild>
+              <button className={chipBase}>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Title</span>
+                <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
+                  <span className="truncate">
+                    {titleActive
+                      ? draft.titles.length === 1
+                        ? draft.titles[0]
+                        : `${draft.titles.length} titles`
+                      : "Any title"}
+                  </span>
+                  {titleActive && (
+                    <X
+                      className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, titles: [] }; setFilters(next); setDraft(next); }}
+                    />
+                  )}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-3">
+              <TitleMultiSelect
+                values={draft.titles}
+                onChange={(next) => setDraft({ ...draft, titles: next })}
+              />
+            </PopoverContent>
+          </Popover>
+
+          {/* More Filters (name/company/has email/phone) */}
+          <Popover onOpenChange={(o) => !o && apply()}>
+            <PopoverTrigger asChild>
+              <button className={`${chipBase} flex-row items-center gap-2`}>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-foreground">More Filters</span>
+                {(nameActive || draft.hasEmail || draft.hasPhone) && (
+                  <span className="ml-1 rounded-full bg-[var(--gradient-aurora)] px-1.5 text-[10px] font-semibold text-white">
+                    {[nameActive, draft.hasEmail, draft.hasPhone].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 space-y-4 p-4">
+              <Field
+                icon={<Search className="h-3.5 w-3.5" />}
+                label="Name"
+                placeholder="Search by first or last name"
+                value={draft.name}
+                onChange={(v) => setDraft({ ...draft, name: v })}
+              />
+              <Field
+                icon={<Building2 className="h-3.5 w-3.5" />}
+                label="Company"
+                placeholder="e.g. Acme Corp"
+                value={draft.company}
+                onChange={(v) => setDraft({ ...draft, company: v })}
+              />
+              <div className="space-y-2 pt-1">
+                <Toggle label="Has phone number" checked={draft.hasPhone} onChange={(v) => setDraft({ ...draft, hasPhone: v })} />
+                <Toggle label="Has email" checked={draft.hasEmail} onChange={(v) => setDraft({ ...draft, hasEmail: v })} />
+              </div>
+              {activeChips.length > 0 && (
+                <button onClick={clear} className="text-xs text-muted-foreground hover:text-foreground">
+                  Clear all filters
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Search + View row */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") apply(); }}
+              placeholder="Search by name or keyword…"
+              className="h-11 rounded-xl border-white/10 bg-white/[0.03] pl-10 placeholder:text-muted-foreground/60"
             />
-            <div className="mt-2 flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={scorePageLeads}
-                disabled={scoringBusy || rows.length === 0}
-              >
-                {scoringBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
-                Score page
-              </Button>
+          </div>
+        </div>
+
+        {/* Selection bar */}
+        {hasSelection && (
+          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[oklch(0.70_0.18_290/0.08)] px-4 py-2.5 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{picked.size.toLocaleString()} leads selected</span>
+              <span className="text-muted-foreground">· selection persists across pages</span>
+            </div>
+            <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground">
+              Clear selection
+            </button>
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="glass-panel-strong flex-1 overflow-hidden rounded-2xl">
+          <div className="h-full overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/5 hover:bg-transparent">
+                  <TableHead className="w-14 pl-6">
+                    <Popover open={selectMenuOpen} onOpenChange={(o) => { setSelectMenuOpen(o); if (!o) setAdvancedMode(false); }}>
+                      <PopoverTrigger asChild>
+                        <button className="flex items-center gap-1 rounded hover:bg-white/5 px-1 py-0.5">
+                          <Checkbox
+                            checked={allPageChecked ? true : somePageChecked ? "indeterminate" : false}
+                            onCheckedChange={() => {}}
+                            onClick={(e) => e.preventDefault()}
+                          />
+                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-64 p-1">
+                        {!advancedMode ? (
+                          <div className="flex flex-col">
+                            <MenuItem onClick={selectThisPage}>Select this page</MenuItem>
+                            <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
+                              {bulkBusy ? "Selecting…" : `Select all leads${total ? ` (${total.toLocaleString()})` : ""}`}
+                            </MenuItem>
+                            <MenuItem onClick={() => setAdvancedMode(true)}>Advanced Selection</MenuItem>
+                            <MenuItem onClick={clearSelection}>Clear selection</MenuItem>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 p-2">
+                            <Label className="text-xs">Select number of leads</Label>
+                            <Input type="number" min={1} max={MAX_BULK} value={advancedN} onChange={(e) => setAdvancedN(e.target.value)} />
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="ghost" className="flex-1" onClick={() => setAdvancedMode(false)}>Back</Button>
+                              <Button size="sm" className="flex-1" onClick={applyAdvanced} disabled={bulkBusy}>
+                                {bulkBusy ? "…" : "Apply Selection"}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Title</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Company</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Location</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">AI Score</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+                ) : rows.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">No leads match your filters.</TableCell></TableRow>
+                ) : (
+                  rows.map((r) => (
+                    <TableRow
+                      key={r.id}
+                      className={`cursor-pointer border-white/5 transition hover:bg-white/[0.03] ${selected?.id === r.id ? "bg-white/[0.04]" : ""}`}
+                      onClick={() => setSelected(r)}
+                    >
+                      <TableCell className="pl-6" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={picked.has(r.id)}
+                          onCheckedChange={(v) => {
+                            setPicked((prev) => {
+                              const next = new Set(prev);
+                              if (v) next.add(r.id); else next.delete(r.id);
+                              return next;
+                            });
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                            {((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate">{[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}</span>
+                            {r.linkedin_url && <Linkedin className="h-3 w-3 text-muted-foreground" />}
+                            {r.email && <Mail className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[220px] truncate text-sm">{r.title || "—"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate text-sm">{r.org_name || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {[r.city, r.state].filter(Boolean).join(", ") || r.country || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell><ScoreBadge info={scores.get(r.id)} /></TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            {isFetching ? "Loading…" : `Showing page ${page + 1} of ${totalPages.toLocaleString()}`}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="border-white/10 bg-white/5" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
+            <Button variant="outline" size="sm" className="border-white/10 bg-white/5" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT RAIL — desktop only */}
+      <aside className="hidden w-[360px] shrink-0 flex-col gap-4 overflow-y-auto lg:flex">
+        {/* AI Scoring panel */}
+        <div className="glass-panel-strong rounded-2xl p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-[oklch(0.78_0.16_210)]" />
+              <span className="text-sm font-medium">AI Scoring</span>
+            </div>
+          </div>
+
+          {/* Circular gauge */}
+          <div className="relative mx-auto mb-4 h-40 w-40">
+            <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+              <defs>
+                <linearGradient id="gauge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="oklch(0.70 0.18 290)" />
+                  <stop offset="100%" stopColor="oklch(0.78 0.16 210)" />
+                </linearGradient>
+              </defs>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="oklch(1 0 0 / 0.06)" strokeWidth="8" />
+              <circle
+                cx="60" cy="60" r="50" fill="none"
+                stroke="url(#gauge-grad)" strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={`${gaugePct * 314} 314`}
+                style={{ filter: "drop-shadow(0 0 8px oklch(0.78 0.16 210 / 0.5))" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="font-mono-num text-2xl font-bold tracking-tight">
+                {totalScore.toLocaleString()}
+                <span className="text-sm font-normal text-muted-foreground"> / {maxScore.toLocaleString()}</span>
+              </div>
+              <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Total Score</div>
+            </div>
+          </div>
+
+          {/* ICP textarea */}
+          <Textarea
+            rows={3}
+            value={scoringContext}
+            onChange={(e) => setScoringContext(e.target.value)}
+            placeholder="Describe your ideal customer profile…"
+            className="border-white/10 bg-white/[0.03] text-xs"
+          />
+
+          {/* Threshold */}
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Scoring Threshold</span>
+              <span className="font-mono-num font-semibold">{minScore}</span>
+            </div>
+            <Slider value={[minScore]} min={0} max={100} step={5} onValueChange={(v) => setMinScore(v[0] ?? 0)} />
+            <p className="mt-2 font-mono-num text-xs text-muted-foreground">
+              {aboveThreshold} leads above threshold
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-4 space-y-2">
+            <Button
+              size="sm"
+              className="w-full bg-[var(--gradient-aurora)] text-white shadow-[var(--shadow-glow)] hover:opacity-90"
+              onClick={scorePageLeads}
+              disabled={scoringBusy || rows.length === 0}
+            >
+              {scoringBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+              Score page
+            </Button>
+            {scoredEligibleIds.length > 0 && (
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1"
-                onClick={scoreSelectedLeads}
-                disabled={scoringBusy || !hasSelection}
+                className="w-full border-white/10 bg-white/5"
+                onClick={() => setScoredCampaignOpen(true)}
               >
-                Score selected
+                <Send className="mr-1 h-3 w-3" />
+                Add {scoredEligibleIds.length.toLocaleString()} to campaign
               </Button>
-            </div>
-
-            {jobProgress && (
-              <div className="mt-3 rounded-md border bg-background p-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">
-                    {jobProgress.status === "running" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
-                    {jobProgress.status === "running"
-                      ? "Scoring in background…"
-                      : jobProgress.status === "completed"
-                        ? "Scoring complete"
-                        : jobProgress.status === "completed_with_errors"
-                          ? "Done (some errors)"
-                          : jobProgress.status === "cancelled"
-                            ? "Cancelled"
-                            : jobProgress.status}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {jobProgress.scoredLeads.toLocaleString()} / {jobProgress.totalLeads.toLocaleString()}
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full bg-primary transition-all"
-                    style={{
-                      width: `${jobProgress.totalBatches === 0 ? 0 : Math.round(((jobProgress.completedBatches + jobProgress.failedBatches) / jobProgress.totalBatches) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>
-                    {jobProgress.completedBatches + jobProgress.failedBatches} / {jobProgress.totalBatches} batches
-                    {jobProgress.failedBatches > 0 ? ` · ${jobProgress.failedBatches} failed` : ""}
-                  </span>
-                  {jobProgress.status === "running" && activeJobId && (
-                    <button onClick={cancelScoring} className="text-destructive hover:underline">
-                      Cancel
-                    </button>
-                  )}
-                </div>
-                {jobProgress.status === "running" && (
-                  <p className="mt-1 text-[10px] text-muted-foreground">Safe to close the tab — progress is saved.</p>
-                )}
-              </div>
             )}
-
-
-            <div className="mt-4">
-              <div className="mb-1.5 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Min score for campaign</span>
-                <span className="font-medium">{minScore === 0 ? "Any" : `${minScore}+`}</span>
-              </div>
-              <Slider
-                value={[minScore]}
-                min={0}
-                max={100}
-                step={5}
-                onValueChange={(v) => setMinScore(v[0] ?? 0)}
-              />
-              {hasSelection && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {eligibleIds.length.toLocaleString()} of {picked.size.toLocaleString()} selected pass the threshold.
-                </p>
-              )}
-
-              {scores.size > 0 && (
-                <div className="mt-3 rounded-md border bg-background p-2">
-                  <div className="flex items-baseline justify-between text-xs">
-                    <span className="text-muted-foreground">Qualified prospects</span>
-                    <span className="font-semibold text-foreground">
-                      {scoredEligibleIds.length.toLocaleString()}
-                      <span className="text-muted-foreground"> / {scores.size.toLocaleString()} scored</span>
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    Everyone scored {minScore > 0 ? `${minScore}+` : "1+"} so far — add them straight to a campaign.
-                  </p>
-                  <Button
-                    size="sm"
-                    className="mt-2 w-full"
-                    disabled={scoredEligibleIds.length === 0}
-                    onClick={() => setScoredCampaignOpen(true)}
-                  >
-                    <Send className="mr-1 h-3 w-3" />
-                    Add {scoredEligibleIds.length.toLocaleString()} to campaign
-                  </Button>
-                </div>
-              )}
-            </div>
           </div>
-        </aside>
 
-
-        <section className="glass-panel-strong flex-1 overflow-hidden rounded-2xl">
-          <div className="h-full overflow-y-auto">
-          {activeChips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/5 px-6 py-3">
-
-              {activeChips.map((k) => {
-                const v = filters[k];
-                const display = Array.isArray(v) ? v.join(", ") : String(v);
-                const emptyVal: any = Array.isArray(v) ? [] : typeof v === "boolean" ? false : "";
-                return (
-                  <Badge key={k} variant="secondary" className="gap-1">
-                    {k}: {display}
-                    <button
-                      onClick={() => {
-                        const next = { ...filters, [k]: emptyVal } as Filters;
-                        setFilters(next);
-                        setDraft(next);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                );
-              })}
-            </div>
-          )}
-
-          {hasSelection && (
-            <div className="flex items-center justify-between border-b bg-primary/5 px-6 py-2.5 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{picked.size.toLocaleString()} leads selected</span>
-                <span className="text-muted-foreground">
-                  · selection persists across pages
+          {jobProgress && (
+            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] p-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">
+                  {jobProgress.status === "running" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+                  {jobProgress.status === "running" ? "Scoring…" : jobProgress.status}
+                </span>
+                <span className="font-mono-num text-muted-foreground">
+                  {jobProgress.scoredLeads.toLocaleString()} / {jobProgress.totalLeads.toLocaleString()}
                 </span>
               </div>
-              <button
-                onClick={clearSelection}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear selection
-              </button>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                <div
+                  className="h-full bg-[var(--gradient-aurora)] transition-all"
+                  style={{ width: `${jobProgress.totalBatches === 0 ? 0 : Math.round(((jobProgress.completedBatches + jobProgress.failedBatches) / jobProgress.totalBatches) * 100)}%` }}
+                />
+              </div>
+              {jobProgress.status === "running" && activeJobId && (
+                <button onClick={cancelScoring} className="mt-1 text-[10px] text-destructive hover:underline">Cancel</button>
+              )}
             </div>
           )}
+        </div>
 
-          <div className="p-6">
-            <Card className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-14">
-                      <Popover open={selectMenuOpen} onOpenChange={(o) => { setSelectMenuOpen(o); if (!o) setAdvancedMode(false); }}>
-                        <PopoverTrigger asChild>
-                          <button className="flex items-center gap-1 rounded hover:bg-accent px-1 py-0.5">
-                            <Checkbox
-                              checked={allPageChecked ? true : somePageChecked ? "indeterminate" : false}
-                              onCheckedChange={() => {}}
-                              onClick={(e) => e.preventDefault()}
-                            />
-                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-64 p-1">
-                          {!advancedMode ? (
-                            <div className="flex flex-col">
-                              <MenuItem onClick={selectThisPage}>Select this page</MenuItem>
-                              <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
-                                {bulkBusy ? "Selecting…" : `Select all leads${total ? ` (${total.toLocaleString()})` : ""}`}
-                              </MenuItem>
-                              <MenuItem onClick={() => setAdvancedMode(true)}>Advanced Selection</MenuItem>
-                              <MenuItem onClick={clearSelection}>Clear selection</MenuItem>
-                            </div>
-                          ) : (
-                            <div className="space-y-2 p-2">
-                              <Label className="text-xs">Select number of leads</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={MAX_BULK}
-                                value={advancedN}
-                                onChange={(e) => setAdvancedN(e.target.value)}
-                              />
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="ghost" className="flex-1" onClick={() => setAdvancedMode(false)}>
-                                  Back
-                                </Button>
-                                <Button size="sm" className="flex-1" onClick={applyAdvanced} disabled={bulkBusy}>
-                                  {bulkBusy ? "…" : "Apply Selection"}
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-                    </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-20">Score</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Contact</TableHead>
-                  </TableRow>
-
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                        Loading…
-                      </TableCell>
-                    </TableRow>
-                  ) : rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
-                        No leads match your filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-
-                    rows.map((r) => (
-                      <TableRow
-                        key={r.id}
-                        className="cursor-pointer"
-                        onClick={() => setSelected(r)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={picked.has(r.id)}
-                            onCheckedChange={(v) => {
-                              setPicked((prev) => {
-                                const next = new Set(prev);
-                                if (v) next.add(r.id);
-                                else next.delete(r.id);
-                                return next;
-                              });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-3">
-                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                              {((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}
-                            </div>
-                            <span className="truncate">
-                              {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <ScoreBadge info={scores.get(r.id)} />
-                        </TableCell>
-
-                        <TableCell className="max-w-[260px] truncate text-sm">
-                          {r.title || "—"}
-                        </TableCell>
-
-                        <TableCell className="max-w-[220px] truncate text-sm">
-                          {r.org_name || "—"}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {[r.city, r.state].filter(Boolean).join(", ") || r.country || "—"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1.5 text-muted-foreground">
-                            {r.email && <Mail className="h-3.5 w-3.5" />}
-                            {r.phone && <Phone className="h-3.5 w-3.5" />}
-                            {r.linkedin_url && <Linkedin className="h-3.5 w-3.5" />}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
-
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {isFetching ? "Loading…" : `Page ${page + 1} of ${totalPages.toLocaleString()}`}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page + 1 >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                </Button>
+        {/* Lead Detail panel */}
+        {selectedFull ? (
+          <div className="glass-panel-strong rounded-2xl p-5">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                {((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}
               </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="truncate font-semibold">
+                    {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}
+                  </div>
+                  {scores.get(selectedFull.id) && scores.get(selectedFull.id)!.score >= minScore && (
+                    <span className="rounded-full border border-[oklch(0.78_0.16_210/0.3)] bg-[oklch(0.78_0.16_210/0.1)] px-2 py-0.5 text-[10px] font-medium text-[oklch(0.78_0.16_210)]">
+                      High Match
+                    </span>
+                  )}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">{selectedFull.title || "—"}</div>
+                {selectedFull.org_name && (
+                  <div className="mt-1 truncate text-xs text-foreground">{selectedFull.org_name}</div>
+                )}
+                {([selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ")) && (
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    {[selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ")}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              {(() => {
+                const info = scores.get(selectedFull.id);
+                return info ? (
+                  <div className="-mx-1 overflow-hidden rounded-lg border border-white/10">
+                    <IppBreakdown info={info} />
+                  </div>
+                ) : null;
+              })()}
+
+              <Section title="Contact">
+                <div className="space-y-1.5 text-xs">
+                  {selectedFull.email && <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />}
+                  {selectedFull.phone && <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />}
+                  {selectedFull.linkedin_url && <Row icon={<Linkedin className="h-3.5 w-3.5" />} value="LinkedIn profile" href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`} />}
+                  {selectedFull.org_website_url && <Row icon={<Globe className="h-3.5 w-3.5" />} value={selectedFull.org_website_url} href={selectedFull.org_website_url.startsWith("http") ? selectedFull.org_website_url : `https://${selectedFull.org_website_url}`} />}
+                </div>
+              </Section>
+
+              {(selectedFull.org_industry || selectedFull.org_employee_count || selectedFull.org_description) && (
+                <Section title="Company">
+                  {selectedFull.org_industry && <div className="text-xs text-muted-foreground">{selectedFull.org_industry}</div>}
+                  {selectedFull.org_employee_count && <div className="text-xs text-muted-foreground">{selectedFull.org_employee_count} employees</div>}
+                  {selectedFull.org_description && <p className="mt-2 line-clamp-4 whitespace-pre-line text-xs text-muted-foreground">{selectedFull.org_description}</p>}
+                </Section>
+              )}
             </div>
           </div>
+        ) : (
+          <div className="glass-panel-strong flex flex-col items-center justify-center gap-2 rounded-2xl p-6 text-center">
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-white/5">
+              <Search className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">Select a lead to view details</p>
           </div>
-        </section>
+        )}
+      </aside>
 
-      </div>
-
-      <AddToListDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        leadIds={pickedIds}
-        onAdded={() => setPicked(new Set())}
-      />
-      <AddToListDialog
-        mode="campaign"
-        open={campaignOpen}
-        onOpenChange={setCampaignOpen}
-        leadIds={pickedIds}
-        leadScores={campaignLeadScores}
-        onAdded={() => setPicked(new Set())}
-      />
-      <AddToListDialog
-        mode="campaign"
-        open={scoredCampaignOpen}
-        onOpenChange={setScoredCampaignOpen}
-        leadIds={scoredEligibleIds}
-        leadScores={scoredEligibleScores}
-      />
-
-
-
-
+      {/* Mobile slide-over for lead detail */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md lg:hidden">
           {selectedFull && (
             <>
               <SheetHeader>
-                <SheetTitle>
-                  {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}
-                </SheetTitle>
+                <SheetTitle>{[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}</SheetTitle>
                 <SheetDescription>{selectedFull.title}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-5 px-4 pb-6 text-sm">
@@ -1220,57 +1238,20 @@ function PeoplePage() {
                   const info = scores.get(selectedFull.id);
                   return info ? (
                     <Section title="AI IPP analysis">
-                      <div className="-mx-1 rounded-md border">
-                        <IppBreakdown info={info} />
-                      </div>
+                      <div className="-mx-1 rounded-md border"><IppBreakdown info={info} /></div>
                     </Section>
-                  ) : (
-                    <Section title="AI IPP analysis">
-                      <p className="text-xs text-muted-foreground">
-                        Not scored yet. Run "Score this page" or "Score selected" to get an in-depth fit breakdown.
-                      </p>
-                    </Section>
-                  );
+                  ) : null;
                 })()}
                 <Section title="Company">
                   <div className="font-medium">{selectedFull.org_name || "—"}</div>
-                  {selectedFull.org_industry && (
-                    <div className="text-muted-foreground">{selectedFull.org_industry}</div>
-                  )}
-                  {selectedFull.org_employee_count && (
-                    <div className="text-muted-foreground">{selectedFull.org_employee_count} employees</div>
-                  )}
-                  {selectedFull.org_description && (
-                    <p className="mt-2 line-clamp-6 whitespace-pre-line text-muted-foreground">
-                      {selectedFull.org_description}
-                    </p>
-                  )}
-                </Section>
-                <Section title="Location">
-                  {[selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ") || "—"}
+                  {selectedFull.org_industry && <div className="text-muted-foreground">{selectedFull.org_industry}</div>}
+                  {selectedFull.org_employee_count && <div className="text-muted-foreground">{selectedFull.org_employee_count} employees</div>}
                 </Section>
                 <Section title="Contact">
                   <div className="space-y-1.5">
-                    {selectedFull.email && (
-                      <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />
-                    )}
-                    {selectedFull.phone && (
-                      <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />
-                    )}
-                    {selectedFull.linkedin_url && (
-                      <Row
-                        icon={<Linkedin className="h-3.5 w-3.5" />}
-                        value="LinkedIn profile"
-                        href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`}
-                      />
-                    )}
-                    {selectedFull.org_website_url && (
-                      <Row
-                        icon={<Globe className="h-3.5 w-3.5" />}
-                        value={selectedFull.org_website_url}
-                        href={selectedFull.org_website_url.startsWith("http") ? selectedFull.org_website_url : `https://${selectedFull.org_website_url}`}
-                      />
-                    )}
+                    {selectedFull.email && <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />}
+                    {selectedFull.phone && <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />}
+                    {selectedFull.linkedin_url && <Row icon={<Linkedin className="h-3.5 w-3.5" />} value="LinkedIn profile" href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`} />}
                   </div>
                 </Section>
               </div>
@@ -1278,6 +1259,10 @@ function PeoplePage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <AddToListDialog open={addOpen} onOpenChange={setAddOpen} leadIds={pickedIds} onAdded={() => setPicked(new Set())} />
+      <AddToListDialog mode="campaign" open={campaignOpen} onOpenChange={setCampaignOpen} leadIds={pickedIds} leadScores={campaignLeadScores} onAdded={() => setPicked(new Set())} />
+      <AddToListDialog mode="campaign" open={scoredCampaignOpen} onOpenChange={setScoredCampaignOpen} leadIds={scoredEligibleIds} leadScores={scoredEligibleScores} />
     </div>
   );
 }
