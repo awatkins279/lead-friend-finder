@@ -1114,11 +1114,19 @@ function PeoplePage() {
                           />
                         </TableCell>
                         <TableCell className="font-medium">
-                          {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
+                          <div className="flex items-center gap-3">
+                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                              {((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}
+                            </div>
+                            <span className="truncate">
+                              {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <ScoreBadge info={scores.get(r.id)} />
                         </TableCell>
+
                         <TableCell className="max-w-[260px] truncate text-sm">
                           {r.title || "—"}
                         </TableCell>
@@ -1669,22 +1677,24 @@ const verdictDot: Record<Signal["verdict"], string> = {
 function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
   if (!info) return <span className="text-xs text-muted-foreground">—</span>;
   const { score } = info;
-  const tone =
-    score >= 85
-      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-      : score >= 65
-        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30"
-        : "bg-muted text-muted-foreground border-border";
+  const pct = Math.max(0, Math.min(100, score));
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           type="button"
           onClick={(e) => e.stopPropagation()}
-          className={`inline-flex h-6 min-w-[2.5rem] cursor-pointer items-center justify-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors hover:opacity-90 ${tone}`}
+          className="group flex w-[140px] items-center gap-2 text-left"
         >
-          {score}
-          <ChevronDown className="h-3 w-3 opacity-60" />
+          <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
+            <div
+              className="h-full rounded-full bg-[var(--gradient-aurora)] shadow-[0_0_8px_oklch(0.78_0.16_210/0.4)] transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="font-mono-num w-7 text-right text-sm font-semibold text-foreground">
+            {score}
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -1697,6 +1707,7 @@ function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
     </Popover>
   );
 }
+
 
 function IppBreakdown({ info }: { info: ScoreInfo }) {
   const { score, reasoning, signals, strengths, gaps } = info;
