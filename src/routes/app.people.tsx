@@ -1166,8 +1166,16 @@ function PeoplePage() {
         {selectedFull ? (
           <div className="glass-panel-strong rounded-2xl p-5">
             <div className="mb-4 flex items-start gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                {((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}
+              <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                {selectedFull.profile_pic ? (
+                  <img
+                    src={selectedFull.profile_pic}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : null}
+                <span className="relative">{((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
