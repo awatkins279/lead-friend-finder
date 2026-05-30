@@ -43,6 +43,7 @@ import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot, Play, Pause, Minus, Plu
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
+import { LiveCopilotPanel } from "@/components/LiveCopilotPanel";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
