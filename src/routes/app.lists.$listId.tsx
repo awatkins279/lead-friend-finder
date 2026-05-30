@@ -1767,16 +1767,29 @@ function CallWorkstation({
             </div>
 
             {userId && (
-              <div className="space-y-3 border-b bg-muted/30 px-6 py-3">
-                <AiVoicemailStatusBadge userId={userId} />
-                <VoicemailRecorder
-                  listId={listId}
-                  userId={userId}
-                  currentPath={voicemailAudioPath}
-                  onChange={() => onVoicemailChanged()}
-                />
-              </div>
+              <details className="group border-b bg-muted/20">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-2.5 text-xs hover:bg-muted/30">
+                  <span className="flex items-center gap-2 font-medium text-muted-foreground">
+                    <Voicemail className="h-3.5 w-3.5" />
+                    Voicemail drop
+                    <span className="text-[10px] text-muted-foreground/70">
+                      {voicemailAudioPath ? "· prerecorded ready" : "· not configured"}
+                    </span>
+                  </span>
+                  <span className="text-[10px] text-muted-foreground transition group-open:rotate-180">▾</span>
+                </summary>
+                <div className="space-y-3 px-6 pb-4 pt-1">
+                  <AiVoicemailStatusBadge userId={userId} />
+                  <VoicemailRecorder
+                    listId={listId}
+                    userId={userId}
+                    currentPath={voicemailAudioPath}
+                    onChange={() => onVoicemailChanged()}
+                  />
+                </div>
+              </details>
             )}
+
 
 
             <div className="flex-1 overflow-y-auto">
