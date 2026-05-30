@@ -64,6 +64,7 @@ import {
   processNextBatch as processNextBatchFn,
   getJobSnapshot as getJobSnapshotFn,
   cancelScoringJob as cancelScoringJobFn,
+  finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
 import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 
@@ -223,6 +224,7 @@ function PeoplePage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
+  const [scoredCampaignOpen, setScoredCampaignOpen] = useState(false);
 
   const [selectMenuOpen, setSelectMenuOpen] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
@@ -248,6 +250,7 @@ function PeoplePage() {
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
   const cancelScoringJobCall = useServerFn(cancelScoringJobFn);
+  const finalizeScoringJobCall = useServerFn(finalizeScoringJobFn);
 
   useEffect(() => setPage(0), [filters]);
 
@@ -494,6 +497,12 @@ function PeoplePage() {
 
     await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
 
+    // Force-finalize: if any batches were left stuck, mark them failed and
+    // set the job's terminal status so the UI stops thinking it's still running.
+    try {
+      await finalizeScoringJobCall({ data: { jobId } });
+    } catch {}
+
     // Final snapshot to sync counters + status
     try {
       const snap = await getJobSnapshotCall({ data: { jobId } });
@@ -611,6 +620,20 @@ function PeoplePage() {
         return !!s && s.score >= minScore;
       }),
     [picked, scores, minScore],
+  );
+
+  // All scored leads that pass the current threshold (independent of selection).
+  // Used by the "Add qualified to campaign" shortcut under the scoring panel.
+  const scoredEligibleIds = useMemo(() => {
+    const out: string[] = [];
+    scores.forEach((s, id) => {
+      if (s.score >= Math.max(minScore, 1)) out.push(id);
+    });
+    return out;
+  }, [scores, minScore]);
+  const scoredEligibleScores = useMemo(
+    () => new Map(scoredEligibleIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
+    [scoredEligibleIds, scores],
   );
 
   const hasSelection = picked.size > 0;
@@ -913,6 +936,30 @@ function PeoplePage() {
                   {eligibleIds.length.toLocaleString()} of {picked.size.toLocaleString()} selected pass the threshold.
                 </p>
               )}
+
+              {scores.size > 0 && (
+                <div className="mt-3 rounded-md border bg-background p-2">
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="text-muted-foreground">Qualified prospects</span>
+                    <span className="font-semibold text-foreground">
+                      {scoredEligibleIds.length.toLocaleString()}
+                      <span className="text-muted-foreground"> / {scores.size.toLocaleString()} scored</span>
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Everyone scored {minScore > 0 ? `${minScore}+` : "1+"} so far — add them straight to a campaign.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-2 w-full"
+                    disabled={scoredEligibleIds.length === 0}
+                    onClick={() => setScoredCampaignOpen(true)}
+                  >
+                    <Send className="mr-1 h-3 w-3" />
+                    Add {scoredEligibleIds.length.toLocaleString()} to campaign
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </aside>
@@ -1123,6 +1170,13 @@ function PeoplePage() {
         leadIds={pickedIds}
         leadScores={campaignLeadScores}
         onAdded={() => setPicked(new Set())}
+      />
+      <AddToListDialog
+        mode="campaign"
+        open={scoredCampaignOpen}
+        onOpenChange={setScoredCampaignOpen}
+        leadIds={scoredEligibleIds}
+        leadScores={scoredEligibleScores}
       />
 
 

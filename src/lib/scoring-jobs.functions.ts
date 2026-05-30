@@ -222,6 +222,23 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
     return { job, results };
   });
 
+// ---------- finalizeScoringJob ----------
+
+const finalizeInput = z.object({ jobId: z.string().uuid() });
+
+export const finalizeScoringJob = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => finalizeInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: rows, error } = await supabase.rpc("finalize_scoring_job", {
+      p_job_id: data.jobId,
+    });
+    if (error) throw new Error(error.message);
+    const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    return { job: row };
+  });
+
 // ---------- listActiveJobs ----------
 
 export const listActiveJobs = createServerFn({ method: "POST" })
