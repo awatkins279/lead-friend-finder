@@ -101,6 +101,57 @@ export type Database = {
           },
         ]
       }
+      credit_costs: {
+        Row: {
+          action: string
+          cost_per_unit: number
+          description: string | null
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          cost_per_unit: number
+          description?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          cost_per_unit?: number
+          description?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      credit_ledger: {
+        Row: {
+          action: string
+          amount: number
+          created_at: string
+          id: string
+          note: string | null
+          period_start: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          amount: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          period_start: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          note?: string | null
+          period_start?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_accounts: {
         Row: {
           auth_method: string | null
@@ -419,6 +470,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      plans: {
+        Row: {
+          annual_price_cents: number
+          created_at: string
+          id: string
+          monthly_credits: number
+          name: string
+          quarterly_price_cents: number
+          sort_order: number
+        }
+        Insert: {
+          annual_price_cents: number
+          created_at?: string
+          id: string
+          monthly_credits: number
+          name: string
+          quarterly_price_cents: number
+          sort_order?: number
+        }
+        Update: {
+          annual_price_cents?: number
+          created_at?: string
+          id?: string
+          monthly_credits?: number
+          name?: string
+          quarterly_price_cents?: number
+          sort_order?: number
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -966,6 +1047,59 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          billing_cycle: string
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          next_billing_date: string | null
+          plan_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_cycle: string
+          created_at?: string
+          current_period_end: string
+          current_period_start?: string
+          id?: string
+          next_billing_date?: string | null
+          plan_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_cycle?: string
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          next_billing_date?: string | null
+          plan_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_phone_accounts: {
         Row: {
           created_at: string
@@ -1013,6 +1147,27 @@ export type Database = {
           twilio_auth_token?: string | null
           twilio_twiml_app_sid?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
         Relationships: []
@@ -1082,11 +1237,41 @@ export type Database = {
           total_leads: number
         }[]
       }
+      get_credit_summary: {
+        Args: { _user_id: string }
+        Returns: {
+          allowance: number
+          by_action: Json
+          is_admin: boolean
+          period_end: string
+          period_start: string
+          plan_id: string
+          plan_name: string
+          remaining: number
+          used: number
+        }[]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      spend_credits: {
+        Args: {
+          _action: string
+          _amount: number
+          _note?: string
+          _user_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1213,6 +1398,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "customer"],
+    },
   },
 } as const
