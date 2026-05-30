@@ -71,6 +71,14 @@ function AppShell() {
     .slice(0, 2)
     .toUpperCase();
 
+  // Derive company name from email domain (e.g. "user@ttmusa.net" → "TTMUSA")
+  const companyName = (() => {
+    const domain = email?.split("@")[1];
+    if (!domain) return "My Company";
+    const core = domain.split(".")[0];
+    return core.toUpperCase();
+  })();
+
   return (
     <div className="dashboard-font flex min-h-screen w-full gap-4 p-4">
       {/* Sidebar */}
