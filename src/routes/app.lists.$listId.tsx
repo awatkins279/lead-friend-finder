@@ -2041,128 +2041,138 @@ function FocusCallView({
       </div>
 
       {/* Top bar */}
-      <header className="relative z-10 flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-white/[0.03] px-6 py-3 backdrop-blur-xl">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[oklch(0.70_0.18_290)] to-[oklch(0.78_0.16_210)] text-sm font-bold text-white shadow-[0_0_24px_-4px_oklch(0.70_0.18_290/0.8)]">
-            {leadName.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "—"}
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate bg-gradient-to-r from-white to-[oklch(0.85_0.08_260)] bg-clip-text text-2xl font-bold tracking-tight text-transparent">
-              {leadName}
-            </h1>
-            <div className="mt-0.5 flex items-center gap-3 truncate text-xs text-muted-foreground">
-              {leadSub && <span className="truncate">{leadSub}</span>}
-              {phone && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono tracking-wider text-[oklch(0.85_0.10_210)]">
-                  <Phone className="h-3 w-3" /> {phone}
-                </span>
-              )}
-            </div>
+      <header className="relative z-10 flex shrink-0 items-start justify-between gap-4 px-7 pt-6 pb-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h1 className="truncate text-[2.75rem] font-extrabold leading-none tracking-tight text-white">
+            {leadName}
+          </h1>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            {leadSub && <span className="truncate">{leadSub}</span>}
+            {phone && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 font-mono text-xs tracking-wider text-[oklch(0.88_0.10_210)]">
+                <Phone className="h-3 w-3" /> {phone}
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {callStatus !== "idle" && (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 shadow-[0_0_24px_-6px_oklch(0.78_0.18_150/0.7)] backdrop-blur">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-80" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_oklch(0.78_0.18_150)]" />
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300">{statusLabel}</span>
-              {callStatus === "in_progress" && (
-                <span className="font-mono text-base font-semibold tabular-nums text-emerald-100">
-                  <CallTimer startedAt={callStart} />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {/* Top row: status + quick actions + AI Voicemail */}
+          <div className="flex items-center gap-2">
+            {callStatus !== "idle" ? (
+              <div className="flex items-center gap-3 pr-1">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-80" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_12px_oklch(0.78_0.18_150)]" />
                 </span>
+                <span className="font-mono text-2xl font-semibold tabular-nums text-white">
+                  {callStatus === "in_progress" ? <CallTimer startedAt={callStart} /> : statusLabel}
+                </span>
+              </div>
+            ) : (
+              <span className="pr-1 font-mono text-2xl font-semibold tabular-nums text-muted-foreground/60">00:00</span>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onDropVoicemail}
+              disabled={!canDropVoicemail}
+              className="h-10 w-10 rounded-xl border border-white/10 bg-white/[0.04] p-0 text-foreground hover:bg-white/[0.08]"
+              title={canDropVoicemail ? "Drop prerecorded voicemail" : "Record a voicemail first"}
+            >
+              {voicemailDropping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Voicemail className="h-4 w-4" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onToggleMute}
+              disabled={!canMute}
+              className="h-10 w-10 rounded-xl border border-white/10 bg-white/[0.04] p-0 text-foreground hover:bg-white/[0.08]"
+              title={muted ? "Unmute" : "Mute"}
+            >
+              {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+            <Button
+              size="sm"
+              onClick={onDropAiVoicemail}
+              disabled={!canDropAiVoicemail}
+              className="h-10 rounded-xl border-0 bg-gradient-to-r from-[oklch(0.50_0.22_295)] to-[oklch(0.58_0.20_275)] px-4 text-white shadow-[0_0_22px_-6px_oklch(0.70_0.18_290/0.9)] hover:opacity-95"
+            >
+              {aiVmDropping ? (
+                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Sending…</>
+              ) : (
+                <><Sparkles className="mr-1.5 h-4 w-4" /> AI Voicemail</>
               )}
-              <Button size="sm" variant="ghost" className="h-8 px-2 text-emerald-100 hover:bg-emerald-400/10 hover:text-white" onClick={onToggleMute} disabled={!canMute}>
-                {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-              </Button>
-              <Button
-                size="sm"
-                onClick={onHangUp}
-                className="h-8 border-0 bg-gradient-to-br from-rose-500 to-red-600 px-3 text-white shadow-[0_0_18px_-4px_oklch(0.66_0.22_18/0.9)] hover:from-rose-400 hover:to-red-500"
-              >
-                <PhoneOff className="mr-1 h-4 w-4" /> Hang up
-              </Button>
-            </div>
-          )}
+            </Button>
+          </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onDropVoicemail}
-            disabled={!canDropVoicemail}
-            className="h-9 border-white/15 bg-white/[0.04] text-foreground backdrop-blur hover:bg-white/[0.08]"
-            title={canDropVoicemail ? "Play prerecorded voicemail, hang up, advance" : "Record a voicemail for this campaign first"}
-          >
-            {voicemailDropping ? (
-              <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Dropping…</>
-            ) : (
-              <>📩 Drop VM</>
-            )}
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={onDropAiVoicemail}
-            disabled={!canDropAiVoicemail}
-            className="h-9 border-0 bg-gradient-to-r from-[oklch(0.70_0.18_290)] to-[oklch(0.78_0.16_210)] text-white shadow-[0_0_22px_-4px_oklch(0.70_0.18_290/0.9)] hover:opacity-95"
-            title={canDropAiVoicemail ? "Drop AI voicemail in your cloned voice, hang up, advance" : "Available during an active call"}
-          >
-            {aiVmDropping ? (
-              <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Sending…</>
-            ) : (
-              <><Sparkles className="mr-1.5 h-4 w-4" /> AI Voicemail</>
-            )}
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={onNext}
-            disabled={!hasNext}
-            className="h-9 border border-[oklch(0.78_0.16_210/0.5)] bg-[oklch(0.78_0.16_210/0.12)] text-[oklch(0.92_0.08_210)] hover:bg-[oklch(0.78_0.16_210/0.22)]"
-          >
-            Next call →
-          </Button>
-          <Button size="sm" variant="ghost" onClick={onExit} className="h-9 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground">
-            <X className="mr-1.5 h-4 w-4" /> Exit
-          </Button>
+          {/* Bottom row: Hang up + Next call + Exit */}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={onHangUp}
+              disabled={callStatus === "idle"}
+              className="h-10 rounded-xl border-0 bg-gradient-to-r from-[oklch(0.62_0.22_28)] to-[oklch(0.66_0.22_18)] px-5 text-white shadow-[0_0_22px_-6px_oklch(0.66_0.22_18/0.9)] hover:opacity-95 disabled:opacity-40"
+            >
+              <PhoneOff className="mr-1.5 h-4 w-4" /> Hang up
+            </Button>
+            <Button
+              size="sm"
+              onClick={onNext}
+              disabled={!hasNext}
+              className="h-10 rounded-xl border border-[oklch(0.55_0.22_290/0.6)] bg-[oklch(0.55_0.22_290/0.12)] px-5 text-[oklch(0.90_0.10_290)] hover:bg-[oklch(0.55_0.22_290/0.22)]"
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" /> Next call
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onExit} className="h-10 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground">
+              <X className="mr-1 h-4 w-4" /> Exit
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Body */}
-      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
+      <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 px-6 pb-6">
         {/* Script panel — teleprompter */}
         <section className="col-span-7 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
           <Teleprompter script={script} />
         </section>
 
-
-
         {/* Objections panel */}
         <section className="col-span-5 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-          <div className="relative flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210)] to-transparent opacity-80" />
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[oklch(0.78_0.16_210)] shadow-[0_0_10px_oklch(0.78_0.16_210)]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.88_0.10_210)]">Objection answers</span>
+          <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
+            <div className="rounded-xl bg-gradient-to-r from-[oklch(0.55_0.18_200)] to-[oklch(0.62_0.15_185)] px-4 py-2 shadow-[0_0_24px_-6px_oklch(0.78_0.16_210/0.8)]">
+              <span className="text-xs font-bold uppercase tracking-[0.25em] text-white">Objection answers</span>
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">// cheatsheet</span>
           </div>
-          <div className="flex-1 space-y-2.5 overflow-y-auto p-4">
+          <div className="flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
             {script.objection_map.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No objections configured.</p>
+              <p className="px-2 text-sm text-muted-foreground">No objections configured.</p>
             ) : (
-              script.objection_map.map((o, i) => (
-                <div
-                  key={i}
-                  className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:border-[oklch(0.78_0.16_210/0.5)] hover:bg-white/[0.06]"
-                >
-                  <span className="absolute left-0 top-0 h-full w-[2px] bg-gradient-to-b from-[oklch(0.78_0.16_210)] to-transparent opacity-70" />
-                  <div className="text-sm font-semibold text-foreground">{o.objection}</div>
-                  <div className="mt-1 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
-                </div>
-              ))
+              script.objection_map.map((o, i) => {
+                const palette = [
+                  "from-[oklch(0.62_0.18_265)] to-[oklch(0.70_0.16_280)]",
+                  "from-[oklch(0.65_0.18_300)] to-[oklch(0.72_0.16_320)]",
+                  "from-[oklch(0.68_0.18_340)] to-[oklch(0.72_0.17_355)]",
+                  "from-[oklch(0.72_0.16_60)] to-[oklch(0.75_0.16_85)]",
+                  "from-[oklch(0.62_0.16_200)] to-[oklch(0.68_0.15_220)]",
+                ];
+                const grad = palette[i % palette.length];
+                return (
+                  <div
+                    key={i}
+                    className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:border-[oklch(0.78_0.16_210/0.5)] hover:bg-white/[0.06]"
+                  >
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${grad} shadow-[0_0_14px_-4px_oklch(0.70_0.18_290/0.7)]`}>
+                      <MessageSquare className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-foreground">{o.objection}</div>
+                      <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{o.response}</div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </section>
