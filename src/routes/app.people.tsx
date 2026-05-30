@@ -95,6 +95,7 @@ type Lead = {
   country: string | null;
   phone: string | null;
   org_name: string | null;
+  profile_pic: string | null;
   // Heavy/detail-only fields — only present after lazy-loading in the side sheet
   org_description?: string | null;
   org_website_url?: string | null;
@@ -104,7 +105,7 @@ type Lead = {
 
 // Columns rendered in the table (fast path)
 const LIST_COLS =
-  "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name";
+  "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,profile_pic";
 // Extra columns only needed in the detail sheet
 const DETAIL_COLS =
   "org_description,org_website_url,org_industry,org_employee_count";
@@ -392,7 +393,7 @@ function PeoplePage() {
       }
       const all: Lead[] = [];
       const cols =
-        "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,org_description,org_website_url,org_industry,org_employee_count";
+        "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,profile_pic,org_description,org_website_url,org_industry,org_employee_count";
       for (let i = 0; i < ids.length; i += 1000) {
         const slice = ids.slice(i, i + 1000);
         const { data, error } = await supabase.from("leads").select(cols).in("id", slice);
@@ -1007,8 +1008,17 @@ function PeoplePage() {
                       </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                            {((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}
+                          <div className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                            {r.profile_pic ? (
+                              <img
+                                src={r.profile_pic}
+                                alt=""
+                                loading="lazy"
+                                className="absolute inset-0 h-full w-full object-cover"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                              />
+                            ) : null}
+                            <span className="relative">{((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="truncate">{[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}</span>
@@ -1156,8 +1166,16 @@ function PeoplePage() {
         {selectedFull ? (
           <div className="glass-panel-strong rounded-2xl p-5">
             <div className="mb-4 flex items-start gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                {((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}
+              <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                {selectedFull.profile_pic ? (
+                  <img
+                    src={selectedFull.profile_pic}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : null}
+                <span className="relative">{((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
