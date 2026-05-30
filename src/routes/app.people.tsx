@@ -1171,6 +1171,13 @@ function PeoplePage() {
         leadScores={campaignLeadScores}
         onAdded={() => setPicked(new Set())}
       />
+      <AddToListDialog
+        mode="campaign"
+        open={scoredCampaignOpen}
+        onOpenChange={setScoredCampaignOpen}
+        leadIds={scoredEligibleIds}
+        leadScores={scoredEligibleScores}
+      />
 
 
 
