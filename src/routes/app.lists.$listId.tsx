@@ -2132,46 +2132,12 @@ function FocusCallView({
 
       {/* Body */}
       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 p-4">
-        {/* Script panel */}
+        {/* Script panel — teleprompter */}
         <section className="col-span-7 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-          <div className="relative flex items-center justify-between border-b border-white/10 px-5 py-3">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[oklch(0.70_0.18_290)] to-transparent opacity-80" />
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[oklch(0.70_0.18_290)] shadow-[0_0_10px_oklch(0.70_0.18_290)]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-[oklch(0.85_0.10_290)]">Script</span>
-            </div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">// live</span>
-          </div>
-
-          <div className="flex-1 space-y-5 overflow-y-auto p-5">
-            <FuturisticBlock label="Opener" highlight>
-              <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.opener}</p>
-            </FuturisticBlock>
-
-            {script.talk_track?.map((s, i) => (
-              <FuturisticBlock key={i} label={s.heading}>
-                <p className="whitespace-pre-wrap text-base leading-relaxed">{s.body}</p>
-              </FuturisticBlock>
-            ))}
-
-            {script.problem_questions?.length > 0 && (
-              <FocusQList title="Problem questions" items={script.problem_questions} />
-            )}
-            {script.consequence_questions?.length > 0 && (
-              <FocusQList title="Consequence questions" items={script.consequence_questions} />
-            )}
-            {script.solution_questions?.length > 0 && (
-              <FocusQList title="Solution questions" items={script.solution_questions} />
-            )}
-            {script.qualifying_questions?.length > 0 && (
-              <FocusQList title="Qualifying questions" items={script.qualifying_questions} />
-            )}
-
-            <FuturisticBlock label="Close" highlight>
-              <p className="whitespace-pre-wrap text-lg leading-relaxed">{script.close}</p>
-            </FuturisticBlock>
-          </div>
+          <Teleprompter script={script} />
         </section>
+
+
 
         {/* Objections panel */}
         <section className="col-span-5 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
