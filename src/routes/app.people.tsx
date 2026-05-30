@@ -1019,17 +1019,18 @@ function PeoplePage() {
                       </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <div className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                            {r.profile_pic ? (
-                              <img
-                                src={r.profile_pic}
-                                alt=""
-                                loading="lazy"
-                                className="absolute inset-0 h-full w-full object-cover"
-                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                              />
-                            ) : null}
-                            <span className="relative">{((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
+                          <div className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-white/5 shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.4)] ring-1 ring-white/10">
+                            <img
+                              src={r.profile_pic || avatarUrl(r.first_name, r.last_name, r.id)}
+                              alt=""
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                const fallback = avatarUrl(r.first_name, r.last_name, r.id);
+                                if (img.src !== fallback) img.src = fallback;
+                              }}
+                            />
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="truncate">{[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}</span>
