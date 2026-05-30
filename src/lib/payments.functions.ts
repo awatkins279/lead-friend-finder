@@ -71,10 +71,10 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         ui_mode: "embedded_page",
         return_url: data.returnUrl,
         customer: customerId,
-        managed_payments: { enabled: true } as any,
         metadata: { userId, managed_payments: "true" },
         subscription_data: { metadata: { userId } },
-      });
+        managed_payments: { enabled: true },
+      } as any);
 
       return { clientSecret: session.client_secret ?? "" };
     } catch (error) {
