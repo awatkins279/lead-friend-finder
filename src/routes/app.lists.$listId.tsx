@@ -106,7 +106,7 @@ function effectiveEmails(r: Row): EmailInSequence[] {
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null };
+type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null };
 
 function ListDetailPage() {
   const { listId } = Route.useParams();
@@ -135,7 +135,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled",
         )
         .eq("id", listId)
         .maybeSingle();
@@ -506,6 +506,7 @@ function ListDetailPage() {
             onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
             voicemailAudioPath={list?.voicemail_audio_url ?? null}
             onVoicemailChanged={() => refetchList()}
+            aiCopilotEnabled={!!list?.ai_copilot_enabled}
           />
 
         </TabsContent>
@@ -1131,6 +1132,7 @@ function CallWorkstation({
   onChanged,
   voicemailAudioPath,
   onVoicemailChanged,
+  aiCopilotEnabled,
 }: {
   listId: string;
   rows: Row[];
@@ -1140,6 +1142,7 @@ function CallWorkstation({
   onChanged: () => void;
   voicemailAudioPath: string | null;
   onVoicemailChanged: () => void;
+  aiCopilotEnabled: boolean;
 }) {
 
   const genScriptFn = useServerFn(generateCallScript);
@@ -1871,6 +1874,32 @@ function CallWorkstation({
     </div>
     {focusMode && active && activeScript ? (
       <FocusCallView
+        listId={listId}
+        leadId={active.lead_id}
+        callId={callId}
+        aiCopilotEnabled={aiCopilotEnabled}
+        getRemoteStream={() => {
+          try {
+            const rcPc: RTCPeerConnection | undefined =
+              (window as any).__rcWebPhone?.userAgent?.sessionManager?.sessions?.values?.()?.next?.()?.value
+                ?.sessionDescriptionHandler?.peerConnection;
+            if (rcPc) {
+              const tracks = rcPc.getReceivers().map((r) => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
+              if (tracks.length) return new MediaStream(tracks);
+            }
+          } catch {}
+          try {
+            const twPc: RTCPeerConnection | undefined =
+              connection?._mediaHandler?.version?.pc ??
+              connection?.mediaStream?.version?.pc ??
+              connection?._mediaHandler?.pc;
+            if (twPc) {
+              const tracks = twPc.getReceivers().map((r) => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
+              if (tracks.length) return new MediaStream(tracks);
+            }
+          } catch {}
+          return null;
+        }}
         leadName={`${active.lead?.first_name ?? ""} ${active.lead?.last_name ?? ""}`.trim() || "Lead"}
         leadSub={`${active.lead?.title ?? ""}${active.lead?.title && active.lead?.org_name ? " · " : ""}${active.lead?.org_name ?? ""}`}
         phone={active.lead?.phone ?? null}
@@ -1904,6 +1933,11 @@ function CallWorkstation({
 }
 
 function FocusCallView({
+  listId,
+  leadId,
+  callId,
+  aiCopilotEnabled,
+  getRemoteStream,
   leadName,
   leadSub,
   phone,
@@ -1928,6 +1962,11 @@ function FocusCallView({
   outcomeBusy,
   onLogOutcome,
 }: {
+  listId: string;
+  leadId: string;
+  callId: string | null;
+  aiCopilotEnabled: boolean;
+  getRemoteStream: () => MediaStream | null;
   leadName: string;
   leadSub: string;
   phone: string | null;
@@ -2088,41 +2127,54 @@ function FocusCallView({
 
         {/* Objections panel */}
         <section className="col-span-5 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-          <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
-            <div className="rounded-xl bg-gradient-to-r from-[oklch(0.55_0.18_200)] to-[oklch(0.62_0.15_185)] px-4 py-2 shadow-[0_0_24px_-6px_oklch(0.78_0.16_210/0.8)]">
-              <span className="text-xs font-bold uppercase tracking-[0.25em] text-white">Objection answers</span>
-            </div>
-          </div>
-          <div className="flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
-            {script.objection_map.length === 0 ? (
-              <p className="px-2 text-sm text-muted-foreground">No objections configured.</p>
-            ) : (
-              script.objection_map.map((o, i) => {
-                const palette = [
-                  "from-[oklch(0.62_0.18_265)] to-[oklch(0.70_0.16_280)]",
-                  "from-[oklch(0.65_0.18_300)] to-[oklch(0.72_0.16_320)]",
-                  "from-[oklch(0.68_0.18_340)] to-[oklch(0.72_0.17_355)]",
-                  "from-[oklch(0.72_0.16_60)] to-[oklch(0.75_0.16_85)]",
-                  "from-[oklch(0.62_0.16_200)] to-[oklch(0.68_0.15_220)]",
-                ];
-                const grad = palette[i % palette.length];
-                return (
-                  <div
-                    key={i}
-                    className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:border-[oklch(0.78_0.16_210/0.5)] hover:bg-white/[0.06]"
-                  >
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${grad} shadow-[0_0_14px_-4px_oklch(0.70_0.18_290/0.7)]`}>
-                      <MessageSquare className="h-4 w-4 text-white" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-foreground">{o.objection}</div>
-                      <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{o.response}</div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {aiCopilotEnabled ? (
+            <LiveCopilotPanel
+              listId={listId}
+              leadId={leadId}
+              callId={callId}
+              enabled={aiCopilotEnabled}
+              script={script}
+              getRemoteStream={getRemoteStream}
+            />
+          ) : (
+            <>
+              <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
+                <div className="rounded-xl bg-gradient-to-r from-[oklch(0.55_0.18_200)] to-[oklch(0.62_0.15_185)] px-4 py-2 shadow-[0_0_24px_-6px_oklch(0.78_0.16_210/0.8)]">
+                  <span className="text-xs font-bold uppercase tracking-[0.25em] text-white">Objection answers</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
+                {script.objection_map.length === 0 ? (
+                  <p className="px-2 text-sm text-muted-foreground">No objections configured.</p>
+                ) : (
+                  script.objection_map.map((o, i) => {
+                    const palette = [
+                      "from-[oklch(0.62_0.18_265)] to-[oklch(0.70_0.16_280)]",
+                      "from-[oklch(0.65_0.18_300)] to-[oklch(0.72_0.16_320)]",
+                      "from-[oklch(0.68_0.18_340)] to-[oklch(0.72_0.17_355)]",
+                      "from-[oklch(0.72_0.16_60)] to-[oklch(0.75_0.16_85)]",
+                      "from-[oklch(0.62_0.16_200)] to-[oklch(0.68_0.15_220)]",
+                    ];
+                    const grad = palette[i % palette.length];
+                    return (
+                      <div
+                        key={i}
+                        className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:border-[oklch(0.78_0.16_210/0.5)] hover:bg-white/[0.06]"
+                      >
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${grad} shadow-[0_0_14px_-4px_oklch(0.70_0.18_290/0.7)]`}>
+                          <MessageSquare className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold text-foreground">{o.objection}</div>
+                          <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{o.response}</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
         </section>
       </div>
     </div>
