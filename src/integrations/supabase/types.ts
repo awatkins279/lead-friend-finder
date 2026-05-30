@@ -1071,6 +1071,17 @@ export type Database = {
           lead_ids: string[]
         }[]
       }
+      finalize_scoring_job: {
+        Args: { p_job_id: string }
+        Returns: {
+          completed_batches: number
+          failed_batches: number
+          scored_leads: number
+          status: string
+          total_batches: number
+          total_leads: number
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
