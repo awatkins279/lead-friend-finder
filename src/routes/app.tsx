@@ -13,6 +13,7 @@ import {
   Voicemail,
   Sparkles,
   ChevronDown,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { CreditWidget } from "@/components/CreditWidget";
+import { useServerFn } from "@tanstack/react-start";
+import { checkIsAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/app")({
   component: AppShell,
@@ -33,6 +36,8 @@ function AppShell() {
   const loc = useLocation();
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const fetchIsAdmin = useServerFn(checkIsAdmin);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -44,10 +49,13 @@ function AppShell() {
       else {
         setEmail(data.session.user.email ?? null);
         setReady(true);
+        fetchIsAdmin()
+          .then((r) => setIsAdmin(r.isAdmin))
+          .catch(() => setIsAdmin(false));
       }
     });
     return () => sub.subscription.unsubscribe();
-  }, [nav]);
+  }, [nav, fetchIsAdmin]);
 
   if (!ready) {
     return (
@@ -66,6 +74,7 @@ function AppShell() {
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
     { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
     { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
+    ...(isAdmin ? [{ to: "/app/admin", icon: Shield, label: "Admin" }] : []),
   ];
 
   const initials = (email ?? "U")
