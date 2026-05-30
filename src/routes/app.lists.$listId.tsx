@@ -421,17 +421,19 @@ function ListDetailPage() {
             </Button>
           </div>
         </div>
-
-        <CampaignStatStrip listId={listId} totalProspects={(rows ?? []).length} enrichedCount={enrichedCount} />
       </header>
 
       <SdrAssignBar listId={listId} currentAgentId={list?.sdr_agent_id ?? null} onChanged={() => refetchList()} />
 
-
-
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "overview" | "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
         <div className="border-b bg-background px-8">
           <TabsList className="h-11 bg-transparent p-0">
+            <TabsTrigger
+              value="overview"
+              className="rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <Sparkles className="mr-2 h-4 w-4" /> Overview
+            </TabsTrigger>
             <TabsTrigger
               value="email"
               className="rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
@@ -446,6 +448,11 @@ function ListDetailPage() {
             </TabsTrigger>
           </TabsList>
         </div>
+
+        <TabsContent value="overview" className="m-0 flex-1 overflow-y-auto p-8">
+          <CampaignStatStrip listId={listId} totalProspects={(rows ?? []).length} enrichedCount={enrichedCount} />
+        </TabsContent>
+
 
         <TabsContent value="email" className="m-0 flex-1 overflow-y-auto p-8">
           {!isConfigured && list && (
