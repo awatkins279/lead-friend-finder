@@ -393,7 +393,7 @@ function PeoplePage() {
       }
       const all: Lead[] = [];
       const cols =
-        "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,org_description,org_website_url,org_industry,org_employee_count";
+        "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,profile_pic,org_description,org_website_url,org_industry,org_employee_count";
       for (let i = 0; i < ids.length; i += 1000) {
         const slice = ids.slice(i, i + 1000);
         const { data, error } = await supabase.from("leads").select(cols).in("id", slice);
