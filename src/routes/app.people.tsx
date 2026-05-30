@@ -1178,16 +1178,17 @@ function PeoplePage() {
         {selectedFull ? (
           <div className="glass-panel-strong rounded-2xl p-5">
             <div className="mb-4 flex items-start gap-3">
-              <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                {selectedFull.profile_pic ? (
-                  <img
-                    src={selectedFull.profile_pic}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : null}
-                <span className="relative">{((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
+              <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-white/5 shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)] ring-1 ring-white/10">
+                <img
+                  src={selectedFull.profile_pic || avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id)}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement;
+                    const fallback = avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id);
+                    if (img.src !== fallback) img.src = fallback;
+                  }}
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
