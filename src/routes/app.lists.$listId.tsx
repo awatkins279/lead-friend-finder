@@ -506,6 +506,7 @@ function ListDetailPage() {
             onChanged={() => qc.invalidateQueries({ queryKey: ["list-leads", listId] })}
             voicemailAudioPath={list?.voicemail_audio_url ?? null}
             onVoicemailChanged={() => refetchList()}
+            aiCopilotEnabled={!!list?.ai_copilot_enabled}
           />
 
         </TabsContent>
