@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeUser } from "@/lib/credits.functions";
 
 const inputSchema = z.object({
   leadIds: z.array(z.string().min(1)).min(1).max(25),
@@ -26,7 +27,10 @@ export const scoreLeads = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }): Promise<{ scores: ScoreRow[] }> => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+
+    // Each scored lead = 1 generate_email credit unit
+    await chargeUser(userId, "generate_email", data.leadIds.length, `score:${data.leadIds.length}`);
 
     const { data: leads, error } = await supabase
       .from("leads")

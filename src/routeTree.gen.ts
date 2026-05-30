@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AppVoicemailAgentRouteImport } from './routes/app.voicemail-agent'
 import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
@@ -25,6 +27,7 @@ import { Route as ApiRingcentralOauthCallbackRouteImport } from './routes/api/ri
 import { Route as ApiPublicTwilioVoiceRouteImport } from './routes/api/public/twilio.voice'
 import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/twilio.status'
 import { Route as ApiPublicTwilioRecordingRouteImport } from './routes/api/public/twilio.recording'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
 
 const PricingRoute = PricingRouteImport.update({
@@ -37,6 +40,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -46,6 +54,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/return',
+  path: '/return',
+  getParentRoute: () => CheckoutRoute,
 } as any)
 const AppVoicemailAgentRoute = AppVoicemailAgentRouteImport.update({
   id: '/voicemail-agent',
@@ -109,6 +122,12 @@ const ApiPublicTwilioRecordingRoute =
     path: '/api/public/twilio/recording',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInboxIngestRoute = ApiPublicInboxIngestRouteImport.update({
   id: '/api/public/inbox/ingest',
   path: '/api/public/inbox/ingest',
@@ -118,6 +137,7 @@ const ApiPublicInboxIngestRoute = ApiPublicInboxIngestRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/checkout': typeof CheckoutRouteWithChildren
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
@@ -126,9 +146,11 @@ export interface FileRoutesByFullPath {
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
   '/api/public/twilio/voice': typeof ApiPublicTwilioVoiceRoute
@@ -137,6 +159,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/checkout': typeof CheckoutRouteWithChildren
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
@@ -145,9 +168,11 @@ export interface FileRoutesByTo {
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
   '/api/public/twilio/voice': typeof ApiPublicTwilioVoiceRoute
@@ -157,6 +182,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/checkout': typeof CheckoutRouteWithChildren
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
@@ -165,9 +191,11 @@ export interface FileRoutesById {
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
   '/api/public/twilio/voice': typeof ApiPublicTwilioVoiceRoute
@@ -178,6 +206,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/checkout'
     | '/login'
     | '/pricing'
     | '/app/accounts'
@@ -186,9 +215,11 @@ export interface FileRouteTypes {
     | '/app/saved'
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
+    | '/checkout/return'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/inbox/ingest'
+    | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
     | '/api/public/twilio/voice'
@@ -197,6 +228,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/checkout'
     | '/login'
     | '/pricing'
     | '/app/accounts'
@@ -205,9 +237,11 @@ export interface FileRouteTypes {
     | '/app/saved'
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
+    | '/checkout/return'
     | '/app/lists/$listId'
     | '/app/lists'
     | '/api/public/inbox/ingest'
+    | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
     | '/api/public/twilio/voice'
@@ -216,6 +250,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/checkout'
     | '/login'
     | '/pricing'
     | '/app/accounts'
@@ -224,9 +259,11 @@ export interface FileRouteTypes {
     | '/app/saved'
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
+    | '/checkout/return'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/inbox/ingest'
+    | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
     | '/api/public/twilio/voice'
@@ -236,9 +273,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  CheckoutRoute: typeof CheckoutRouteWithChildren
   LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicTwilioRecordingRoute: typeof ApiPublicTwilioRecordingRoute
   ApiPublicTwilioStatusRoute: typeof ApiPublicTwilioStatusRoute
   ApiPublicTwilioVoiceRoute: typeof ApiPublicTwilioVoiceRoute
@@ -261,6 +300,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app': {
       id: '/app'
       path: '/app'
@@ -274,6 +320,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
+      parentRoute: typeof CheckoutRoute
     }
     '/app/voicemail-agent': {
       id: '/app/voicemail-agent'
@@ -359,6 +412,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTwilioRecordingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/inbox/ingest': {
       id: '/api/public/inbox/ingest'
       path: '/api/public/inbox/ingest'
@@ -393,12 +453,26 @@ const AppRouteChildren: AppRouteChildren = {
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
+interface CheckoutRouteChildren {
+  CheckoutReturnRoute: typeof CheckoutReturnRoute
+}
+
+const CheckoutRouteChildren: CheckoutRouteChildren = {
+  CheckoutReturnRoute: CheckoutReturnRoute,
+}
+
+const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
+  CheckoutRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  CheckoutRoute: CheckoutRouteWithChildren,
   LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicTwilioRecordingRoute: ApiPublicTwilioRecordingRoute,
   ApiPublicTwilioStatusRoute: ApiPublicTwilioStatusRoute,
   ApiPublicTwilioVoiceRoute: ApiPublicTwilioVoiceRoute,

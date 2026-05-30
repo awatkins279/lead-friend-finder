@@ -162,8 +162,11 @@ function PricingPage() {
                 </ul>
 
                 <Button asChild className="w-full" variant={featured ? "default" : "outline"}>
-                  <Link to="/login" search={{ plan: plan.id, cycle } as any}>
-                    Get started
+                  <Link
+                    to="/checkout"
+                    search={{ priceId: `${plan.id}_annual` } as any}
+                  >
+                    {isAnnual ? "Get started" : "Talk to sales"}
                   </Link>
                 </Button>
               </div>
@@ -172,7 +175,7 @@ function PricingPage() {
         </div>
 
         <p className="mt-10 text-center text-xs text-muted-foreground">
-          Checkout & automated billing coming soon. Reach out to claim launch pricing.
+          Quarterly billing coming soon — contact us if you need it now.
         </p>
       </main>
     </div>
