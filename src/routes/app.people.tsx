@@ -936,6 +936,30 @@ function PeoplePage() {
                   {eligibleIds.length.toLocaleString()} of {picked.size.toLocaleString()} selected pass the threshold.
                 </p>
               )}
+
+              {scores.size > 0 && (
+                <div className="mt-3 rounded-md border bg-background p-2">
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="text-muted-foreground">Qualified prospects</span>
+                    <span className="font-semibold text-foreground">
+                      {scoredEligibleIds.length.toLocaleString()}
+                      <span className="text-muted-foreground"> / {scores.size.toLocaleString()} scored</span>
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Everyone scored {minScore > 0 ? `${minScore}+` : "1+"} so far — add them straight to a campaign.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="mt-2 w-full"
+                    disabled={scoredEligibleIds.length === 0}
+                    onClick={() => setScoredCampaignOpen(true)}
+                  >
+                    <Send className="mr-1 h-3 w-3" />
+                    Add {scoredEligibleIds.length.toLocaleString()} to campaign
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </aside>
