@@ -103,6 +103,17 @@ type Lead = {
   org_employee_count?: string | null;
 };
 
+// Deterministic, colorful initials avatar (DiceBear "initials" — free, no API key).
+// Seeded by first+last name so the same person always gets the same color.
+function avatarUrl(first: string | null, last: string | null, id: string): string {
+  const seed = encodeURIComponent(
+    `${(first ?? "").trim()} ${(last ?? "").trim()}`.trim() || id,
+  );
+  // Palette tuned to the app's aurora/indigo/teal/pink theme
+  const bg = "6366f1,8b5cf6,ec4899,06b6d4,14b8a6,f59e0b,ef4444,3b82f6,a855f7,10b981";
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${seed}&backgroundColor=${bg}&fontFamily=Inter&fontWeight=600&radius=50`;
+}
+
 // Columns rendered in the table (fast path)
 const LIST_COLS =
   "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,profile_pic";
@@ -1008,17 +1019,18 @@ function PeoplePage() {
                       </TableCell>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <div className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                            {r.profile_pic ? (
-                              <img
-                                src={r.profile_pic}
-                                alt=""
-                                loading="lazy"
-                                className="absolute inset-0 h-full w-full object-cover"
-                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                              />
-                            ) : null}
-                            <span className="relative">{((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
+                          <div className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-white/5 shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.4)] ring-1 ring-white/10">
+                            <img
+                              src={r.profile_pic || avatarUrl(r.first_name, r.last_name, r.id)}
+                              alt=""
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                const fallback = avatarUrl(r.first_name, r.last_name, r.id);
+                                if (img.src !== fallback) img.src = fallback;
+                              }}
+                            />
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="truncate">{[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}</span>
@@ -1166,16 +1178,17 @@ function PeoplePage() {
         {selectedFull ? (
           <div className="glass-panel-strong rounded-2xl p-5">
             <div className="mb-4 flex items-start gap-3">
-              <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--gradient-aurora)] text-sm font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
-                {selectedFull.profile_pic ? (
-                  <img
-                    src={selectedFull.profile_pic}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : null}
-                <span className="relative">{((selectedFull.first_name?.[0] ?? "") + (selectedFull.last_name?.[0] ?? "")).toUpperCase() || "·"}</span>
+              <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-white/5 shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)] ring-1 ring-white/10">
+                <img
+                  src={selectedFull.profile_pic || avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id)}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement;
+                    const fallback = avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id);
+                    if (img.src !== fallback) img.src = fallback;
+                  }}
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
