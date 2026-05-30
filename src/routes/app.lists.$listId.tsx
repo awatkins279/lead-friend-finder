@@ -2508,3 +2508,555 @@ function AiVoicemailStatusBadge({ userId: _userId }: { userId: string }) {
     </div>
   );
 }
+
+// ============================================================
+// Campaign detail — table-style redesign helpers
+// ============================================================
+
+type CallAgg = {
+  attempts: number;
+  connects: number;
+  meetings: number;
+  lastStartedAt: string | null;
+  lastStatus: string | null;
+  lastOutcome: string | null;
+  lastDurationSec: number | null;
+};
+
+function useCampaignCalls(listId: string) {
+  return useQuery({
+    queryKey: ["campaign-calls", listId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("calls")
+        .select("lead_id, status, outcome, duration_sec, started_at")
+        .eq("list_id", listId)
+        .order("started_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        lead_id: string;
+        status: string;
+        outcome: string | null;
+        duration_sec: number | null;
+        started_at: string;
+      }>;
+    },
+    refetchInterval: 30000,
+  });
+}
+
+function aggregateByLead(
+  calls:
+    | Array<{
+        lead_id: string;
+        status: string;
+        outcome: string | null;
+        duration_sec: number | null;
+        started_at: string;
+      }>
+    | undefined,
+): Map<string, CallAgg> {
+  const m = new Map<string, CallAgg>();
+  if (!calls) return m;
+  for (const c of calls) {
+    const cur =
+      m.get(c.lead_id) ?? {
+        attempts: 0,
+        connects: 0,
+        meetings: 0,
+        lastStartedAt: null as string | null,
+        lastStatus: null as string | null,
+        lastOutcome: null as string | null,
+        lastDurationSec: null as number | null,
+      };
+    cur.attempts += 1;
+    const connected = c.status === "completed" && (c.duration_sec ?? 0) >= 20;
+    if (connected) cur.connects += 1;
+    if (c.outcome === "meeting_booked" || c.outcome === "meeting") cur.meetings += 1;
+    if (!cur.lastStartedAt) {
+      cur.lastStartedAt = c.started_at;
+      cur.lastStatus = c.status;
+      cur.lastOutcome = c.outcome;
+      cur.lastDurationSec = c.duration_sec;
+    }
+    m.set(c.lead_id, cur);
+  }
+  return m;
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function formatActivityTimestamp(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const sameDay =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (sameDay) return `Today at ${time}`;
+  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} at ${time}`;
+}
+
+function LastActivityLabel({ listId }: { listId: string }) {
+  const { data: calls } = useCampaignCalls(listId);
+  const latest = calls && calls.length > 0 ? calls[0].started_at : null;
+  return <span>{latest ? formatActivityTimestamp(latest) : "no calls yet"}</span>;
+}
+
+function Sparkline({ points, stroke }: { points: number[]; stroke: string }) {
+  if (points.length === 0) return <div className="h-10 w-full" />;
+  const w = 160;
+  const h = 36;
+  const max = Math.max(1, ...points);
+  const step = points.length > 1 ? w / (points.length - 1) : w;
+  const path = points
+    .map((p, i) => {
+      const x = i * step;
+      const y = h - (p / max) * (h - 4) - 2;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const area = `${path} L${w},${h} L0,${h} Z`;
+  const gradId = `spk-${stroke.replace(/[^a-z0-9]/gi, "")}`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-10 w-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={path} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function bucketByDay(isoList: string[], days = 14): number[] {
+  const buckets = new Array(days).fill(0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  for (const iso of isoList) {
+    const d = new Date(iso);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff >= 0 && diff < days) buckets[days - 1 - diff] += 1;
+  }
+  return buckets;
+}
+
+function StatCardLg({
+  label,
+  value,
+  sub,
+  icon,
+  spark,
+  sparkColor,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ReactNode;
+  spark: number[];
+  sparkColor: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 backdrop-blur-sm">
+      <div className="flex items-start justify-between">
+        <div className="text-sm text-muted-foreground">{label}</div>
+        <div className="text-muted-foreground/60">{icon}</div>
+      </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <div className="text-3xl font-semibold tracking-tight text-foreground">{value}</div>
+        {sub ? <div className="text-sm text-muted-foreground">{sub}</div> : null}
+      </div>
+      <div className="mt-3">
+        <Sparkline points={spark} stroke={sparkColor} />
+      </div>
+    </div>
+  );
+}
+
+function CampaignStatStrip({
+  listId,
+  totalProspects,
+  enrichedCount,
+}: {
+  listId: string;
+  totalProspects: number;
+  enrichedCount: number;
+}) {
+  const { data: calls } = useCampaignCalls(listId);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayMs = today.getTime();
+
+  const callsToday = (calls ?? []).filter((c) => new Date(c.started_at).getTime() >= todayMs);
+  const calledTodayCount = callsToday.length;
+  const connected = (calls ?? []).filter(
+    (c) => c.status === "completed" && (c.duration_sec ?? 0) >= 20,
+  );
+  const connectedTodayCount = connected.filter(
+    (c) => new Date(c.started_at).getTime() >= todayMs,
+  ).length;
+  const connectRate = calledTodayCount > 0 ? (connectedTodayCount / calledTodayCount) * 100 : 0;
+  const meetings = (calls ?? []).filter(
+    (c) => c.outcome === "meeting_booked" || c.outcome === "meeting",
+  );
+
+  const sparkProspects = new Array(14).fill(0).map((_, i) => Math.max(1, totalProspects - (13 - i)));
+  const sparkCalls = bucketByDay((calls ?? []).map((c) => c.started_at), 14);
+  const sparkConnected = bucketByDay(connected.map((c) => c.started_at), 14);
+  const sparkMeetings = bucketByDay(meetings.map((c) => c.started_at), 14);
+
+  return (
+    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCardLg
+        label="Prospects"
+        value={totalProspects.toLocaleString()}
+        sub={enrichedCount > 0 ? `${enrichedCount} researched` : undefined}
+        icon={
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="9" cy="8" r="3.5" />
+            <circle cx="17" cy="10" r="2.5" />
+            <path d="M3 19c0-3 2.5-5 6-5s6 2 6 5" />
+          </svg>
+        }
+        spark={sparkProspects}
+        sparkColor="oklch(0.7 0.18 290)"
+      />
+      <StatCardLg
+        label="Called today"
+        value={calledTodayCount}
+        icon={<PhoneIcon className="h-4 w-4" />}
+        spark={sparkCalls}
+        sparkColor="oklch(0.65 0.18 260)"
+      />
+      <StatCardLg
+        label="Connected"
+        value={connectedTodayCount}
+        sub={calledTodayCount > 0 ? `(${connectRate.toFixed(1)}%)` : undefined}
+        icon={
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 4h4l2 5-3 2c1 3 3 5 6 6l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+          </svg>
+        }
+        spark={sparkConnected}
+        sparkColor="oklch(0.75 0.16 180)"
+      />
+      <StatCardLg
+        label="Meetings booked"
+        value={meetings.length}
+        icon={
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="5" width="18" height="16" rx="2" />
+            <path d="M3 9h18M8 3v4M16 3v4" />
+          </svg>
+        }
+        spark={sparkMeetings}
+        sparkColor="oklch(0.72 0.18 340)"
+      />
+    </div>
+  );
+}
+
+// ---------- Prospect Table ----------
+
+type ProspectStatus = {
+  kind: "meeting" | "connected" | "attempted" | "sequence" | "new";
+  label: string;
+  tone: "violet" | "emerald" | "amber" | "blue" | "slate";
+};
+
+function deriveStatus(row: Row, agg: CallAgg | undefined): ProspectStatus {
+  if (agg) {
+    if (agg.meetings > 0) return { kind: "meeting", label: "Meeting", tone: "violet" };
+    if (agg.connects > 0) return { kind: "connected", label: "Connected", tone: "emerald" };
+    if (agg.attempts > 0) return { kind: "attempted", label: "Attempted", tone: "amber" };
+  }
+  const hasSeq = effectiveEmails(row).length > 0;
+  if (hasSeq) return { kind: "sequence", label: "Sequence ready", tone: "blue" };
+  return { kind: "new", label: "New", tone: "slate" };
+}
+
+function StatusPill({ status }: { status: ProspectStatus }) {
+  const tones: Record<ProspectStatus["tone"], string> = {
+    violet: "border-violet-500/30 bg-violet-500/10 text-violet-300",
+    emerald: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    amber: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    blue: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+    slate: "border-white/10 bg-white/5 text-muted-foreground",
+  };
+  const dot: Record<ProspectStatus["tone"], string> = {
+    violet: "bg-violet-400",
+    emerald: "bg-emerald-400",
+    amber: "bg-amber-400",
+    blue: "bg-blue-400",
+    slate: "bg-muted-foreground",
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${tones[status.tone]}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot[status.tone]}`} />
+      {status.label}
+    </span>
+  );
+}
+
+function ScoreBar({ score }: { score: number | null }) {
+  if (score == null) return <span className="text-xs text-muted-foreground">—</span>;
+  const pct = Math.max(0, Math.min(100, score));
+  const color = score >= 75 ? "bg-emerald-400" : score >= 50 ? "bg-amber-400" : "bg-rose-400";
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-7 text-right text-sm tabular-nums text-foreground">{score}</span>
+      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function CompanyMonogram({ name }: { name: string | null }) {
+  if (!name) return <div className="h-7 w-7 rounded-md bg-white/5" />;
+  const letter = name.trim().charAt(0).toUpperCase() || "?";
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return (
+    <div
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold text-white"
+      style={{ background: `oklch(0.55 0.15 ${hue})` }}
+    >
+      {letter}
+    </div>
+  );
+}
+
+function ProspectAvatar({ first, last }: { first: string | null; last: string | null }) {
+  const initials = `${(first ?? "").charAt(0)}${(last ?? "").charAt(0)}`.toUpperCase() || "—";
+  return (
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-cyan-500/20 text-[11px] font-semibold text-foreground">
+      {initials}
+    </div>
+  );
+}
+
+function LastTouchCell({ agg, row }: { agg: CallAgg | undefined; row: Row }) {
+  if (agg && agg.lastStartedAt) {
+    const outcome = agg.lastOutcome || (agg.lastStatus === "completed" ? "completed" : agg.lastStatus);
+    return (
+      <div className="flex items-center gap-1.5">
+        <PhoneIcon className="h-3 w-3 text-muted-foreground" />
+        <span className="text-sm text-foreground">{timeAgo(agg.lastStartedAt)}</span>
+        {outcome ? <span className="text-xs text-muted-foreground">· {outcome}</span> : null}
+      </div>
+    );
+  }
+  if (effectiveEmails(row).length > 0) {
+    return (
+      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Mail className="h-3 w-3" />
+        Draft ready
+      </div>
+    );
+  }
+  return <span className="text-sm text-muted-foreground">Never</span>;
+}
+
+function ProspectTable({
+  listId,
+  rows,
+  busy,
+  onOpenRow,
+  onGenerate,
+  onRemove,
+}: {
+  listId: string;
+  rows: Row[];
+  busy: Set<string>;
+  onOpenRow: (r: Row) => void;
+  onGenerate: (leadId: string) => void;
+  onRemove: (leadId: string) => void;
+}) {
+  const { data: calls } = useCampaignCalls(listId);
+  const aggByLead = aggregateByLead(calls);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const toggle = (leadId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(leadId)) next.delete(leadId);
+      else next.add(leadId);
+      return next;
+    });
+  };
+  const allSelected = rows.length > 0 && selected.size === rows.length;
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(rows.map((r) => r.lead_id)));
+  };
+
+  const cols =
+    "grid-cols-[36px_minmax(220px,1.4fr)_minmax(140px,1fr)_minmax(160px,1fr)_minmax(140px,0.9fr)_minmax(130px,0.9fr)_minmax(130px,0.9fr)_48px]";
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02]">
+      <div className={`grid ${cols} items-center gap-3 border-b border-white/5 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground`}>
+        <div>
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleAll}
+            className="h-3.5 w-3.5 cursor-pointer accent-[oklch(0.6_0.18_290)]"
+            aria-label="Select all"
+          />
+        </div>
+        <div>Name + title</div>
+        <div>Company</div>
+        <div>Contact</div>
+        <div>Last touch</div>
+        <div>Status</div>
+        <div>Score</div>
+        <div />
+      </div>
+      {rows.map((r) => {
+        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
+        const agg = aggByLead.get(r.lead_id);
+        const status = deriveStatus(r, agg);
+        const isBusy = busy.has(r.lead_id);
+        return (
+          <div
+            key={r.lead_id}
+            onClick={() => onOpenRow(r)}
+            className={`grid ${cols} cursor-pointer items-center gap-3 border-b border-white/5 px-4 py-3 transition-colors last:border-b-0 hover:bg-white/[0.03]`}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={selected.has(r.lead_id)}
+                onChange={() => toggle(r.lead_id)}
+                className="h-3.5 w-3.5 cursor-pointer accent-[oklch(0.6_0.18_290)]"
+                aria-label={`Select ${name}`}
+              />
+            </div>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProspectAvatar first={r.lead?.first_name ?? null} last={r.lead?.last_name ?? null} />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-foreground">{name}</div>
+                <div className="truncate text-xs text-muted-foreground">{r.lead?.title || "—"}</div>
+              </div>
+            </div>
+            <div className="flex min-w-0 items-center gap-2">
+              <CompanyMonogram name={r.lead?.org_name ?? null} />
+              <span className="truncate text-sm text-foreground">{r.lead?.org_name || "—"}</span>
+            </div>
+            <div className="min-w-0 text-sm">
+              {r.lead?.phone ? (
+                <div className="flex items-center gap-1.5 text-foreground">
+                  <PhoneIcon className="h-3 w-3 text-muted-foreground" />
+                  <span className="truncate tabular-nums">{r.lead.phone}</span>
+                </div>
+              ) : null}
+              {r.lead?.email ? (
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <Mail className="h-3 w-3" />
+                  <span className="truncate">{r.lead.email}</span>
+                </div>
+              ) : null}
+              {!r.lead?.phone && !r.lead?.email ? (
+                <span className="text-muted-foreground">—</span>
+              ) : null}
+            </div>
+            <LastTouchCell agg={agg} row={r} />
+            <StatusPill status={status} />
+            <ScoreBar score={r.score} />
+            <div onClick={(e) => e.stopPropagation()} className="flex justify-end">
+              <ProspectRowMenu
+                isBusy={isBusy}
+                hasSeq={effectiveEmails(r).length > 0}
+                onGenerate={() => onGenerate(r.lead_id)}
+                onRemove={() => onRemove(r.lead_id)}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProspectRowMenu({
+  isBusy,
+  hasSeq,
+  onGenerate,
+  onRemove,
+}: {
+  isBusy: boolean;
+  hasSeq: boolean;
+  onGenerate: () => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [open]);
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-white/5 hover:text-foreground"
+        aria-label="Row actions"
+      >
+        {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="text-base leading-none">⋯</span>}
+      </button>
+      {open && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-0 top-8 z-20 w-48 overflow-hidden rounded-lg border border-white/10 bg-[oklch(0.16_0.02_265)] py-1 shadow-xl"
+        >
+          <button
+            onClick={() => {
+              setOpen(false);
+              onGenerate();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-foreground hover:bg-white/5"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {hasSeq ? "Regenerate sequence" : "Generate sequence"}
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              onRemove();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-rose-300 hover:bg-rose-500/10"
+          >
+            <X className="h-3.5 w-3.5" />
+            Remove from list
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
