@@ -71,6 +71,14 @@ function AppShell() {
     .slice(0, 2)
     .toUpperCase();
 
+  // Derive company name from email domain (e.g. "user@ttmusa.net" → "TTMUSA")
+  const companyName = (() => {
+    const domain = email?.split("@")[1];
+    if (!domain) return "My Company";
+    const core = domain.split(".")[0];
+    return core.toUpperCase();
+  })();
+
   return (
     <div className="dashboard-font flex min-h-screen w-full gap-4 p-4">
       {/* Sidebar */}
@@ -129,35 +137,17 @@ function AppShell() {
           })}
         </nav>
 
-        {/* Pro Plan card */}
-        <div className="glass-panel mt-4 rounded-xl p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-sm font-medium">Pro Plan</span>
-            <span className="rounded-full bg-[var(--gradient-aurora-soft)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-foreground/80">
-              Active
-            </span>
-          </div>
-          <p className="mb-3 text-xs text-muted-foreground">Resets in 14 days</p>
-          <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-            <div
-              className="h-full rounded-full bg-[var(--gradient-aurora)]"
-              style={{ width: "70%" }}
-            />
-          </div>
-          <p className="font-mono-num text-[11px] text-muted-foreground">
-            4,200 / 6,000 credits
-          </p>
-        </div>
+        {/* Pro Plan card — reserved for customer accounts (hidden for owner) */}
 
         {/* User pill */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="glass-panel mt-3 flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-white/5">
+            <button className="glass-panel mt-auto flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-white/5">
               <div className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--gradient-aurora)] text-xs font-semibold text-white">
                 {initials}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium">Aurora Labs</div>
+                <div className="truncate text-xs font-medium">{companyName}</div>
                 <div className="truncate text-[10px] text-muted-foreground">
                   {email}
                 </div>
