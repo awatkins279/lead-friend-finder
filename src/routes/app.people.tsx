@@ -1114,11 +1114,19 @@ function PeoplePage() {
                           />
                         </TableCell>
                         <TableCell className="font-medium">
-                          {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
+                          <div className="flex items-center gap-3">
+                            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--gradient-aurora)] text-[10px] font-semibold uppercase text-white shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)]">
+                              {((r.first_name?.[0] ?? "") + (r.last_name?.[0] ?? "")).toUpperCase() || "·"}
+                            </div>
+                            <span className="truncate">
+                              {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <ScoreBadge info={scores.get(r.id)} />
                         </TableCell>
+
                         <TableCell className="max-w-[260px] truncate text-sm">
                           {r.title || "—"}
                         </TableCell>
