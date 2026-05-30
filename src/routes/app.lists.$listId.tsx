@@ -1131,6 +1131,7 @@ function CallWorkstation({
   onChanged,
   voicemailAudioPath,
   onVoicemailChanged,
+  aiCopilotEnabled,
 }: {
   listId: string;
   rows: Row[];
@@ -1140,6 +1141,7 @@ function CallWorkstation({
   onChanged: () => void;
   voicemailAudioPath: string | null;
   onVoicemailChanged: () => void;
+  aiCopilotEnabled: boolean;
 }) {
 
   const genScriptFn = useServerFn(generateCallScript);
