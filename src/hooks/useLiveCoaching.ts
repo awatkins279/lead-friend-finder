@@ -65,7 +65,7 @@ export function useLiveCoaching({ listId, leadId, callId, enabled, getRemoteStre
     setError(null);
     try {
       // 1) mint a short-lived deepgram key
-      const { key } = await tokenFn({ data: {} });
+      const { key } = await tokenFn();
 
       // 2) capture rep mic
       const mic = await navigator.mediaDevices.getUserMedia({
