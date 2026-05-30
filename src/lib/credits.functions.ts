@@ -89,7 +89,7 @@ export const spendCredits = createServerFn({ method: "POST" })
       _user_id: userId,
       _action: data.action,
       _amount: totalCost,
-      _note: data.note ?? null,
+      _note: data.note ?? undefined,
     });
     if (error) throw new Error(error.message);
     return { remaining: rem as number, charged: totalCost };
@@ -113,7 +113,7 @@ export async function chargeUser(
     _user_id: userId,
     _action: action,
     _amount: totalCost,
-    _note: note ?? null,
+    _note: note ?? undefined,
   });
   if (error) throw new Error(error.message);
 }
