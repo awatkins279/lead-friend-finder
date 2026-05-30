@@ -103,6 +103,17 @@ type Lead = {
   org_employee_count?: string | null;
 };
 
+// Deterministic, colorful initials avatar (DiceBear "initials" — free, no API key).
+// Seeded by first+last name so the same person always gets the same color.
+function avatarUrl(first: string | null, last: string | null, id: string): string {
+  const seed = encodeURIComponent(
+    `${(first ?? "").trim()} ${(last ?? "").trim()}`.trim() || id,
+  );
+  // Palette tuned to the app's aurora/indigo/teal/pink theme
+  const bg = "6366f1,8b5cf6,ec4899,06b6d4,14b8a6,f59e0b,ef4444,3b82f6,a855f7,10b981";
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${seed}&backgroundColor=${bg}&fontFamily=Inter&fontWeight=600&radius=50`;
+}
+
 // Columns rendered in the table (fast path)
 const LIST_COLS =
   "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,profile_pic";
