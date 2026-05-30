@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeUser } from "@/lib/credits.functions";
 
 const inputSchema = z.object({
   listId: z.string().uuid(),
@@ -34,7 +35,10 @@ export const enrichLead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => inputSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
+
+    // Charge credits up front (admin bypass is automatic)
+    await chargeUser(userId, "enrich", 1, `lead:${data.leadId}`);
 
     const { data: list, error: listErr } = await supabase
       .from("lists")

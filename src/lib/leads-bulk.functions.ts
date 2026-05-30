@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chargeUser } from "@/lib/credits.functions";
 
 const FiltersSchema = z.object({
   name: z.string().max(200).optional().default(""),
@@ -40,7 +41,7 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Input.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const { supabase, userId } = context;
     const { filters, limit } = data;
 
     // Page through the filtered result set in API-safe chunks. For text-filtered
@@ -100,6 +101,11 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
       for (const r of batch) ids.push(r.id);
       offset += batch.length;
       if (batch.length < take) break;
+    }
+
+    // Meter pulled contacts (admin bypass automatic)
+    if (ids.length > 0) {
+      await chargeUser(userId, "pull_contacts", ids.length, `bulk_pull:${ids.length}`);
     }
 
     return { ids };
