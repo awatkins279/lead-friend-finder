@@ -249,6 +249,7 @@ function PeoplePage() {
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
   const cancelScoringJobCall = useServerFn(cancelScoringJobFn);
+  const finalizeScoringJobCall = useServerFn(finalizeScoringJobFn);
 
   useEffect(() => setPage(0), [filters]);
 
