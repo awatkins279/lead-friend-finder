@@ -70,6 +70,7 @@ function AppShell() {
   const nav_items = [
     { to: "/app/people", icon: Users, label: "People Search" },
     { to: "/app/lists", icon: Send, label: "Campaigns" },
+    { to: "/app/calendar", icon: Calendar, label: "Calendar" },
     { to: "/app/inbox", icon: Inbox, label: "Inbox" },
     { to: "/app/saved", icon: Bookmark, label: "Saved Searches" },
     { to: "/app/accounts", icon: Mail, label: "Sending Accounts" },
