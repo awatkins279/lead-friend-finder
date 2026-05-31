@@ -63,7 +63,7 @@ export const saveProductInfo = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const patch: Record<string, string | null> = {};
     for (const f of FIELDS) patch[f] = ((data as any)[f] ?? null) || null;
-    const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
+    const { error } = await supabase.from("profiles").update(patch as any).eq("id", userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
