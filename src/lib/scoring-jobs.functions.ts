@@ -91,10 +91,9 @@ export const processNextBatch = createServerFn({ method: "POST" })
     const { supabase } = context;
 
     // Atomic claim — uses RPC with SECURITY DEFINER + FOR UPDATE SKIP LOCKED
-    const { data: claimed, error: claimErr } = await supabase.rpc(
-      "claim_scoring_batch",
-      { p_job_id: data.jobId },
-    );
+    const { data: claimed, error: claimErr } = await supabase.rpc("claim_scoring_batch", {
+      p_job_id: data.jobId,
+    });
     if (claimErr) throw new Error(claimErr.message);
 
     const batch = Array.isArray(claimed) && claimed.length > 0 ? claimed[0] : null;
@@ -443,16 +442,23 @@ ${JSON.stringify(compact)}`;
 }
 
 function extractJson(raw: string): unknown {
-  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  let s = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = s.search(/[\{\[]/);
   if (start === -1) throw new Error("No JSON found");
   s = s.slice(start);
-  try { return JSON.parse(s); } catch {}
-  let cleaned = s
+  try {
+    return JSON.parse(s);
+  } catch {}
+  const cleaned = s
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
-  try { return JSON.parse(cleaned); } catch {}
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
   const arrStart = cleaned.indexOf('"scores"');
   if (arrStart !== -1) {
     const bracketStart = cleaned.indexOf("[", arrStart);
