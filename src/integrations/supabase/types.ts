@@ -1576,6 +1576,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bump_scoring_job_counters: {
+        Args: {
+          p_completed?: number
+          p_failed?: number
+          p_job_id: string
+          p_scored?: number
+        }
+        Returns: {
+          completed_batches: number
+          failed_batches: number
+          scored_leads: number
+          status: string
+          total_batches: number
+          total_leads: number
+        }[]
+      }
       claim_scoring_batch: {
         Args: { p_job_id: string }
         Returns: {
