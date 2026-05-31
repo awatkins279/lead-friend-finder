@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -461,59 +461,14 @@ function PeoplePage() {
   };
 
   const cancelTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  const workerRunIdRef = useRef(0);
 
-  const runWorkers = async (jobId: string, totalBatches: number) => {
-    cancelTokenRef.current = { cancelled: false };
-    const token = cancelTokenRef.current;
-
-    // Progress poll: lightweight, decoupled from per-batch DB roundtrips.
-    // One snapshot every 1.5s feeds the UI, while workers focus on AI calls.
-    const progressTimer = setInterval(async () => {
-      if (token.cancelled) return;
-      try {
-        const snap = await getJobSnapshotCall({ data: { jobId } });
-        setJobProgress({
-          totalBatches: snap.job.total_batches,
-          completedBatches: snap.job.completed_batches,
-          failedBatches: snap.job.failed_batches,
-          scoredLeads: snap.job.scored_leads,
-          totalLeads: snap.job.total_leads,
-          status: snap.job.status,
-        });
-      } catch {}
-    }, 1500);
-
-    const workerLoop = async () => {
-      let emptyClaims = 0;
-      while (!token.cancelled) {
-        try {
-          const res = await processNextBatchCall({ data: { jobId } });
-          if (res.claimed) {
-            emptyClaims = 0;
-            if (res.results && res.results.length > 0) mergeScoreResults(res.results);
-            continue;
-          }
-          emptyClaims += 1;
-          if (emptyClaims > 6) break; // ~9s of nothing-to-do → let finalize close the job
-          await new Promise((r) => setTimeout(r, 1500));
-        } catch (e) {
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-      }
-    };
-
-    await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
-    clearInterval(progressTimer);
-
-    // Force-finalize: if any batches were left stuck, mark them failed and
-    // set the job's terminal status so the UI stops thinking it's still running.
-    try {
-      await finalizeScoringJobCall({ data: { jobId } });
-    } catch {}
-
-    // Final snapshot to sync counters + status
-    try {
+  const syncJobSnapshot = useCallback(
+    async (jobId: string, runId: number, token: { cancelled: boolean }) => {
       const snap = await getJobSnapshotCall({ data: { jobId } });
+      if (workerRunIdRef.current !== runId) return snap;
+
+      if (snap.results.length > 0) mergeScoreResults(snap.results);
       setJobProgress({
         totalBatches: snap.job.total_batches,
         completedBatches: snap.job.completed_batches,
@@ -522,6 +477,7 @@ function PeoplePage() {
         totalLeads: snap.job.total_leads,
         status: snap.job.status,
       });
+
       if (snap.job.status !== "running") {
         localStorage.removeItem(STORAGE_KEY);
         setActiveJobId(null);
@@ -531,9 +487,80 @@ function PeoplePage() {
             toast.success(`Scored ${snap.job.scored_leads.toLocaleString()} of ${snap.job.total_leads.toLocaleString()} leads`);
           } else if (snap.job.status === "completed_with_errors") {
             toast.warning(`Scored ${snap.job.scored_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed`);
+          } else if (snap.job.status === "failed") {
+            toast.error("Lead scoring stopped before the whole list finished.");
           }
         }
       }
+
+      return snap;
+    },
+    [getJobSnapshotCall],
+  );
+
+  const runWorkers = async (jobId: string, totalBatches: number) => {
+    cancelTokenRef.current = { cancelled: false };
+    const token = cancelTokenRef.current;
+    const runId = ++workerRunIdRef.current;
+
+    const progressTimer = setInterval(async () => {
+      if (token.cancelled || workerRunIdRef.current !== runId) return;
+      try {
+        await syncJobSnapshot(jobId, runId, token);
+      } catch {}
+    }, 1500);
+
+    const workerLoop = async () => {
+      let emptyClaims = 0;
+      while (!token.cancelled && workerRunIdRef.current === runId) {
+        try {
+          const res = await processNextBatchCall({ data: { jobId } });
+          if (res.claimed) {
+            emptyClaims = 0;
+            if (res.results && res.results.length > 0) mergeScoreResults(res.results);
+            continue;
+          }
+
+          const snap = await syncJobSnapshot(jobId, runId, token);
+          if (snap.job.status !== "running") break;
+
+          const accounted = snap.job.completed_batches + snap.job.failed_batches;
+          if (accounted >= totalBatches) {
+            try {
+              await finalizeScoringJobCall({ data: { jobId } });
+            } catch {}
+            const afterFinalize = await syncJobSnapshot(jobId, runId, token);
+            if (afterFinalize.job.status !== "running") break;
+          }
+
+          emptyClaims += 1;
+          if (emptyClaims > 30) {
+            try {
+              await finalizeScoringJobCall({ data: { jobId } });
+            } catch {}
+            const afterFinalize = await syncJobSnapshot(jobId, runId, token);
+            if (afterFinalize.job.status !== "running") break;
+            emptyClaims = 0;
+          }
+
+          await new Promise((r) => setTimeout(r, 1500));
+        } catch {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
+    clearInterval(progressTimer);
+
+    if (workerRunIdRef.current !== runId) return;
+
+    try {
+      await finalizeScoringJobCall({ data: { jobId } });
+    } catch {}
+
+    try {
+      await syncJobSnapshot(jobId, runId, token);
     } catch {}
   };
 
