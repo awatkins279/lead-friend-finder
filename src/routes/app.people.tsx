@@ -556,7 +556,8 @@ function PeoplePage() {
           }
 
           await new Promise((r) => setTimeout(r, 1500));
-        } catch {
+        } catch (error) {
+          console.error("Scoring worker loop failed", error);
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
