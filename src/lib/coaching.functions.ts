@@ -345,6 +345,88 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
 
     const lastProspect = [...data.transcript].reverse().find((t) => t.role === "prospect")?.text ?? "";
 
+    // Fetch the rep's next 3 available meeting slots so the AI can pitch real times
+    // (used on closes when the prospect agrees to a meeting).
+    let availabilityBlock = "";
+    try {
+      const { data: prefsRow } = await supabase
+        .from("scheduling_preferences")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const prefs: any = prefsRow ?? {
+        timezone: "America/New_York",
+        workday_start_minute: 540,
+        workday_end_minute: 1020,
+        meeting_duration_minutes: 30,
+        buffer_minutes: 15,
+        workdays: [1, 2, 3, 4, 5],
+      };
+      const now = new Date();
+      const horizon = new Date(now.getTime() + 7 * 86400000);
+      const { data: existing } = await supabase
+        .from("meetings")
+        .select("starts_at,ends_at")
+        .gte("starts_at", now.toISOString())
+        .lte("starts_at", horizon.toISOString())
+        .neq("status", "cancelled");
+      const busy = (existing ?? []).map((m: any) => ({
+        start: new Date(m.starts_at).getTime(),
+        end: new Date(m.ends_at).getTime(),
+      }));
+      const slotMs = prefs.meeting_duration_minutes * 60000;
+      const bufferMs = prefs.buffer_minutes * 60000;
+      const fmt = new Intl.DateTimeFormat("en-US", {
+        timeZone: prefs.timezone,
+        weekday: "long",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      const tzParts = (d: Date) => {
+        const parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: prefs.timezone,
+          weekday: "short",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: false,
+        }).formatToParts(d);
+        const wd = parts.find((p) => p.type === "weekday")?.value ?? "Mon";
+        const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+        const min = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+        return {
+          dow: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd),
+          minuteOfDay: hour * 60 + min,
+        };
+      };
+      const slots: string[] = [];
+      let cursor = new Date(Math.ceil((now.getTime() + 30 * 60000) / (15 * 60000)) * (15 * 60000));
+      let guard = 0;
+      while (slots.length < 3 && cursor < horizon && guard++ < 2000) {
+        const { dow, minuteOfDay } = tzParts(cursor);
+        const inDay = (prefs.workdays as number[]).includes(dow);
+        const inHours =
+          minuteOfDay >= prefs.workday_start_minute &&
+          minuteOfDay + prefs.meeting_duration_minutes <= prefs.workday_end_minute;
+        if (inDay && inHours) {
+          const start = cursor.getTime();
+          const end = start + slotMs;
+          const conflict = busy.some((b) => start < b.end + bufferMs && end + bufferMs > b.start);
+          if (!conflict) {
+            slots.push(fmt.format(new Date(start)));
+            cursor = new Date(end + bufferMs);
+            continue;
+          }
+        }
+        cursor = new Date(cursor.getTime() + 15 * 60000);
+      }
+      if (slots.length) {
+        availabilityBlock = `\nREP'S NEXT OPEN SLOTS (use these EXACT times when the prospect agrees to a meeting — never invent times):\n${slots.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`;
+      }
+    } catch {
+      // non-fatal — AI just won't have specific times to pitch
+    }
+
     // Retrieve top knowledge chunks via trigram similarity on the prospect's last utterance.
     let knowledge: string[] = [];
     if (lastProspect.length > 5) {
@@ -401,6 +483,7 @@ PROSPECT
 ${[lead?.first_name, lead?.last_name].filter(Boolean).join(" ")} — ${lead?.title ?? "?"} at ${lead?.org_name ?? "?"} (${lead?.org_industry ?? "?"})
 
 ${knowledge.length ? `RELEVANT UPLOADED KNOWLEDGE:\n${knowledge.map((k, i) => `[${i + 1}] ${k}`).join("\n\n")}\n` : ""}
+${availabilityBlock}
 ${
   style?.example_objection_handlers?.length
     ? `STYLE EXAMPLES:\n${style.example_objection_handlers

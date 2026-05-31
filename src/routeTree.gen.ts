@@ -22,10 +22,13 @@ import { Route as AppProductInfoRouteImport } from './routes/app.product-info'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
 import { Route as AppInboxRouteImport } from './routes/app.inbox'
 import { Route as AppCoachingStylesRouteImport } from './routes/app.coaching-styles'
+import { Route as AppCalendarRouteImport } from './routes/app.calendar'
 import { Route as AppAdminRouteImport } from './routes/app.admin'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
 import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
+import { Route as ApiGoogleCalendarConnectRouteImport } from './routes/api.google-calendar.connect'
+import { Route as ApiGoogleCalendarCallbackRouteImport } from './routes/api.google-calendar.callback'
 import { Route as ApiRingcentralOauthCallbackRouteImport } from './routes/api/ringcentral.oauth.callback'
 import { Route as ApiPublicTwilioVoiceRouteImport } from './routes/api/public/twilio.voice'
 import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/twilio.status'
@@ -98,6 +101,11 @@ const AppCoachingStylesRoute = AppCoachingStylesRouteImport.update({
   path: '/coaching-styles',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCalendarRoute = AppCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminRoute = AppAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -118,6 +126,18 @@ const AppListsListIdRoute = AppListsListIdRouteImport.update({
   path: '/lists/$listId',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiGoogleCalendarConnectRoute =
+  ApiGoogleCalendarConnectRouteImport.update({
+    id: '/api/google-calendar/connect',
+    path: '/api/google-calendar/connect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiGoogleCalendarCallbackRoute =
+  ApiGoogleCalendarCallbackRouteImport.update({
+    id: '/api/google-calendar/callback',
+    path: '/api/google-calendar/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiRingcentralOauthCallbackRoute =
   ApiRingcentralOauthCallbackRouteImport.update({
     id: '/api/ringcentral/oauth/callback',
@@ -160,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/admin': typeof AppAdminRoute
+  '/app/calendar': typeof AppCalendarRoute
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
@@ -168,6 +189,8 @@ export interface FileRoutesByFullPath {
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/api/google-calendar/callback': typeof ApiGoogleCalendarCallbackRoute
+  '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -185,6 +208,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/admin': typeof AppAdminRoute
+  '/app/calendar': typeof AppCalendarRoute
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
@@ -193,6 +217,8 @@ export interface FileRoutesByTo {
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/api/google-calendar/callback': typeof ApiGoogleCalendarCallbackRoute
+  '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -211,6 +237,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/app/accounts': typeof AppAccountsRoute
   '/app/admin': typeof AppAdminRoute
+  '/app/calendar': typeof AppCalendarRoute
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
@@ -219,6 +246,8 @@ export interface FileRoutesById {
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/api/google-calendar/callback': typeof ApiGoogleCalendarCallbackRoute
+  '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -238,6 +267,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/app/accounts'
     | '/app/admin'
+    | '/app/calendar'
     | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
@@ -246,6 +276,8 @@ export interface FileRouteTypes {
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
     | '/checkout/return'
+    | '/api/google-calendar/callback'
+    | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/inbox/ingest'
@@ -263,6 +295,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/app/accounts'
     | '/app/admin'
+    | '/app/calendar'
     | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
@@ -271,6 +304,8 @@ export interface FileRouteTypes {
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
     | '/checkout/return'
+    | '/api/google-calendar/callback'
+    | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists'
     | '/api/public/inbox/ingest'
@@ -288,6 +323,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/app/accounts'
     | '/app/admin'
+    | '/app/calendar'
     | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
@@ -296,6 +332,8 @@ export interface FileRouteTypes {
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
     | '/checkout/return'
+    | '/api/google-calendar/callback'
+    | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/inbox/ingest'
@@ -312,6 +350,8 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRouteWithChildren
   LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
+  ApiGoogleCalendarCallbackRoute: typeof ApiGoogleCalendarCallbackRoute
+  ApiGoogleCalendarConnectRoute: typeof ApiGoogleCalendarConnectRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicTwilioRecordingRoute: typeof ApiPublicTwilioRecordingRoute
@@ -413,6 +453,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCoachingStylesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/calendar': {
+      id: '/app/calendar'
+      path: '/calendar'
+      fullPath: '/app/calendar'
+      preLoaderRoute: typeof AppCalendarRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/admin': {
       id: '/app/admin'
       path: '/admin'
@@ -440,6 +487,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/lists/$listId'
       preLoaderRoute: typeof AppListsListIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/google-calendar/connect': {
+      id: '/api/google-calendar/connect'
+      path: '/api/google-calendar/connect'
+      fullPath: '/api/google-calendar/connect'
+      preLoaderRoute: typeof ApiGoogleCalendarConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/google-calendar/callback': {
+      id: '/api/google-calendar/callback'
+      path: '/api/google-calendar/callback'
+      fullPath: '/api/google-calendar/callback'
+      preLoaderRoute: typeof ApiGoogleCalendarCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/ringcentral/oauth/callback': {
       id: '/api/ringcentral/oauth/callback'
@@ -489,6 +550,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppAdminRoute: typeof AppAdminRoute
+  AppCalendarRoute: typeof AppCalendarRoute
   AppCoachingStylesRoute: typeof AppCoachingStylesRoute
   AppInboxRoute: typeof AppInboxRoute
   AppPeopleRoute: typeof AppPeopleRoute
@@ -503,6 +565,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
   AppAdminRoute: AppAdminRoute,
+  AppCalendarRoute: AppCalendarRoute,
   AppCoachingStylesRoute: AppCoachingStylesRoute,
   AppInboxRoute: AppInboxRoute,
   AppPeopleRoute: AppPeopleRoute,
@@ -534,6 +597,8 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRouteWithChildren,
   LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
+  ApiGoogleCalendarCallbackRoute: ApiGoogleCalendarCallbackRoute,
+  ApiGoogleCalendarConnectRoute: ApiGoogleCalendarConnectRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicTwilioRecordingRoute: ApiPublicTwilioRecordingRoute,
