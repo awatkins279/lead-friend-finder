@@ -19,6 +19,7 @@ export type ScoreRow = {
 
 const BATCH_SIZE = 12;
 const MAX_LEADS_PER_JOB = 20000;
+const PROCESSING_STALE_MS = 75_000;
 
 // ---------- createScoringJob ----------
 
@@ -90,10 +91,9 @@ export const processNextBatch = createServerFn({ method: "POST" })
     const { supabase } = context;
 
     // Atomic claim — uses RPC with SECURITY DEFINER + FOR UPDATE SKIP LOCKED
-    const { data: claimed, error: claimErr } = await supabase.rpc(
-      "claim_scoring_batch",
-      { p_job_id: data.jobId },
-    );
+    const { data: claimed, error: claimErr } = await supabase.rpc("claim_scoring_batch", {
+      p_job_id: data.jobId,
+    });
     if (claimErr) throw new Error(claimErr.message);
 
     const batch = Array.isArray(claimed) && claimed.length > 0 ? claimed[0] : null;
@@ -136,10 +136,17 @@ export const processNextBatch = createServerFn({ method: "POST" })
     try {
       const results = await scoreBatch(supabase, leadIds, job.context);
 
-      await supabase
+      const { data: completedRows, error: completeErr } = await supabase
         .from("scoring_job_batches")
         .update({ status: "done", results, error: null })
+        .eq("status", "processing")
+        .select("id")
         .eq("id", batchId);
+      if (completeErr) throw new Error(completeErr.message);
+
+      if (!completedRows || completedRows.length === 0) {
+        return { claimed: true as const, results: [], ignored: true };
+      }
 
       await bumpJobCounters(supabase, data.jobId, {
         completed: 1,
@@ -162,10 +169,16 @@ export const processNextBatch = createServerFn({ method: "POST" })
         .single();
 
       if (batchRow && batchRow.attempts < 3) {
-        await supabase
+        const { data: retriedRows, error: retryErr } = await supabase
           .from("scoring_job_batches")
           .update({ status: "retry", error: message })
+          .eq("status", "processing")
+          .select("id")
           .eq("id", batchId);
+        if (retryErr) throw new Error(retryErr.message);
+        if (!retriedRows || retriedRows.length === 0) {
+          return { claimed: true as const, results: [], ignored: true };
+        }
         return { claimed: true as const, results: [], retried: true, error: message };
       }
 
@@ -176,13 +189,44 @@ export const processNextBatch = createServerFn({ method: "POST" })
 
 // ---------- getJobSnapshot ----------
 
-const snapshotInput = z.object({ jobId: z.string().uuid() });
+const snapshotInput = z.object({
+  jobId: z.string().uuid(),
+  includeResults: z.boolean().optional().default(false),
+});
 
 export const getJobSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => snapshotInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+
+    const staleIso = new Date(Date.now() - PROCESSING_STALE_MS).toISOString();
+    const { data: staleRows, error: staleErr } = await supabase
+      .from("scoring_job_batches")
+      .select("id,error")
+      .eq("job_id", data.jobId)
+      .eq("status", "processing")
+      .lt("updated_at", staleIso);
+    if (staleErr) throw new Error(staleErr.message);
+
+    if ((staleRows?.length ?? 0) > 0) {
+      const staleIds = staleRows!.map((row) => row.id);
+      const { data: failedRows, error: failErr } = await supabase
+        .from("scoring_job_batches")
+        .update({
+          status: "failed",
+          error: "worker heartbeat expired before scoring finished",
+        })
+        .eq("status", "processing")
+        .select("id")
+        .in("id", staleIds);
+      if (failErr) throw new Error(failErr.message);
+
+      const failedCount = failedRows?.length ?? 0;
+      if (failedCount > 0) {
+        await bumpJobCounters(supabase, data.jobId, { failed: failedCount });
+      }
+    }
 
     const { data: job, error: jobErr } = await supabase
       .from("scoring_jobs")
@@ -193,16 +237,18 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
       .single();
     if (jobErr || !job) throw new Error(jobErr?.message ?? "Job not found");
 
-    const { data: doneBatches, error: batchErr } = await supabase
-      .from("scoring_job_batches")
-      .select("results")
-      .eq("job_id", data.jobId)
-      .eq("status", "done");
-    if (batchErr) throw new Error(batchErr.message);
-
     const results: ScoreRow[] = [];
-    for (const b of doneBatches ?? []) {
-      if (Array.isArray(b.results)) results.push(...(b.results as ScoreRow[]));
+    if (data.includeResults) {
+      const { data: doneBatches, error: batchErr } = await supabase
+        .from("scoring_job_batches")
+        .select("results")
+        .eq("job_id", data.jobId)
+        .eq("status", "done");
+      if (batchErr) throw new Error(batchErr.message);
+
+      for (const b of doneBatches ?? []) {
+        if (Array.isArray(b.results)) results.push(...(b.results as ScoreRow[]));
+      }
     }
     return { job, results };
   });
@@ -409,16 +455,23 @@ ${JSON.stringify(compact)}`;
 }
 
 function extractJson(raw: string): unknown {
-  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  let s = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = s.search(/[\{\[]/);
   if (start === -1) throw new Error("No JSON found");
   s = s.slice(start);
-  try { return JSON.parse(s); } catch {}
-  let cleaned = s
+  try {
+    return JSON.parse(s);
+  } catch {}
+  const cleaned = s
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
-  try { return JSON.parse(cleaned); } catch {}
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
   const arrStart = cleaned.indexOf('"scores"');
   if (arrStart !== -1) {
     const bracketStart = cleaned.indexOf("[", arrStart);

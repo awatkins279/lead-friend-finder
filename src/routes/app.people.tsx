@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -22,11 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,7 +73,6 @@ type ScoreInfo = {
   gaps: string[];
 };
 
-
 export const Route = createFileRoute("/app/people")({
   component: PeoplePage,
   head: () => ({ meta: [{ title: "People Search — NexusAi" }] }),
@@ -116,8 +111,7 @@ function avatarUrl(first: string | null, last: string | null, id: string, size =
 const LIST_COLS =
   "id,first_name,last_name,email,title,linkedin_url,city,state,country,phone,org_name,profile_pic";
 // Extra columns only needed in the detail sheet
-const DETAIL_COLS =
-  "org_description,org_website_url,org_industry,org_employee_count";
+const DETAIL_COLS = "org_description,org_website_url,org_industry,org_employee_count";
 
 type Filters = {
   name: string;
@@ -177,7 +171,10 @@ function escapeForOr(v: string) {
   return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any; in: any }>(q: T, f: Filters): T {
+function applyFilters<T extends { select: any; ilike: any; or: any; not: any; neq: any; in: any }>(
+  q: T,
+  f: Filters,
+): T {
   let r: any = q;
   const nameQ = (f.name ?? "").trim();
   if (nameQ) {
@@ -208,9 +205,7 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   }
   const sizes = f.companySize ?? [];
   if (sizes.length > 0) {
-    const raw = Array.from(
-      new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])),
-    );
+    const raw = Array.from(new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])));
     if (raw.length > 0) r = r.in("org_employee_count", raw);
   }
   if (f.hasPhone) r = r.not("phone", "is", null).neq("phone", "");
@@ -255,7 +250,7 @@ function PeoplePage() {
     status: string;
   } | null>(null);
   const scoringBusy = jobProgress?.status === "running";
-  
+
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
@@ -273,9 +268,7 @@ function PeoplePage() {
     refetchOnWindowFocus: false,
     queryKey,
     queryFn: async () => {
-      let q: any = supabase
-        .from("leads")
-        .select(LIST_COLS, { count: "estimated" });
+      let q: any = supabase.from("leads").select(LIST_COLS, { count: "estimated" });
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -434,86 +427,50 @@ function PeoplePage() {
     }
   };
 
-
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
   // re-opening the page resumes via the localStorage handle.
-  const WORKER_COUNT = 24;
+  const WORKER_COUNT = 12;
   const STORAGE_KEY = "active-scoring-job-id";
 
-  const mergeScoreResults = (
-    rows: Array<{ leadId: string; score: number; reasoning: string; signals: any; strengths: any; gaps: any }>,
-  ) => {
-    if (rows.length === 0) return;
-    setScores((prev) => {
-      const next = new Map(prev);
-      rows.forEach((s) =>
-        next.set(s.leadId, {
-          score: s.score,
-          reasoning: s.reasoning,
-          signals: s.signals ?? [],
-          strengths: s.strengths ?? [],
-          gaps: s.gaps ?? [],
-        }),
-      );
-      return next;
-    });
-  };
+  const mergeScoreResults = useCallback(
+    (
+      rows: Array<{
+        leadId: string;
+        score: number;
+        reasoning: string;
+        signals: any;
+        strengths: any;
+        gaps: any;
+      }>,
+    ) => {
+      if (rows.length === 0) return;
+      setScores((prev) => {
+        const next = new Map(prev);
+        rows.forEach((s) =>
+          next.set(s.leadId, {
+            score: s.score,
+            reasoning: s.reasoning,
+            signals: s.signals ?? [],
+            strengths: s.strengths ?? [],
+            gaps: s.gaps ?? [],
+          }),
+        );
+        return next;
+      });
+    },
+    [],
+  );
 
   const cancelTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  const workerRunIdRef = useRef(0);
 
-  const runWorkers = async (jobId: string, totalBatches: number) => {
-    cancelTokenRef.current = { cancelled: false };
-    const token = cancelTokenRef.current;
+  const syncJobSnapshot = useCallback(
+    async (jobId: string, runId: number, token: { cancelled: boolean }) => {
+      const snap = await getJobSnapshotCall({ data: { jobId, includeResults: false } });
+      if (workerRunIdRef.current !== runId) return snap;
 
-    // Progress poll: lightweight, decoupled from per-batch DB roundtrips.
-    // One snapshot every 1.5s feeds the UI, while workers focus on AI calls.
-    const progressTimer = setInterval(async () => {
-      if (token.cancelled) return;
-      try {
-        const snap = await getJobSnapshotCall({ data: { jobId } });
-        setJobProgress({
-          totalBatches: snap.job.total_batches,
-          completedBatches: snap.job.completed_batches,
-          failedBatches: snap.job.failed_batches,
-          scoredLeads: snap.job.scored_leads,
-          totalLeads: snap.job.total_leads,
-          status: snap.job.status,
-        });
-      } catch {}
-    }, 1500);
-
-    const workerLoop = async () => {
-      let emptyClaims = 0;
-      while (!token.cancelled) {
-        try {
-          const res = await processNextBatchCall({ data: { jobId } });
-          if (res.claimed) {
-            emptyClaims = 0;
-            if (res.results && res.results.length > 0) mergeScoreResults(res.results);
-            continue;
-          }
-          emptyClaims += 1;
-          if (emptyClaims > 6) break; // ~9s of nothing-to-do → let finalize close the job
-          await new Promise((r) => setTimeout(r, 1500));
-        } catch (e) {
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-      }
-    };
-
-    await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
-    clearInterval(progressTimer);
-
-    // Force-finalize: if any batches were left stuck, mark them failed and
-    // set the job's terminal status so the UI stops thinking it's still running.
-    try {
-      await finalizeScoringJobCall({ data: { jobId } });
-    } catch {}
-
-    // Final snapshot to sync counters + status
-    try {
-      const snap = await getJobSnapshotCall({ data: { jobId } });
+      if (snap.results.length > 0) mergeScoreResults(snap.results);
       setJobProgress({
         totalBatches: snap.job.total_batches,
         completedBatches: snap.job.completed_batches,
@@ -522,19 +479,106 @@ function PeoplePage() {
         totalLeads: snap.job.total_leads,
         status: snap.job.status,
       });
+
       if (snap.job.status !== "running") {
         localStorage.removeItem(STORAGE_KEY);
         setActiveJobId(null);
         if (!token.cancelled) {
           const failed = snap.job.failed_batches;
           if (snap.job.status === "completed") {
-            toast.success(`Scored ${snap.job.scored_leads.toLocaleString()} of ${snap.job.total_leads.toLocaleString()} leads`);
+            toast.success(
+              `Scored ${snap.job.scored_leads.toLocaleString()} of ${snap.job.total_leads.toLocaleString()} leads`,
+            );
           } else if (snap.job.status === "completed_with_errors") {
-            toast.warning(`Scored ${snap.job.scored_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed`);
+            toast.warning(
+              `Scored ${snap.job.scored_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed`,
+            );
+          } else if (snap.job.status === "failed") {
+            toast.error("Lead scoring stopped before the whole list finished.");
           }
         }
       }
-    } catch {}
+
+      return snap;
+    },
+    [getJobSnapshotCall, mergeScoreResults],
+  );
+
+  const runWorkers = async (jobId: string, totalBatches: number) => {
+    cancelTokenRef.current = { cancelled: false };
+    const token = cancelTokenRef.current;
+    const runId = ++workerRunIdRef.current;
+
+    const progressTimer = setInterval(async () => {
+      if (token.cancelled || workerRunIdRef.current !== runId) return;
+      try {
+        await syncJobSnapshot(jobId, runId, token);
+      } catch (error) {
+        console.error("Failed to poll scoring progress", error);
+      }
+    }, 1500);
+
+    const workerLoop = async () => {
+      let emptyClaims = 0;
+      while (!token.cancelled && workerRunIdRef.current === runId) {
+        try {
+          const res = await processNextBatchCall({ data: { jobId } });
+          if (res.claimed) {
+            emptyClaims = 0;
+            if (res.results && res.results.length > 0) mergeScoreResults(res.results);
+            continue;
+          }
+
+          const snap = await syncJobSnapshot(jobId, runId, token);
+          if (snap.job.status !== "running") break;
+
+          const accounted = snap.job.completed_batches + snap.job.failed_batches;
+          if (accounted >= totalBatches) {
+            try {
+              await finalizeScoringJobCall({ data: { jobId } });
+            } catch (error) {
+              console.error("Failed to finalize completed scoring job", error);
+            }
+            const afterFinalize = await syncJobSnapshot(jobId, runId, token);
+            if (afterFinalize.job.status !== "running") break;
+          }
+
+          emptyClaims += 1;
+          if (emptyClaims > 30) {
+            try {
+              await finalizeScoringJobCall({ data: { jobId } });
+            } catch (error) {
+              console.error("Failed to force-finalize idle scoring job", error);
+            }
+            const afterFinalize = await syncJobSnapshot(jobId, runId, token);
+            if (afterFinalize.job.status !== "running") break;
+            emptyClaims = 0;
+          }
+
+          await new Promise((r) => setTimeout(r, 1500));
+        } catch (error) {
+          console.error("Scoring worker loop failed", error);
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
+    clearInterval(progressTimer);
+
+    if (workerRunIdRef.current !== runId) return;
+
+    try {
+      await finalizeScoringJobCall({ data: { jobId } });
+    } catch (error) {
+      console.error("Failed to finalize scoring job after workers exited", error);
+    }
+
+    try {
+      await syncJobSnapshot(jobId, runId, token);
+    } catch (error) {
+      console.error("Failed to fetch final scoring snapshot", error);
+    }
   };
 
   const startScoringJob = async (ids: string[]) => {
@@ -579,9 +623,12 @@ function PeoplePage() {
   const cancelScoring = async () => {
     if (!activeJobId) return;
     cancelTokenRef.current.cancelled = true;
+    workerRunIdRef.current += 1;
     try {
       await cancelScoringJobCall({ data: { jobId: activeJobId } });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to cancel scoring job", error);
+    }
     localStorage.removeItem(STORAGE_KEY);
     setActiveJobId(null);
     setJobProgress((p) => (p ? { ...p, status: "cancelled" } : null));
@@ -594,7 +641,7 @@ function PeoplePage() {
     if (!jobId) return;
     (async () => {
       try {
-        const snap = await getJobSnapshotCall({ data: { jobId } });
+        const snap = await getJobSnapshotCall({ data: { jobId, includeResults: true } });
         if (snap.results.length > 0) mergeScoreResults(snap.results);
         setJobProgress({
           totalBatches: snap.job.total_batches,
@@ -610,15 +657,13 @@ function PeoplePage() {
         } else {
           localStorage.removeItem(STORAGE_KEY);
         }
-      } catch {
+      } catch (error) {
+        console.error("Failed to resume scoring job", error);
         localStorage.removeItem(STORAGE_KEY);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
-
 
   const eligibleIds = useMemo(
     () =>
@@ -668,13 +713,13 @@ function PeoplePage() {
         .eq("id", selected.id)
         .maybeSingle();
       if (error) throw error;
-      return data as Pick<Lead, "org_description" | "org_website_url" | "org_industry" | "org_employee_count"> | null;
+      return data as Pick<
+        Lead,
+        "org_description" | "org_website_url" | "org_industry" | "org_employee_count"
+      > | null;
     },
   });
-  const selectedFull: Lead | null = selected
-    ? { ...selected, ...(selectedDetail ?? {}) }
-    : null;
-
+  const selectedFull: Lead | null = selected ? { ...selected, ...(selectedDetail ?? {}) } : null;
 
   // ===== Filter chip helpers =====
   const chipBase =
@@ -690,7 +735,7 @@ function PeoplePage() {
     draft.companySize.length === 0
       ? "Any size"
       : draft.companySize.length === 1
-        ? SIZE_OPTIONS.find((o) => o.value === draft.companySize[0])?.label ?? "—"
+        ? (SIZE_OPTIONS.find((o) => o.value === draft.companySize[0])?.label ?? "—")
         : `${draft.companySize.length} selected`;
 
   // ===== Right-rail AI gauge math =====
@@ -728,7 +773,11 @@ function PeoplePage() {
                   size="icon"
                   className="border-white/10 bg-white/5 backdrop-blur"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="5" cy="12" r="1.5" />
+                    <circle cx="12" cy="12" r="1.5" />
+                    <circle cx="19" cy="12" r="1.5" />
+                  </svg>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -738,7 +787,10 @@ function PeoplePage() {
                 <DropdownMenuItem onClick={() => setCampaignOpen(true)} disabled={!hasSelection}>
                   <Send className="mr-2 h-4 w-4" /> Add to Campaign
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportCsv} disabled={exportBusy || (total === 0 && !hasSelection)}>
+                <DropdownMenuItem
+                  onClick={exportCsv}
+                  disabled={exportBusy || (total === 0 && !hasSelection)}
+                >
                   <Download className="mr-2 h-4 w-4" /> {exportBusy ? "Exporting…" : "Export CSV"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -752,13 +804,22 @@ function PeoplePage() {
           <Popover onOpenChange={(o) => !o && apply()}>
             <PopoverTrigger asChild>
               <button className={chipBase}>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Company Industry</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Company Industry
+                </span>
                 <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
-                  <span className="truncate">{industryActive ? draft.industry : "Any industry"}</span>
+                  <span className="truncate">
+                    {industryActive ? draft.industry : "Any industry"}
+                  </span>
                   {industryActive && (
                     <X
                       className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, industry: "" }; setFilters(next); setDraft(next); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = { ...filters, industry: "" };
+                        setFilters(next);
+                        setDraft(next);
+                      }}
                     />
                   )}
                 </span>
@@ -780,13 +841,20 @@ function PeoplePage() {
           <Popover onOpenChange={(o) => !o && apply()}>
             <PopoverTrigger asChild>
               <button className={chipBase}>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Company Size</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Company Size
+                </span>
                 <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
                   <span className="truncate">{sizeLabel}</span>
                   {sizeActive && (
                     <X
                       className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, companySize: [] }; setFilters(next); setDraft(next); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = { ...filters, companySize: [] };
+                        setFilters(next);
+                        setDraft(next);
+                      }}
                     />
                   )}
                 </span>
@@ -797,11 +865,16 @@ function PeoplePage() {
                 {SIZE_OPTIONS.map((o) => {
                   const checked = draft.companySize.includes(o.value);
                   return (
-                    <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent">
+                    <label
+                      key={o.value}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                    >
                       <Checkbox
                         checked={checked}
                         onCheckedChange={(v) => {
-                          const next = v ? [...draft.companySize, o.value] : draft.companySize.filter((x) => x !== o.value);
+                          const next = v
+                            ? [...draft.companySize, o.value]
+                            : draft.companySize.filter((x) => x !== o.value);
                           setDraft({ ...draft, companySize: next });
                         }}
                       />
@@ -817,13 +890,20 @@ function PeoplePage() {
           <Popover onOpenChange={(o) => !o && apply()}>
             <PopoverTrigger asChild>
               <button className={chipBase}>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Location</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Location
+                </span>
                 <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
                   <span className="truncate">{locationActive ? draft.location : "Anywhere"}</span>
                   {locationActive && (
                     <X
                       className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, location: "" }; setFilters(next); setDraft(next); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = { ...filters, location: "" };
+                        setFilters(next);
+                        setDraft(next);
+                      }}
                     />
                   )}
                 </span>
@@ -845,7 +925,9 @@ function PeoplePage() {
           <Popover onOpenChange={(o) => !o && apply()}>
             <PopoverTrigger asChild>
               <button className={chipBase}>
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Title</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Title
+                </span>
                 <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
                   <span className="truncate">
                     {titleActive
@@ -857,7 +939,12 @@ function PeoplePage() {
                   {titleActive && (
                     <X
                       className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => { e.stopPropagation(); const next = { ...filters, titles: [] }; setFilters(next); setDraft(next); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = { ...filters, titles: [] };
+                        setFilters(next);
+                        setDraft(next);
+                      }}
                     />
                   )}
                 </span>
@@ -900,11 +987,22 @@ function PeoplePage() {
                 onChange={(v) => setDraft({ ...draft, company: v })}
               />
               <div className="space-y-2 pt-1">
-                <Toggle label="Has phone number" checked={draft.hasPhone} onChange={(v) => setDraft({ ...draft, hasPhone: v })} />
-                <Toggle label="Has email" checked={draft.hasEmail} onChange={(v) => setDraft({ ...draft, hasEmail: v })} />
+                <Toggle
+                  label="Has phone number"
+                  checked={draft.hasPhone}
+                  onChange={(v) => setDraft({ ...draft, hasPhone: v })}
+                />
+                <Toggle
+                  label="Has email"
+                  checked={draft.hasEmail}
+                  onChange={(v) => setDraft({ ...draft, hasEmail: v })}
+                />
               </div>
               {activeChips.length > 0 && (
-                <button onClick={clear} className="text-xs text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={clear}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
                   Clear all filters
                 </button>
               )}
@@ -919,7 +1017,9 @@ function PeoplePage() {
             <Input
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              onKeyDown={(e) => { if (e.key === "Enter") apply(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") apply();
+              }}
               placeholder="Search by name or keyword…"
               className="h-11 rounded-xl border-white/10 bg-white/[0.03] pl-10 placeholder:text-muted-foreground/60"
             />
@@ -933,7 +1033,10 @@ function PeoplePage() {
               <span className="font-medium">{picked.size.toLocaleString()} leads selected</span>
               <span className="text-muted-foreground">· selection persists across pages</span>
             </div>
-            <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground">
+            <button
+              onClick={clearSelection}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
               Clear selection
             </button>
           </div>
@@ -946,11 +1049,19 @@ function PeoplePage() {
               <TableHeader>
                 <TableRow className="border-white/5 hover:bg-transparent">
                   <TableHead className="w-14 pl-6">
-                    <Popover open={selectMenuOpen} onOpenChange={(o) => { setSelectMenuOpen(o); if (!o) setAdvancedMode(false); }}>
+                    <Popover
+                      open={selectMenuOpen}
+                      onOpenChange={(o) => {
+                        setSelectMenuOpen(o);
+                        if (!o) setAdvancedMode(false);
+                      }}
+                    >
                       <PopoverTrigger asChild>
                         <button className="flex items-center gap-1 rounded hover:bg-white/5 px-1 py-0.5">
                           <Checkbox
-                            checked={allPageChecked ? true : somePageChecked ? "indeterminate" : false}
+                            checked={
+                              allPageChecked ? true : somePageChecked ? "indeterminate" : false
+                            }
                             onCheckedChange={() => {}}
                             onClick={(e) => e.preventDefault()}
                           />
@@ -962,18 +1073,40 @@ function PeoplePage() {
                           <div className="flex flex-col">
                             <MenuItem onClick={selectThisPage}>Select this page</MenuItem>
                             <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
-                              {bulkBusy ? "Selecting…" : `Select all leads${total ? ` (${total.toLocaleString()})` : ""}`}
+                              {bulkBusy
+                                ? "Selecting…"
+                                : `Select all leads${total ? ` (${total.toLocaleString()})` : ""}`}
                             </MenuItem>
-                            <MenuItem onClick={() => setAdvancedMode(true)}>Advanced Selection</MenuItem>
+                            <MenuItem onClick={() => setAdvancedMode(true)}>
+                              Advanced Selection
+                            </MenuItem>
                             <MenuItem onClick={clearSelection}>Clear selection</MenuItem>
                           </div>
                         ) : (
                           <div className="space-y-2 p-2">
                             <Label className="text-xs">Select number of leads</Label>
-                            <Input type="number" min={1} max={MAX_BULK} value={advancedN} onChange={(e) => setAdvancedN(e.target.value)} />
+                            <Input
+                              type="number"
+                              min={1}
+                              max={MAX_BULK}
+                              value={advancedN}
+                              onChange={(e) => setAdvancedN(e.target.value)}
+                            />
                             <div className="flex gap-2">
-                              <Button size="sm" variant="ghost" className="flex-1" onClick={() => setAdvancedMode(false)}>Back</Button>
-                              <Button size="sm" className="flex-1" onClick={applyAdvanced} disabled={bulkBusy}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="flex-1"
+                                onClick={() => setAdvancedMode(false)}
+                              >
+                                Back
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1"
+                                onClick={applyAdvanced}
+                                disabled={bulkBusy}
+                              >
                                 {bulkBusy ? "…" : "Apply Selection"}
                               </Button>
                             </div>
@@ -982,18 +1115,42 @@ function PeoplePage() {
                       </PopoverContent>
                     </Popover>
                   </TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Name</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Title</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Company</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">Location</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">AI Score</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Title
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Company
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Location
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    AI Score
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">Loading…</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      Loading…
+                    </TableCell>
+                  </TableRow>
                 ) : rows.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">No leads match your filters.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="py-12 text-center text-sm text-muted-foreground"
+                    >
+                      No leads match your filters.
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   rows.map((r) => (
                     <TableRow
@@ -1007,7 +1164,8 @@ function PeoplePage() {
                           onCheckedChange={(v) => {
                             setPicked((prev) => {
                               const next = new Set(prev);
-                              if (v) next.add(r.id); else next.delete(r.id);
+                              if (v) next.add(r.id);
+                              else next.delete(r.id);
                               return next;
                             });
                           }}
@@ -1029,21 +1187,31 @@ function PeoplePage() {
                             />
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate">{[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}</span>
-                            {r.linkedin_url && <Linkedin className="h-3 w-3 text-muted-foreground" />}
+                            <span className="truncate">
+                              {[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}
+                            </span>
+                            {r.linkedin_url && (
+                              <Linkedin className="h-3 w-3 text-muted-foreground" />
+                            )}
                             {r.email && <Mail className="h-3 w-3 text-muted-foreground" />}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm">{r.title || "—"}</TableCell>
-                      <TableCell className="max-w-[200px] truncate text-sm">{r.org_name || "—"}</TableCell>
+                      <TableCell className="max-w-[220px] truncate text-sm">
+                        {r.title || "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-sm">
+                        {r.org_name || "—"}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
                           {[r.city, r.state].filter(Boolean).join(", ") || r.country || "—"}
                         </span>
                       </TableCell>
-                      <TableCell><ScoreBadge info={scores.get(r.id)} /></TableCell>
+                      <TableCell>
+                        <ScoreBadge info={scores.get(r.id)} />
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -1058,8 +1226,24 @@ function PeoplePage() {
             {isFetching ? "Loading…" : `Showing page ${page + 1} of ${totalPages.toLocaleString()}`}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="border-white/10 bg-white/5" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
-            <Button variant="outline" size="sm" className="border-white/10 bg-white/5" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/10 bg-white/5"
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/10 bg-white/5"
+              disabled={page + 1 >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
           </div>
         </div>
       </div>
@@ -1084,10 +1268,22 @@ function PeoplePage() {
                   <stop offset="100%" stopColor="oklch(0.78 0.16 210)" />
                 </linearGradient>
               </defs>
-              <circle cx="60" cy="60" r="50" fill="none" stroke="oklch(1 0 0 / 0.06)" strokeWidth="8" />
               <circle
-                cx="60" cy="60" r="50" fill="none"
-                stroke="url(#gauge-grad)" strokeWidth="8" strokeLinecap="round"
+                cx="60"
+                cy="60"
+                r="50"
+                fill="none"
+                stroke="oklch(1 0 0 / 0.06)"
+                strokeWidth="8"
+              />
+              <circle
+                cx="60"
+                cy="60"
+                r="50"
+                fill="none"
+                stroke="url(#gauge-grad)"
+                strokeWidth="8"
+                strokeLinecap="round"
                 strokeDasharray={`${gaugePct * 314} 314`}
                 style={{ filter: "drop-shadow(0 0 8px oklch(0.78 0.16 210 / 0.5))" }}
               />
@@ -1095,9 +1291,14 @@ function PeoplePage() {
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div className="font-mono-num text-2xl font-bold tracking-tight">
                 {totalScore.toLocaleString()}
-                <span className="text-sm font-normal text-muted-foreground"> / {maxScore.toLocaleString()}</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {" "}
+                  / {maxScore.toLocaleString()}
+                </span>
               </div>
-              <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Total Score</div>
+              <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                Total Score
+              </div>
             </div>
           </div>
 
@@ -1116,7 +1317,13 @@ function PeoplePage() {
               <span className="text-muted-foreground">Scoring Threshold</span>
               <span className="font-mono-num font-semibold">{minScore}</span>
             </div>
-            <Slider value={[minScore]} min={0} max={100} step={5} onValueChange={(v) => setMinScore(v[0] ?? 0)} />
+            <Slider
+              value={[minScore]}
+              min={0}
+              max={100}
+              step={5}
+              onValueChange={(v) => setMinScore(v[0] ?? 0)}
+            />
             <p className="mt-2 font-mono-num text-xs text-muted-foreground">
               {aboveThreshold} leads above threshold
             </p>
@@ -1130,14 +1337,17 @@ function PeoplePage() {
               onClick={hasSelection ? scoreSelectedLeads : scorePageLeads}
               disabled={scoringBusy || (hasSelection ? picked.size === 0 : rows.length === 0)}
             >
-              {scoringBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
-              {hasSelection
-                ? `Score ${picked.size.toLocaleString()} selected`
-                : "Score this page"}
+              {scoringBusy ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1 h-3 w-3" />
+              )}
+              {hasSelection ? `Score ${picked.size.toLocaleString()} selected` : "Score this page"}
             </Button>
             {!hasSelection && (
               <p className="text-[10px] leading-relaxed text-muted-foreground">
-                Tip: click the checkbox header above the table to select all matching leads (up to 50,000), then score them all at once.
+                Tip: click the checkbox header above the table to select all matching leads (up to
+                50,000), then score them all at once.
               </p>
             )}
             {scoredEligibleIds.length > 0 && (
@@ -1157,21 +1367,31 @@ function PeoplePage() {
             <div className="mt-3 rounded-md border border-white/10 bg-white/[0.03] p-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-medium">
-                  {jobProgress.status === "running" && <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />}
+                  {jobProgress.status === "running" && (
+                    <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+                  )}
                   {jobProgress.status === "running" ? "Scoring…" : jobProgress.status}
                 </span>
                 <span className="font-mono-num text-muted-foreground">
-                  {jobProgress.scoredLeads.toLocaleString()} / {jobProgress.totalLeads.toLocaleString()}
+                  {jobProgress.scoredLeads.toLocaleString()} /{" "}
+                  {jobProgress.totalLeads.toLocaleString()}
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
                 <div
                   className="h-full bg-[var(--gradient-aurora)] transition-all"
-                  style={{ width: `${jobProgress.totalBatches === 0 ? 0 : Math.round(((jobProgress.completedBatches + jobProgress.failedBatches) / jobProgress.totalBatches) * 100)}%` }}
+                  style={{
+                    width: `${jobProgress.totalBatches === 0 ? 0 : Math.round(((jobProgress.completedBatches + jobProgress.failedBatches) / jobProgress.totalBatches) * 100)}%`,
+                  }}
                 />
               </div>
               {jobProgress.status === "running" && activeJobId && (
-                <button onClick={cancelScoring} className="mt-1 text-[10px] text-destructive hover:underline">Cancel</button>
+                <button
+                  onClick={cancelScoring}
+                  className="mt-1 text-[10px] text-destructive hover:underline"
+                >
+                  Cancel
+                </button>
               )}
             </div>
           )}
@@ -1183,12 +1403,19 @@ function PeoplePage() {
             <div className="mb-4 flex items-start gap-3">
               <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-white/5 shadow-[0_4px_12px_-4px_oklch(0.70_0.18_290/0.5)] ring-1 ring-white/10">
                 <img
-                  src={selectedFull.profile_pic || avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id)}
+                  src={
+                    selectedFull.profile_pic ||
+                    avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id)
+                  }
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
                   onError={(e) => {
                     const img = e.currentTarget as HTMLImageElement;
-                    const fallback = avatarUrl(selectedFull.first_name, selectedFull.last_name, selectedFull.id);
+                    const fallback = avatarUrl(
+                      selectedFull.first_name,
+                      selectedFull.last_name,
+                      selectedFull.id,
+                    );
                     if (img.src !== fallback) img.src = fallback;
                   }}
                 />
@@ -1196,26 +1423,39 @@ function PeoplePage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <div className="truncate font-semibold">
-                    {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}
+                    {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") ||
+                      "Lead"}
                   </div>
-                  {scores.get(selectedFull.id) && scores.get(selectedFull.id)!.score >= minScore && (
-                    <span className="rounded-full border border-[oklch(0.78_0.16_210/0.3)] bg-[oklch(0.78_0.16_210/0.1)] px-2 py-0.5 text-[10px] font-medium text-[oklch(0.78_0.16_210)]">
-                      High Match
-                    </span>
-                  )}
+                  {scores.get(selectedFull.id) &&
+                    scores.get(selectedFull.id)!.score >= minScore && (
+                      <span className="rounded-full border border-[oklch(0.78_0.16_210/0.3)] bg-[oklch(0.78_0.16_210/0.1)] px-2 py-0.5 text-[10px] font-medium text-[oklch(0.78_0.16_210)]">
+                        High Match
+                      </span>
+                    )}
                 </div>
-                <div className="truncate text-xs text-muted-foreground">{selectedFull.title || "—"}</div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {selectedFull.title || "—"}
+                </div>
                 {selectedFull.org_name && (
-                  <div className="mt-1 truncate text-xs text-foreground">{selectedFull.org_name}</div>
+                  <div className="mt-1 truncate text-xs text-foreground">
+                    {selectedFull.org_name}
+                  </div>
                 )}
-                {([selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ")) && (
+                {[selectedFull.city, selectedFull.state, selectedFull.country]
+                  .filter(Boolean)
+                  .join(", ") && (
                   <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    {[selectedFull.city, selectedFull.state, selectedFull.country].filter(Boolean).join(", ")}
+                    {[selectedFull.city, selectedFull.state, selectedFull.country]
+                      .filter(Boolean)
+                      .join(", ")}
                   </div>
                 )}
               </div>
-              <button onClick={() => setSelected(null)} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setSelected(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1232,18 +1472,62 @@ function PeoplePage() {
 
               <Section title="Contact">
                 <div className="space-y-1.5 text-xs">
-                  {selectedFull.email && <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />}
-                  {selectedFull.phone && <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />}
-                  {selectedFull.linkedin_url && <Row icon={<Linkedin className="h-3.5 w-3.5" />} value="LinkedIn profile" href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`} />}
-                  {selectedFull.org_website_url && <Row icon={<Globe className="h-3.5 w-3.5" />} value={selectedFull.org_website_url} href={selectedFull.org_website_url.startsWith("http") ? selectedFull.org_website_url : `https://${selectedFull.org_website_url}`} />}
+                  {selectedFull.email && (
+                    <Row
+                      icon={<Mail className="h-3.5 w-3.5" />}
+                      value={selectedFull.email}
+                      href={`mailto:${selectedFull.email}`}
+                    />
+                  )}
+                  {selectedFull.phone && (
+                    <Row
+                      icon={<Phone className="h-3.5 w-3.5" />}
+                      value={selectedFull.phone}
+                      href={`tel:${selectedFull.phone}`}
+                    />
+                  )}
+                  {selectedFull.linkedin_url && (
+                    <Row
+                      icon={<Linkedin className="h-3.5 w-3.5" />}
+                      value="LinkedIn profile"
+                      href={
+                        selectedFull.linkedin_url.startsWith("http")
+                          ? selectedFull.linkedin_url
+                          : `https://${selectedFull.linkedin_url}`
+                      }
+                    />
+                  )}
+                  {selectedFull.org_website_url && (
+                    <Row
+                      icon={<Globe className="h-3.5 w-3.5" />}
+                      value={selectedFull.org_website_url}
+                      href={
+                        selectedFull.org_website_url.startsWith("http")
+                          ? selectedFull.org_website_url
+                          : `https://${selectedFull.org_website_url}`
+                      }
+                    />
+                  )}
                 </div>
               </Section>
 
-              {(selectedFull.org_industry || selectedFull.org_employee_count || selectedFull.org_description) && (
+              {(selectedFull.org_industry ||
+                selectedFull.org_employee_count ||
+                selectedFull.org_description) && (
                 <Section title="Company">
-                  {selectedFull.org_industry && <div className="text-xs text-muted-foreground">{selectedFull.org_industry}</div>}
-                  {selectedFull.org_employee_count && <div className="text-xs text-muted-foreground">{selectedFull.org_employee_count} employees</div>}
-                  {selectedFull.org_description && <p className="mt-2 line-clamp-4 whitespace-pre-line text-xs text-muted-foreground">{selectedFull.org_description}</p>}
+                  {selectedFull.org_industry && (
+                    <div className="text-xs text-muted-foreground">{selectedFull.org_industry}</div>
+                  )}
+                  {selectedFull.org_employee_count && (
+                    <div className="text-xs text-muted-foreground">
+                      {selectedFull.org_employee_count} employees
+                    </div>
+                  )}
+                  {selectedFull.org_description && (
+                    <p className="mt-2 line-clamp-4 whitespace-pre-line text-xs text-muted-foreground">
+                      {selectedFull.org_description}
+                    </p>
+                  )}
                 </Section>
               )}
             </div>
@@ -1264,7 +1548,10 @@ function PeoplePage() {
           {selectedFull && (
             <>
               <SheetHeader>
-                <SheetTitle>{[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") || "Lead"}</SheetTitle>
+                <SheetTitle>
+                  {[selectedFull.first_name, selectedFull.last_name].filter(Boolean).join(" ") ||
+                    "Lead"}
+                </SheetTitle>
                 <SheetDescription>{selectedFull.title}</SheetDescription>
               </SheetHeader>
               <div className="mt-6 space-y-5 px-4 pb-6 text-sm">
@@ -1272,20 +1559,50 @@ function PeoplePage() {
                   const info = scores.get(selectedFull.id);
                   return info ? (
                     <Section title="AI IPP analysis">
-                      <div className="-mx-1 rounded-md border"><IppBreakdown info={info} /></div>
+                      <div className="-mx-1 rounded-md border">
+                        <IppBreakdown info={info} />
+                      </div>
                     </Section>
                   ) : null;
                 })()}
                 <Section title="Company">
                   <div className="font-medium">{selectedFull.org_name || "—"}</div>
-                  {selectedFull.org_industry && <div className="text-muted-foreground">{selectedFull.org_industry}</div>}
-                  {selectedFull.org_employee_count && <div className="text-muted-foreground">{selectedFull.org_employee_count} employees</div>}
+                  {selectedFull.org_industry && (
+                    <div className="text-muted-foreground">{selectedFull.org_industry}</div>
+                  )}
+                  {selectedFull.org_employee_count && (
+                    <div className="text-muted-foreground">
+                      {selectedFull.org_employee_count} employees
+                    </div>
+                  )}
                 </Section>
                 <Section title="Contact">
                   <div className="space-y-1.5">
-                    {selectedFull.email && <Row icon={<Mail className="h-3.5 w-3.5" />} value={selectedFull.email} href={`mailto:${selectedFull.email}`} />}
-                    {selectedFull.phone && <Row icon={<Phone className="h-3.5 w-3.5" />} value={selectedFull.phone} href={`tel:${selectedFull.phone}`} />}
-                    {selectedFull.linkedin_url && <Row icon={<Linkedin className="h-3.5 w-3.5" />} value="LinkedIn profile" href={selectedFull.linkedin_url.startsWith("http") ? selectedFull.linkedin_url : `https://${selectedFull.linkedin_url}`} />}
+                    {selectedFull.email && (
+                      <Row
+                        icon={<Mail className="h-3.5 w-3.5" />}
+                        value={selectedFull.email}
+                        href={`mailto:${selectedFull.email}`}
+                      />
+                    )}
+                    {selectedFull.phone && (
+                      <Row
+                        icon={<Phone className="h-3.5 w-3.5" />}
+                        value={selectedFull.phone}
+                        href={`tel:${selectedFull.phone}`}
+                      />
+                    )}
+                    {selectedFull.linkedin_url && (
+                      <Row
+                        icon={<Linkedin className="h-3.5 w-3.5" />}
+                        value="LinkedIn profile"
+                        href={
+                          selectedFull.linkedin_url.startsWith("http")
+                            ? selectedFull.linkedin_url
+                            : `https://${selectedFull.linkedin_url}`
+                        }
+                      />
+                    )}
                   </div>
                 </Section>
               </div>
@@ -1294,14 +1611,40 @@ function PeoplePage() {
         </SheetContent>
       </Sheet>
 
-      <AddToListDialog open={addOpen} onOpenChange={setAddOpen} leadIds={pickedIds} onAdded={() => setPicked(new Set())} />
-      <AddToListDialog mode="campaign" open={campaignOpen} onOpenChange={setCampaignOpen} leadIds={pickedIds} leadScores={campaignLeadScores} onAdded={() => setPicked(new Set())} />
-      <AddToListDialog mode="campaign" open={scoredCampaignOpen} onOpenChange={setScoredCampaignOpen} leadIds={scoredEligibleIds} leadScores={scoredEligibleScores} />
+      <AddToListDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        leadIds={pickedIds}
+        onAdded={() => setPicked(new Set())}
+      />
+      <AddToListDialog
+        mode="campaign"
+        open={campaignOpen}
+        onOpenChange={setCampaignOpen}
+        leadIds={pickedIds}
+        leadScores={campaignLeadScores}
+        onAdded={() => setPicked(new Set())}
+      />
+      <AddToListDialog
+        mode="campaign"
+        open={scoredCampaignOpen}
+        onOpenChange={setScoredCampaignOpen}
+        leadIds={scoredEligibleIds}
+        leadScores={scoredEligibleScores}
+      />
     </div>
   );
 }
 
-function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+function MenuItem({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
@@ -1314,8 +1657,18 @@ function MenuItem({ children, onClick, disabled }: { children: React.ReactNode; 
 }
 
 function Field({
-  icon, label, placeholder, value, onChange,
-}: { icon: React.ReactNode; label: string; placeholder: string; value: string; onChange: (v: string) => void }) {
+  icon,
+  label,
+  placeholder,
+  value,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="space-y-2">
       <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -1327,56 +1680,228 @@ function Field({
 }
 
 const COMMON_INDUSTRIES = [
-  "Software", "Information Technology", "Computer Software", "Internet", "SaaS",
-  "Artificial Intelligence", "Cybersecurity", "Cloud Computing", "Fintech", "E-commerce",
-  "Financial Services", "Banking", "Insurance", "Investment Management", "Venture Capital",
-  "Private Equity", "Accounting", "Real Estate", "Commercial Real Estate", "Construction",
-  "Architecture & Planning", "Healthcare", "Hospital & Health Care", "Medical Devices",
-  "Pharmaceuticals", "Biotechnology", "Mental Health Care", "Telemedicine",
-  "Education", "Higher Education", "E-Learning", "EdTech",
-  "Marketing & Advertising", "Public Relations", "Market Research", "Media Production",
-  "Publishing", "Broadcast Media", "Entertainment", "Music", "Film",
-  "Retail", "Consumer Goods", "Apparel & Fashion", "Cosmetics", "Food & Beverages",
-  "Restaurants", "Hospitality", "Hotels", "Travel", "Leisure & Tourism",
-  "Manufacturing", "Industrial Automation", "Automotive", "Aerospace", "Defense",
-  "Logistics & Supply Chain", "Transportation", "Warehousing", "Maritime",
-  "Energy", "Oil & Gas", "Renewable Energy", "Utilities", "Mining & Metals",
-  "Agriculture", "Farming", "Environmental Services", "Waste Management",
-  "Legal Services", "Law Practice", "Management Consulting", "Business Consulting",
-  "Staffing & Recruiting", "Human Resources", "Professional Training",
-  "Telecommunications", "Wireless", "Semiconductors", "Electronics",
-  "Government", "Non-Profit", "Civic & Social Organization", "Religious Institutions",
-  "Sports", "Fitness", "Wellness", "Beauty", "Veterinary", "Pet Services",
+  "Software",
+  "Information Technology",
+  "Computer Software",
+  "Internet",
+  "SaaS",
+  "Artificial Intelligence",
+  "Cybersecurity",
+  "Cloud Computing",
+  "Fintech",
+  "E-commerce",
+  "Financial Services",
+  "Banking",
+  "Insurance",
+  "Investment Management",
+  "Venture Capital",
+  "Private Equity",
+  "Accounting",
+  "Real Estate",
+  "Commercial Real Estate",
+  "Construction",
+  "Architecture & Planning",
+  "Healthcare",
+  "Hospital & Health Care",
+  "Medical Devices",
+  "Pharmaceuticals",
+  "Biotechnology",
+  "Mental Health Care",
+  "Telemedicine",
+  "Education",
+  "Higher Education",
+  "E-Learning",
+  "EdTech",
+  "Marketing & Advertising",
+  "Public Relations",
+  "Market Research",
+  "Media Production",
+  "Publishing",
+  "Broadcast Media",
+  "Entertainment",
+  "Music",
+  "Film",
+  "Retail",
+  "Consumer Goods",
+  "Apparel & Fashion",
+  "Cosmetics",
+  "Food & Beverages",
+  "Restaurants",
+  "Hospitality",
+  "Hotels",
+  "Travel",
+  "Leisure & Tourism",
+  "Manufacturing",
+  "Industrial Automation",
+  "Automotive",
+  "Aerospace",
+  "Defense",
+  "Logistics & Supply Chain",
+  "Transportation",
+  "Warehousing",
+  "Maritime",
+  "Energy",
+  "Oil & Gas",
+  "Renewable Energy",
+  "Utilities",
+  "Mining & Metals",
+  "Agriculture",
+  "Farming",
+  "Environmental Services",
+  "Waste Management",
+  "Legal Services",
+  "Law Practice",
+  "Management Consulting",
+  "Business Consulting",
+  "Staffing & Recruiting",
+  "Human Resources",
+  "Professional Training",
+  "Telecommunications",
+  "Wireless",
+  "Semiconductors",
+  "Electronics",
+  "Government",
+  "Non-Profit",
+  "Civic & Social Organization",
+  "Religious Institutions",
+  "Sports",
+  "Fitness",
+  "Wellness",
+  "Beauty",
+  "Veterinary",
+  "Pet Services",
 ];
 
 const COMMON_LOCATIONS = [
-  "United States", "United Kingdom", "Canada", "Australia", "Germany", "France",
-  "Netherlands", "Spain", "Italy", "Sweden", "Ireland", "Switzerland", "Denmark",
-  "Norway", "Finland", "Belgium", "Portugal", "Poland", "Austria",
-  "India", "Singapore", "United Arab Emirates", "Israel", "Japan", "Brazil", "Mexico",
-  "New York", "New York, NY", "San Francisco, CA", "Los Angeles, CA", "San Diego, CA",
-  "Seattle, WA", "Portland, OR", "Austin, TX", "Dallas, TX", "Houston, TX",
-  "Chicago, IL", "Boston, MA", "Atlanta, GA", "Miami, FL", "Orlando, FL", "Tampa, FL",
-  "Denver, CO", "Phoenix, AZ", "Las Vegas, NV", "Salt Lake City, UT",
-  "Washington, DC", "Philadelphia, PA", "Pittsburgh, PA", "Detroit, MI", "Minneapolis, MN",
-  "Nashville, TN", "Charlotte, NC", "Raleigh, NC", "Columbus, OH", "Cleveland, OH",
-  "Indianapolis, IN", "Kansas City, MO", "St. Louis, MO",
-  "California", "Texas", "Florida", "New York", "Illinois", "Pennsylvania", "Ohio",
-  "Georgia", "North Carolina", "Michigan", "Massachusetts", "Washington", "Colorado",
-  "Toronto", "Vancouver", "Montreal", "Calgary", "Ottawa",
-  "London", "Manchester", "Edinburgh", "Dublin",
-  "Berlin", "Munich", "Hamburg", "Frankfurt", "Paris", "Lyon", "Amsterdam", "Rotterdam",
-  "Madrid", "Barcelona", "Lisbon", "Milan", "Rome", "Zurich", "Geneva",
-  "Stockholm", "Copenhagen", "Oslo", "Helsinki",
-  "Sydney", "Melbourne", "Brisbane", "Perth",
-  "Dubai", "Abu Dhabi", "Tel Aviv", "Singapore", "Hong Kong", "Tokyo", "Bangalore", "Mumbai", "Delhi",
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "Germany",
+  "France",
+  "Netherlands",
+  "Spain",
+  "Italy",
+  "Sweden",
+  "Ireland",
+  "Switzerland",
+  "Denmark",
+  "Norway",
+  "Finland",
+  "Belgium",
+  "Portugal",
+  "Poland",
+  "Austria",
+  "India",
+  "Singapore",
+  "United Arab Emirates",
+  "Israel",
+  "Japan",
+  "Brazil",
+  "Mexico",
+  "New York",
+  "New York, NY",
+  "San Francisco, CA",
+  "Los Angeles, CA",
+  "San Diego, CA",
+  "Seattle, WA",
+  "Portland, OR",
+  "Austin, TX",
+  "Dallas, TX",
+  "Houston, TX",
+  "Chicago, IL",
+  "Boston, MA",
+  "Atlanta, GA",
+  "Miami, FL",
+  "Orlando, FL",
+  "Tampa, FL",
+  "Denver, CO",
+  "Phoenix, AZ",
+  "Las Vegas, NV",
+  "Salt Lake City, UT",
+  "Washington, DC",
+  "Philadelphia, PA",
+  "Pittsburgh, PA",
+  "Detroit, MI",
+  "Minneapolis, MN",
+  "Nashville, TN",
+  "Charlotte, NC",
+  "Raleigh, NC",
+  "Columbus, OH",
+  "Cleveland, OH",
+  "Indianapolis, IN",
+  "Kansas City, MO",
+  "St. Louis, MO",
+  "California",
+  "Texas",
+  "Florida",
+  "New York",
+  "Illinois",
+  "Pennsylvania",
+  "Ohio",
+  "Georgia",
+  "North Carolina",
+  "Michigan",
+  "Massachusetts",
+  "Washington",
+  "Colorado",
+  "Toronto",
+  "Vancouver",
+  "Montreal",
+  "Calgary",
+  "Ottawa",
+  "London",
+  "Manchester",
+  "Edinburgh",
+  "Dublin",
+  "Berlin",
+  "Munich",
+  "Hamburg",
+  "Frankfurt",
+  "Paris",
+  "Lyon",
+  "Amsterdam",
+  "Rotterdam",
+  "Madrid",
+  "Barcelona",
+  "Lisbon",
+  "Milan",
+  "Rome",
+  "Zurich",
+  "Geneva",
+  "Stockholm",
+  "Copenhagen",
+  "Oslo",
+  "Helsinki",
+  "Sydney",
+  "Melbourne",
+  "Brisbane",
+  "Perth",
+  "Dubai",
+  "Abu Dhabi",
+  "Tel Aviv",
+  "Singapore",
+  "Hong Kong",
+  "Tokyo",
+  "Bangalore",
+  "Mumbai",
+  "Delhi",
 ];
 
 function AutocompleteField({
-  icon, label, placeholder, value, onChange, options,
+  icon,
+  label,
+  placeholder,
+  value,
+  onChange,
+  options,
 }: {
-  icon: React.ReactNode; label: string; placeholder: string;
-  value: string; onChange: (v: string) => void; options: string[];
+  icon: React.ReactNode;
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1409,7 +1934,10 @@ function AutocompleteField({
       <div className="relative">
         <Input
           value={value}
-          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
@@ -1445,34 +1973,133 @@ function AutocompleteField({
 }
 
 const COMMON_TITLES = [
-  "CEO", "Chief Executive Officer", "COO", "Chief Operating Officer", "CFO", "Chief Financial Officer",
-  "CTO", "Chief Technology Officer", "CIO", "Chief Information Officer", "CMO", "Chief Marketing Officer",
-  "CRO", "Chief Revenue Officer", "CHRO", "Chief People Officer", "CPO", "Chief Product Officer",
-  "Chief of Staff", "Founder", "Co-Founder", "Owner", "President", "Vice President",
-  "VP of Sales", "VP of Marketing", "VP of Engineering", "VP of Product", "VP of Operations",
-  "VP of Finance", "VP of People", "VP of Customer Success", "VP of Business Development",
-  "SVP", "EVP", "Managing Director", "General Manager", "Director",
-  "Director of Sales", "Director of Marketing", "Director of Engineering", "Director of Operations",
-  "Director of Product", "Director of Finance", "Director of HR", "Director of Customer Success",
-  "Head of Sales", "Head of Marketing", "Head of Growth", "Head of Engineering", "Head of Product",
-  "Head of Operations", "Head of People", "Head of Partnerships",
-  "Sales Manager", "Marketing Manager", "Product Manager", "Engineering Manager", "Operations Manager",
-  "Account Manager", "Account Executive", "Sales Development Representative", "SDR", "BDR",
-  "Business Development Representative", "Customer Success Manager", "Project Manager", "Program Manager",
-  "Marketing Director", "Brand Manager", "Content Manager", "SEO Manager", "Growth Marketing Manager",
-  "Digital Marketing Manager", "Digital Marketing Specialist", "Marketing Specialist", "Marketing Coordinator",
-  "Social Media Manager", "Demand Generation Manager", "Performance Marketing Manager",
-  "Software Engineer", "Senior Software Engineer", "Staff Engineer", "Principal Engineer",
-  "Frontend Engineer", "Backend Engineer", "Full Stack Engineer", "DevOps Engineer", "Data Engineer",
-  "Data Scientist", "Data Analyst", "Machine Learning Engineer", "AI Engineer", "Solutions Architect",
-  "Sales Engineer", "Solutions Engineer", "Technical Account Manager",
-  "Recruiter", "Talent Acquisition Manager", "HR Manager", "HR Business Partner",
-  "Financial Analyst", "Controller", "Accountant", "Operations Analyst",
-  "Realtor", "Real Estate Agent", "Broker", "Loan Officer", "Mortgage Broker",
-  "Attorney", "Lawyer", "Paralegal", "Partner", "Associate",
-  "Physician", "Doctor", "Dentist", "Nurse Practitioner", "Practice Manager",
-  "Consultant", "Senior Consultant", "Principal Consultant", "Partner Consultant",
-  "Insurance Agent", "Financial Advisor", "Wealth Manager",
+  "CEO",
+  "Chief Executive Officer",
+  "COO",
+  "Chief Operating Officer",
+  "CFO",
+  "Chief Financial Officer",
+  "CTO",
+  "Chief Technology Officer",
+  "CIO",
+  "Chief Information Officer",
+  "CMO",
+  "Chief Marketing Officer",
+  "CRO",
+  "Chief Revenue Officer",
+  "CHRO",
+  "Chief People Officer",
+  "CPO",
+  "Chief Product Officer",
+  "Chief of Staff",
+  "Founder",
+  "Co-Founder",
+  "Owner",
+  "President",
+  "Vice President",
+  "VP of Sales",
+  "VP of Marketing",
+  "VP of Engineering",
+  "VP of Product",
+  "VP of Operations",
+  "VP of Finance",
+  "VP of People",
+  "VP of Customer Success",
+  "VP of Business Development",
+  "SVP",
+  "EVP",
+  "Managing Director",
+  "General Manager",
+  "Director",
+  "Director of Sales",
+  "Director of Marketing",
+  "Director of Engineering",
+  "Director of Operations",
+  "Director of Product",
+  "Director of Finance",
+  "Director of HR",
+  "Director of Customer Success",
+  "Head of Sales",
+  "Head of Marketing",
+  "Head of Growth",
+  "Head of Engineering",
+  "Head of Product",
+  "Head of Operations",
+  "Head of People",
+  "Head of Partnerships",
+  "Sales Manager",
+  "Marketing Manager",
+  "Product Manager",
+  "Engineering Manager",
+  "Operations Manager",
+  "Account Manager",
+  "Account Executive",
+  "Sales Development Representative",
+  "SDR",
+  "BDR",
+  "Business Development Representative",
+  "Customer Success Manager",
+  "Project Manager",
+  "Program Manager",
+  "Marketing Director",
+  "Brand Manager",
+  "Content Manager",
+  "SEO Manager",
+  "Growth Marketing Manager",
+  "Digital Marketing Manager",
+  "Digital Marketing Specialist",
+  "Marketing Specialist",
+  "Marketing Coordinator",
+  "Social Media Manager",
+  "Demand Generation Manager",
+  "Performance Marketing Manager",
+  "Software Engineer",
+  "Senior Software Engineer",
+  "Staff Engineer",
+  "Principal Engineer",
+  "Frontend Engineer",
+  "Backend Engineer",
+  "Full Stack Engineer",
+  "DevOps Engineer",
+  "Data Engineer",
+  "Data Scientist",
+  "Data Analyst",
+  "Machine Learning Engineer",
+  "AI Engineer",
+  "Solutions Architect",
+  "Sales Engineer",
+  "Solutions Engineer",
+  "Technical Account Manager",
+  "Recruiter",
+  "Talent Acquisition Manager",
+  "HR Manager",
+  "HR Business Partner",
+  "Financial Analyst",
+  "Controller",
+  "Accountant",
+  "Operations Analyst",
+  "Realtor",
+  "Real Estate Agent",
+  "Broker",
+  "Loan Officer",
+  "Mortgage Broker",
+  "Attorney",
+  "Lawyer",
+  "Paralegal",
+  "Partner",
+  "Associate",
+  "Physician",
+  "Doctor",
+  "Dentist",
+  "Nurse Practitioner",
+  "Practice Manager",
+  "Consultant",
+  "Senior Consultant",
+  "Principal Consultant",
+  "Partner Consultant",
+  "Insurance Agent",
+  "Financial Advisor",
+  "Wealth Manager",
 ];
 
 function fuzzyScore(query: string, target: string): number {
@@ -1518,8 +2145,7 @@ function TitleMultiSelect({
 
   const suggestions = useMemo(() => {
     const selected = new Set(values.map((v) => v.toLowerCase()));
-    const scored = COMMON_TITLES
-      .filter((t) => !selected.has(t.toLowerCase()))
+    const scored = COMMON_TITLES.filter((t) => !selected.has(t.toLowerCase()))
       .map((t) => ({ t, s: fuzzyScore(query.trim(), t) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
@@ -1641,7 +2267,15 @@ function TitleMultiSelect({
   );
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <label className="flex cursor-pointer items-center gap-2 text-sm">
       <input
@@ -1716,17 +2350,12 @@ function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-96 p-0"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <PopoverContent align="start" className="w-96 p-0" onClick={(e) => e.stopPropagation()}>
         <IppBreakdown info={info} />
       </PopoverContent>
     </Popover>
   );
 }
-
 
 function IppBreakdown({ info }: { info: ScoreInfo }) {
   const { score, reasoning, signals, strengths, gaps } = info;
@@ -1742,9 +2371,7 @@ function IppBreakdown({ info }: { info: ScoreInfo }) {
             <span className="text-sm text-muted-foreground">/100</span>
           </div>
         </div>
-        {reasoning && (
-          <p className="mt-1 text-xs text-muted-foreground">{reasoning}</p>
-        )}
+        {reasoning && <p className="mt-1 text-xs text-muted-foreground">{reasoning}</p>}
       </div>
 
       {signals.length > 0 && (
@@ -1774,7 +2401,9 @@ function IppBreakdown({ info }: { info: ScoreInfo }) {
                 Why they fit
               </div>
               <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
-                {strengths.map((s, i) => <li key={i}>{s}</li>)}
+                {strengths.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
               </ul>
             </div>
           )}
@@ -1784,7 +2413,9 @@ function IppBreakdown({ info }: { info: ScoreInfo }) {
                 Concerns
               </div>
               <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
-                {gaps.map((g, i) => <li key={i}>{g}</li>)}
+                {gaps.map((g, i) => (
+                  <li key={i}>{g}</li>
+                ))}
               </ul>
             </div>
           )}
@@ -1799,5 +2430,3 @@ function IppBreakdown({ info }: { info: ScoreInfo }) {
     </div>
   );
 }
-
-
