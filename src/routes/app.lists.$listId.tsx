@@ -44,6 +44,8 @@ import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 import { LiveCopilotPanel } from "@/components/LiveCopilotPanel";
+import { FollowAlongTeleprompter } from "@/components/FollowAlongTeleprompter";
+import { useLiveCoaching } from "@/hooks/useLiveCoaching";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -1992,6 +1994,33 @@ function FocusCallView({
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
+
+  // Single shared live-coaching session — drives both the mic-driven teleprompter
+  // (left) and the co-pilot panel (right). One mic, one Deepgram socket.
+  const coaching = useLiveCoaching({
+    listId,
+    leadId,
+    callId: callId ?? null,
+    enabled: aiCopilotEnabled,
+    getRemoteStream,
+  });
+
+  // Auto-start the mic once the call connects.
+  const coachStartedRef = useRef(false);
+  useEffect(() => {
+    if (!aiCopilotEnabled) return;
+    if (callId && !coachStartedRef.current) {
+      coachStartedRef.current = true;
+      coaching.start();
+    }
+    if (!callId) {
+      coachStartedRef.current = false;
+      coaching.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId, aiCopilotEnabled]);
+
+
 
 
   const outcomes = [
