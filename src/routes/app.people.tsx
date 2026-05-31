@@ -466,6 +466,23 @@ function PeoplePage() {
     cancelTokenRef.current = { cancelled: false };
     const token = cancelTokenRef.current;
 
+    // Progress poll: lightweight, decoupled from per-batch DB roundtrips.
+    // One snapshot every 1.5s feeds the UI, while workers focus on AI calls.
+    const progressTimer = setInterval(async () => {
+      if (token.cancelled) return;
+      try {
+        const snap = await getJobSnapshotCall({ data: { jobId } });
+        setJobProgress({
+          totalBatches: snap.job.total_batches,
+          completedBatches: snap.job.completed_batches,
+          failedBatches: snap.job.failed_batches,
+          scoredLeads: snap.job.scored_leads,
+          totalLeads: snap.job.total_leads,
+          status: snap.job.status,
+        });
+      } catch {}
+    }, 1500);
+
     const workerLoop = async () => {
       let emptyClaims = 0;
       while (!token.cancelled) {
@@ -474,27 +491,7 @@ function PeoplePage() {
           if (res.claimed) {
             emptyClaims = 0;
             if (res.results && res.results.length > 0) mergeScoreResults(res.results);
-            if (res.job) {
-              setJobProgress({
-                totalBatches: res.job.total_batches,
-                completedBatches: res.job.completed_batches,
-                failedBatches: res.job.failed_batches,
-                scoredLeads: res.job.scored_leads,
-                totalLeads: res.job.total_leads,
-                status: res.job.status,
-              });
-              if (res.job.status !== "running") break;
-            }
             continue;
-          }
-          // No batch claimed. If job is finished, stop. Otherwise siblings may
-          // still re-queue failures into 'retry' — wait and poll a few times.
-          if (res.job && res.job.status !== "running") break;
-          if (
-            res.job &&
-            res.job.completed_batches + res.job.failed_batches >= res.job.total_batches
-          ) {
-            break;
           }
           emptyClaims += 1;
           if (emptyClaims > 6) break; // ~9s of nothing-to-do → let finalize close the job
@@ -506,6 +503,7 @@ function PeoplePage() {
     };
 
     await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
+    clearInterval(progressTimer);
 
     // Force-finalize: if any batches were left stuck, mark them failed and
     // set the job's terminal status so the UI stops thinking it's still running.
