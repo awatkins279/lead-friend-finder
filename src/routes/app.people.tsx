@@ -606,6 +606,7 @@ function PeoplePage() {
   const cancelScoring = async () => {
     if (!activeJobId) return;
     cancelTokenRef.current.cancelled = true;
+    workerRunIdRef.current += 1;
     try {
       await cancelScoringJobCall({ data: { jobId: activeJobId } });
     } catch {}
