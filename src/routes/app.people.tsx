@@ -657,7 +657,8 @@ function PeoplePage() {
         } else {
           localStorage.removeItem(STORAGE_KEY);
         }
-      } catch {
+      } catch (error) {
+        console.error("Failed to resume scoring job", error);
         localStorage.removeItem(STORAGE_KEY);
       }
     })();
