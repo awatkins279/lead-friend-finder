@@ -2152,7 +2152,11 @@ function FocusCallView({
       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 px-6 pb-6">
         {/* Script panel — teleprompter */}
         <section className="col-span-7 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-          <Teleprompter script={script} />
+          {aiCopilotEnabled ? (
+            <FollowAlongTeleprompter script={script} coaching={coaching} />
+          ) : (
+            <Teleprompter script={script} />
+          )}
         </section>
 
         {/* Objections panel */}
@@ -2165,7 +2169,9 @@ function FocusCallView({
               enabled={aiCopilotEnabled}
               script={script}
               getRemoteStream={getRemoteStream}
+              coaching={coaching}
             />
+
           ) : (
             <>
               <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
