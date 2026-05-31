@@ -41,9 +41,10 @@ export function LiveCopilotPanel({
     sharedCoaching ?? localCoaching;
 
 
-  // auto-start when call is in progress
+  // auto-start when call is in progress (only when we own the mic)
   const startedRef = useRef(false);
   useEffect(() => {
+    if (sharedCoaching) return; // parent owns lifecycle
     if (enabled && callId && !startedRef.current) {
       startedRef.current = true;
       start();
@@ -53,7 +54,8 @@ export function LiveCopilotPanel({
       stop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, callId]);
+  }, [enabled, callId, sharedCoaching]);
+
 
   // Flatten script into searchable sections for auto-highlight.
   const sections = useMemo(() => {
