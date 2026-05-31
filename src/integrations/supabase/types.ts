@@ -364,6 +364,48 @@ export type Database = {
         }
         Relationships: []
       }
+      google_calendar_connections: {
+        Row: {
+          access_token: string
+          calendar_id: string
+          created_at: string
+          google_email: string
+          id: string
+          last_sync_at: string | null
+          refresh_token: string
+          scopes: string | null
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string
+          created_at?: string
+          google_email: string
+          id?: string
+          last_sync_at?: string | null
+          refresh_token: string
+          scopes?: string | null
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string
+          created_at?: string
+          google_email?: string
+          id?: string
+          last_sync_at?: string | null
+          refresh_token?: string
+          scopes?: string | null
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           city: string | null
@@ -642,6 +684,72 @@ export type Database = {
           },
         ]
       }
+      meetings: {
+        Row: {
+          calendar_id: string | null
+          created_at: string
+          ends_at: string
+          google_event_id: string | null
+          id: string
+          lead_id: string | null
+          meet_link: string | null
+          notes: string | null
+          prospect_company: string | null
+          prospect_email: string | null
+          prospect_name: string | null
+          prospect_phone: string | null
+          prospect_summary: Json | null
+          source: string
+          starts_at: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id?: string | null
+          created_at?: string
+          ends_at: string
+          google_event_id?: string | null
+          id?: string
+          lead_id?: string | null
+          meet_link?: string | null
+          notes?: string | null
+          prospect_company?: string | null
+          prospect_email?: string | null
+          prospect_name?: string | null
+          prospect_phone?: string | null
+          prospect_summary?: Json | null
+          source?: string
+          starts_at: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string | null
+          created_at?: string
+          ends_at?: string
+          google_event_id?: string | null
+          id?: string
+          lead_id?: string | null
+          meet_link?: string | null
+          notes?: string | null
+          prospect_company?: string | null
+          prospect_email?: string | null
+          prospect_name?: string | null
+          prospect_phone?: string | null
+          prospect_summary?: Json | null
+          source?: string
+          starts_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           annual_price_cents: number
@@ -750,6 +858,42 @@ export type Database = {
           id?: string
           name?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      scheduling_preferences: {
+        Row: {
+          buffer_minutes: number
+          created_at: string
+          meeting_duration_minutes: number
+          timezone: string
+          updated_at: string
+          user_id: string
+          workday_end_minute: number
+          workday_start_minute: number
+          workdays: number[]
+        }
+        Insert: {
+          buffer_minutes?: number
+          created_at?: string
+          meeting_duration_minutes?: number
+          timezone?: string
+          updated_at?: string
+          user_id: string
+          workday_end_minute?: number
+          workday_start_minute?: number
+          workdays?: number[]
+        }
+        Update: {
+          buffer_minutes?: number
+          created_at?: string
+          meeting_duration_minutes?: number
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+          workday_end_minute?: number
+          workday_start_minute?: number
+          workdays?: number[]
         }
         Relationships: []
       }
