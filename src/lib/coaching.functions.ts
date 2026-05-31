@@ -303,7 +303,7 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ suggestion: LiveSuggestion }> => {
     const { supabase, userId } = context;
 
-    const [{ data: list }, { data: lead }] = await Promise.all([
+    const [{ data: list }, { data: lead }, { data: profile }] = await Promise.all([
       supabase
         .from("lists")
         .select("what_selling, key_selling_points, sender_name, sender_company, coaching_style_id, ai_copilot_enabled")
@@ -313,6 +313,11 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
         .from("leads")
         .select("first_name,last_name,title,org_name,org_industry")
         .eq("id", data.lead_id)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("company_name,product_name,product_description,product_value_props,ideal_customer,common_objections,proof_points,pricing_notes,competitors,call_to_action")
+        .eq("id", userId)
         .maybeSingle(),
     ]);
     if (!list) throw new Error("Campaign not found");
@@ -363,15 +368,32 @@ ${style?.hard_rules ? `HARD RULES:\n${style.hard_rules}` : ""}
 You are listening to a LIVE cold call. Output JSON only:
 {"intent":"objection"|"discovery"|"close"|"rapport"|"continue","prospect_quote":"<the exact line that triggered this>","suggestion":"<1-3 sentences the rep should say RIGHT NOW>","why":"<1 short sentence on why this works in this style>"}`;
 
-    const userPrompt = `CONTEXT
-Rep: ${list.sender_name ?? "the rep"} from ${list.sender_company ?? "—"}
-Selling: ${list.what_selling ?? "—"}
-${list.key_selling_points ? `Selling points: ${list.key_selling_points}` : ""}
+    const p: any = profile ?? {};
+    const productBlock = [
+      p.company_name && `Company: ${p.company_name}`,
+      p.product_name && `Product: ${p.product_name}`,
+      p.product_description && `What it is: ${p.product_description}`,
+      p.product_value_props && `Value props:\n${p.product_value_props}`,
+      p.ideal_customer && `Ideal customer: ${p.ideal_customer}`,
+      p.common_objections && `Common objections + handlers:\n${p.common_objections}`,
+      p.proof_points && `Proof points:\n${p.proof_points}`,
+      p.pricing_notes && `Pricing guidance: ${p.pricing_notes}`,
+      p.competitors && `Competitors: ${p.competitors}`,
+      p.call_to_action && `Default CTA: ${p.call_to_action}`,
+    ].filter(Boolean).join("\n\n");
+
+    const userPrompt = `PRODUCT BRAIN (always-on context)
+${productBlock || "(none configured — tell the user to fill in /app/product-info)"}
+
+CAMPAIGN CONTEXT
+Rep: ${list.sender_name ?? "the rep"} from ${list.sender_company ?? p.company_name ?? "—"}
+Selling: ${list.what_selling ?? p.product_name ?? "—"}
+${list.key_selling_points ? `Campaign-specific points: ${list.key_selling_points}` : ""}
 
 PROSPECT
 ${[lead?.first_name, lead?.last_name].filter(Boolean).join(" ")} — ${lead?.title ?? "?"} at ${lead?.org_name ?? "?"} (${lead?.org_industry ?? "?"})
 
-${knowledge.length ? `RELEVANT PRODUCT KNOWLEDGE:\n${knowledge.map((k, i) => `[${i + 1}] ${k}`).join("\n\n")}\n` : ""}
+${knowledge.length ? `RELEVANT UPLOADED KNOWLEDGE:\n${knowledge.map((k, i) => `[${i + 1}] ${k}`).join("\n\n")}\n` : ""}
 ${
   style?.example_objection_handlers?.length
     ? `STYLE EXAMPLES:\n${style.example_objection_handlers
