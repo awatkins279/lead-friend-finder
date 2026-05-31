@@ -441,7 +441,7 @@ function PeoplePage() {
   const WORKER_COUNT = 24;
   const STORAGE_KEY = "active-scoring-job-id";
 
-  const mergeScoreResults = (
+  const mergeScoreResults = useCallback((
     rows: Array<{ leadId: string; score: number; reasoning: string; signals: any; strengths: any; gaps: any }>,
   ) => {
     if (rows.length === 0) return;
@@ -458,7 +458,7 @@ function PeoplePage() {
       );
       return next;
     });
-  };
+  }, []);
 
   const cancelTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
   const workerRunIdRef = useRef(0);
@@ -495,7 +495,7 @@ function PeoplePage() {
 
       return snap;
     },
-    [getJobSnapshotCall],
+    [getJobSnapshotCall, mergeScoreResults],
   );
 
   const runWorkers = async (jobId: string, totalBatches: number) => {
