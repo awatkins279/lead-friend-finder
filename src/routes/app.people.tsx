@@ -1129,12 +1129,19 @@ function PeoplePage() {
             <Button
               size="sm"
               className="w-full bg-[var(--gradient-aurora)] text-white shadow-[var(--shadow-glow)] hover:opacity-90"
-              onClick={scorePageLeads}
-              disabled={scoringBusy || rows.length === 0}
+              onClick={hasSelection ? scoreSelectedLeads : scorePageLeads}
+              disabled={scoringBusy || (hasSelection ? picked.size === 0 : rows.length === 0)}
             >
               {scoringBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
-              Score page
+              {hasSelection
+                ? `Score ${picked.size.toLocaleString()} selected`
+                : "Score this page"}
             </Button>
+            {!hasSelection && (
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                Tip: click the checkbox header above the table to select all matching leads (up to 50,000), then score them all at once.
+              </p>
+            )}
             {scoredEligibleIds.length > 0 && (
               <Button
                 size="sm"
