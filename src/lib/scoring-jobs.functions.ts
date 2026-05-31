@@ -146,26 +146,11 @@ export const processNextBatch = createServerFn({ method: "POST" })
         scored: results.length,
       });
 
-      const { data: updatedJob } = await supabase
-        .from("scoring_jobs")
-        .select("status,total_batches,completed_batches,failed_batches,scored_leads,total_leads")
-        .eq("id", data.jobId)
-        .single();
-
-      if (
-        updatedJob &&
-        updatedJob.status === "running" &&
-        updatedJob.completed_batches + updatedJob.failed_batches >= updatedJob.total_batches
-      ) {
-        await supabase
-          .from("scoring_jobs")
-          .update({
-            status: updatedJob.failed_batches > 0 ? "completed_with_errors" : "completed",
-          })
-          .eq("id", data.jobId);
-      }
-
-      return { claimed: true as const, results, job: updatedJob ?? null };
+      // Skip the extra SELECT + maybe-mark-completed round-trip here. The
+      // worker loop calls finalize_scoring_job once all workers idle out,
+      // which closes the job atomically. Returning a lightweight progress
+      // hint keeps the UI updating without an extra query per batch.
+      return { claimed: true as const, results, job: null };
     } catch (err: any) {
       const message = String(err?.message ?? "Unknown error").slice(0, 500);
 
