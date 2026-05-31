@@ -465,7 +465,7 @@ function PeoplePage() {
 
   const syncJobSnapshot = useCallback(
     async (jobId: string, runId: number, token: { cancelled: boolean }) => {
-      const snap = await getJobSnapshotCall({ data: { jobId } });
+      const snap = await getJobSnapshotCall({ data: { jobId, includeResults: false } });
       if (workerRunIdRef.current !== runId) return snap;
 
       if (snap.results.length > 0) mergeScoreResults(snap.results);
@@ -622,7 +622,7 @@ function PeoplePage() {
     if (!jobId) return;
     (async () => {
       try {
-        const snap = await getJobSnapshotCall({ data: { jobId } });
+        const snap = await getJobSnapshotCall({ data: { jobId, includeResults: true } });
         if (snap.results.length > 0) mergeScoreResults(snap.results);
         setJobProgress({
           totalBatches: snap.job.total_batches,
