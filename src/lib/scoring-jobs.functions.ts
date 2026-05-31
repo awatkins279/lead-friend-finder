@@ -19,6 +19,7 @@ export type ScoreRow = {
 
 const BATCH_SIZE = 12;
 const MAX_LEADS_PER_JOB = 20000;
+const PROCESSING_STALE_MS = 75_000;
 
 // ---------- createScoringJob ----------
 
@@ -183,6 +184,29 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => snapshotInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+
+    const staleIso = new Date(Date.now() - PROCESSING_STALE_MS).toISOString();
+    const { data: staleRows, error: staleErr } = await supabase
+      .from("scoring_job_batches")
+      .select("id,error")
+      .eq("job_id", data.jobId)
+      .eq("status", "processing")
+      .lt("updated_at", staleIso);
+    if (staleErr) throw new Error(staleErr.message);
+
+    if ((staleRows?.length ?? 0) > 0) {
+      const staleIds = staleRows!.map((row) => row.id);
+      const { error: failErr } = await supabase
+        .from("scoring_job_batches")
+        .update({
+          status: "failed",
+          error: "worker heartbeat expired before scoring finished",
+        })
+        .in("id", staleIds);
+      if (failErr) throw new Error(failErr.message);
+
+      await bumpJobCounters(supabase, data.jobId, { failed: staleIds.length });
+    }
 
     const { data: job, error: jobErr } = await supabase
       .from("scoring_jobs")
