@@ -283,20 +283,15 @@ async function bumpJobCounters(
   jobId: string,
   delta: { completed?: number; failed?: number; scored?: number },
 ) {
-  const { data: row, error } = await supabase
-    .from("scoring_jobs")
-    .select("completed_batches,failed_batches,scored_leads")
-    .eq("id", jobId)
-    .single();
-  if (error || !row) return;
-  await supabase
-    .from("scoring_jobs")
-    .update({
-      completed_batches: row.completed_batches + (delta.completed ?? 0),
-      failed_batches: row.failed_batches + (delta.failed ?? 0),
-      scored_leads: row.scored_leads + (delta.scored ?? 0),
-    })
-    .eq("id", jobId);
+  // Atomic SQL-side increment via SECURITY DEFINER RPC. Avoids the
+  // read-modify-write race that caused workers to lose progress updates
+  // near the end of a run (and made the UI hang on the final ~10% of leads).
+  await supabase.rpc("bump_scoring_job_counters", {
+    p_job_id: jobId,
+    p_completed: delta.completed ?? 0,
+    p_failed: delta.failed ?? 0,
+    p_scored: delta.scored ?? 0,
+  });
 }
 
 async function markBatchFailed(supabase: any, jobId: string, batchId: string, message: string) {
