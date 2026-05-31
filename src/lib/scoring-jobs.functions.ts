@@ -17,7 +17,7 @@ export type ScoreRow = {
   gaps: string[];
 };
 
-const BATCH_SIZE = 6;
+const BATCH_SIZE = 12;
 const MAX_LEADS_PER_JOB = 20000;
 
 // ---------- createScoringJob ----------
