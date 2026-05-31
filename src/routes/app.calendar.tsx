@@ -686,11 +686,19 @@ function SettingsDialog({
               <p className="text-xs text-muted-foreground">
                 Connect your Google Calendar so meetings auto-create Google Meet links and sync both ways.
               </p>
-              <a href="/api/google-calendar/connect">
-                <Button size="sm" className="mt-3">
-                  <CalendarIcon className="mr-2 h-4 w-4" /> Connect Google Calendar
-                </Button>
-              </a>
+              <Button
+                size="sm"
+                className="mt-3"
+                onClick={async () => {
+                  const { supabase } = await import("@/integrations/supabase/client");
+                  const { data } = await supabase.auth.getSession();
+                  const t = data.session?.access_token;
+                  if (!t) return;
+                  window.location.href = `/api/google-calendar/connect?t=${encodeURIComponent(t)}`;
+                }}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" /> Connect Google Calendar
+              </Button>
             </>
           )}
         </div>
