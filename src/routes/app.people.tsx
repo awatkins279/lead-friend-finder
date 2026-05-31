@@ -438,7 +438,7 @@ function PeoplePage() {
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
   // re-opening the page resumes via the localStorage handle.
-  const WORKER_COUNT = 20;
+  const WORKER_COUNT = 6;
   const STORAGE_KEY = "active-scoring-job-id";
 
   const mergeScoreResults = (
