@@ -177,7 +177,10 @@ export const processNextBatch = createServerFn({ method: "POST" })
 
 // ---------- getJobSnapshot ----------
 
-const snapshotInput = z.object({ jobId: z.string().uuid() });
+const snapshotInput = z.object({
+  jobId: z.string().uuid(),
+  includeResults: z.boolean().optional().default(false),
+});
 
 export const getJobSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -196,16 +199,21 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
 
     if ((staleRows?.length ?? 0) > 0) {
       const staleIds = staleRows!.map((row) => row.id);
-      const { error: failErr } = await supabase
+      const { data: failedRows, error: failErr } = await supabase
         .from("scoring_job_batches")
         .update({
           status: "failed",
           error: "worker heartbeat expired before scoring finished",
         })
+        .eq("status", "processing")
+        .select("id")
         .in("id", staleIds);
       if (failErr) throw new Error(failErr.message);
 
-      await bumpJobCounters(supabase, data.jobId, { failed: staleIds.length });
+      const failedCount = failedRows?.length ?? 0;
+      if (failedCount > 0) {
+        await bumpJobCounters(supabase, data.jobId, { failed: failedCount });
+      }
     }
 
     const { data: job, error: jobErr } = await supabase
@@ -217,16 +225,18 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
       .single();
     if (jobErr || !job) throw new Error(jobErr?.message ?? "Job not found");
 
-    const { data: doneBatches, error: batchErr } = await supabase
-      .from("scoring_job_batches")
-      .select("results")
-      .eq("job_id", data.jobId)
-      .eq("status", "done");
-    if (batchErr) throw new Error(batchErr.message);
-
     const results: ScoreRow[] = [];
-    for (const b of doneBatches ?? []) {
-      if (Array.isArray(b.results)) results.push(...(b.results as ScoreRow[]));
+    if (data.includeResults) {
+      const { data: doneBatches, error: batchErr } = await supabase
+        .from("scoring_job_batches")
+        .select("results")
+        .eq("job_id", data.jobId)
+        .eq("status", "done");
+      if (batchErr) throw new Error(batchErr.message);
+
+      for (const b of doneBatches ?? []) {
+        if (Array.isArray(b.results)) results.push(...(b.results as ScoreRow[]));
+      }
     }
     return { job, results };
   });
