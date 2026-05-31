@@ -430,7 +430,7 @@ function PeoplePage() {
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
   // re-opening the page resumes via the localStorage handle.
-  const WORKER_COUNT = 24;
+  const WORKER_COUNT = 12;
   const STORAGE_KEY = "active-scoring-job-id";
 
   const mergeScoreResults = useCallback(
@@ -513,7 +513,9 @@ function PeoplePage() {
       if (token.cancelled || workerRunIdRef.current !== runId) return;
       try {
         await syncJobSnapshot(jobId, runId, token);
-      } catch {}
+      } catch (error) {
+        console.error("Failed to poll scoring progress", error);
+      }
     }, 1500);
 
     const workerLoop = async () => {
@@ -534,7 +536,9 @@ function PeoplePage() {
           if (accounted >= totalBatches) {
             try {
               await finalizeScoringJobCall({ data: { jobId } });
-            } catch {}
+            } catch (error) {
+              console.error("Failed to finalize completed scoring job", error);
+            }
             const afterFinalize = await syncJobSnapshot(jobId, runId, token);
             if (afterFinalize.job.status !== "running") break;
           }
@@ -543,7 +547,9 @@ function PeoplePage() {
           if (emptyClaims > 30) {
             try {
               await finalizeScoringJobCall({ data: { jobId } });
-            } catch {}
+            } catch (error) {
+              console.error("Failed to force-finalize idle scoring job", error);
+            }
             const afterFinalize = await syncJobSnapshot(jobId, runId, token);
             if (afterFinalize.job.status !== "running") break;
             emptyClaims = 0;
@@ -563,11 +569,15 @@ function PeoplePage() {
 
     try {
       await finalizeScoringJobCall({ data: { jobId } });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to finalize scoring job after workers exited", error);
+    }
 
     try {
       await syncJobSnapshot(jobId, runId, token);
-    } catch {}
+    } catch (error) {
+      console.error("Failed to fetch final scoring snapshot", error);
+    }
   };
 
   const startScoringJob = async (ids: string[]) => {
@@ -615,7 +625,9 @@ function PeoplePage() {
     workerRunIdRef.current += 1;
     try {
       await cancelScoringJobCall({ data: { jobId: activeJobId } });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to cancel scoring job", error);
+    }
     localStorage.removeItem(STORAGE_KEY);
     setActiveJobId(null);
     setJobProgress((p) => (p ? { ...p, status: "cancelled" } : null));
