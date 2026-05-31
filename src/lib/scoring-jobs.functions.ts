@@ -136,10 +136,17 @@ export const processNextBatch = createServerFn({ method: "POST" })
     try {
       const results = await scoreBatch(supabase, leadIds, job.context);
 
-      await supabase
+      const { data: completedRows, error: completeErr } = await supabase
         .from("scoring_job_batches")
         .update({ status: "done", results, error: null })
+        .eq("status", "processing")
+        .select("id")
         .eq("id", batchId);
+      if (completeErr) throw new Error(completeErr.message);
+
+      if (!completedRows || completedRows.length === 0) {
+        return { claimed: true as const, results: [], ignored: true };
+      }
 
       await bumpJobCounters(supabase, data.jobId, {
         completed: 1,
@@ -162,10 +169,16 @@ export const processNextBatch = createServerFn({ method: "POST" })
         .single();
 
       if (batchRow && batchRow.attempts < 3) {
-        await supabase
+        const { data: retriedRows, error: retryErr } = await supabase
           .from("scoring_job_batches")
           .update({ status: "retry", error: message })
+          .eq("status", "processing")
+          .select("id")
           .eq("id", batchId);
+        if (retryErr) throw new Error(retryErr.message);
+        if (!retriedRows || retriedRows.length === 0) {
+          return { claimed: true as const, results: [], ignored: true };
+        }
         return { claimed: true as const, results: [], retried: true, error: message };
       }
 
