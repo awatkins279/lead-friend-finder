@@ -497,7 +497,7 @@ function PeoplePage() {
             break;
           }
           emptyClaims += 1;
-          if (emptyClaims > 20) break; // ~30s of nothing-to-do → bail
+          if (emptyClaims > 6) break; // ~9s of nothing-to-do → let finalize close the job
           await new Promise((r) => setTimeout(r, 1500));
         } catch (e) {
           await new Promise((r) => setTimeout(r, 1500));
