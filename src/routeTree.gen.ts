@@ -18,6 +18,7 @@ import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AppVoicemailAgentRouteImport } from './routes/app.voicemail-agent'
 import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
+import { Route as AppProductInfoRouteImport } from './routes/app.product-info'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
 import { Route as AppInboxRouteImport } from './routes/app.inbox'
 import { Route as AppCoachingStylesRouteImport } from './routes/app.coaching-styles'
@@ -75,6 +76,11 @@ const AppSdrAgentsRoute = AppSdrAgentsRouteImport.update({
 const AppSavedRoute = AppSavedRouteImport.update({
   id: '/saved',
   path: '/saved',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProductInfoRoute = AppProductInfoRouteImport.update({
+  id: '/product-info',
+  path: '/product-info',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPeopleRoute = AppPeopleRouteImport.update({
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
+  '/app/product-info': typeof AppProductInfoRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
+  '/app/product-info': typeof AppProductInfoRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
   '/app/people': typeof AppPeopleRoute
+  '/app/product-info': typeof AppProductInfoRoute
   '/app/saved': typeof AppSavedRoute
   '/app/sdr-agents': typeof AppSdrAgentsRoute
   '/app/voicemail-agent': typeof AppVoicemailAgentRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
+    | '/app/product-info'
     | '/app/saved'
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
+    | '/app/product-info'
     | '/app/saved'
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/app/coaching-styles'
     | '/app/inbox'
     | '/app/people'
+    | '/app/product-info'
     | '/app/saved'
     | '/app/sdr-agents'
     | '/app/voicemail-agent'
@@ -371,6 +383,13 @@ declare module '@tanstack/react-router' {
       path: '/saved'
       fullPath: '/app/saved'
       preLoaderRoute: typeof AppSavedRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/product-info': {
+      id: '/app/product-info'
+      path: '/product-info'
+      fullPath: '/app/product-info'
+      preLoaderRoute: typeof AppProductInfoRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/people': {
@@ -473,6 +492,7 @@ interface AppRouteChildren {
   AppCoachingStylesRoute: typeof AppCoachingStylesRoute
   AppInboxRoute: typeof AppInboxRoute
   AppPeopleRoute: typeof AppPeopleRoute
+  AppProductInfoRoute: typeof AppProductInfoRoute
   AppSavedRoute: typeof AppSavedRoute
   AppSdrAgentsRoute: typeof AppSdrAgentsRoute
   AppVoicemailAgentRoute: typeof AppVoicemailAgentRoute
@@ -486,6 +506,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoachingStylesRoute: AppCoachingStylesRoute,
   AppInboxRoute: AppInboxRoute,
   AppPeopleRoute: AppPeopleRoute,
+  AppProductInfoRoute: AppProductInfoRoute,
   AppSavedRoute: AppSavedRoute,
   AppSdrAgentsRoute: AppSdrAgentsRoute,
   AppVoicemailAgentRoute: AppVoicemailAgentRoute,
@@ -523,13 +544,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

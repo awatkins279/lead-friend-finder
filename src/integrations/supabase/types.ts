@@ -674,27 +674,57 @@ export type Database = {
       }
       profiles: {
         Row: {
+          call_to_action: string | null
+          common_objections: string | null
+          company_name: string | null
+          competitors: string | null
           created_at: string
           elevenlabs_voice_id: string | null
           email: string | null
           full_name: string | null
           id: string
+          ideal_customer: string | null
+          pricing_notes: string | null
+          product_description: string | null
+          product_name: string | null
+          product_value_props: string | null
+          proof_points: string | null
           voicemail_settings: Json
         }
         Insert: {
+          call_to_action?: string | null
+          common_objections?: string | null
+          company_name?: string | null
+          competitors?: string | null
           created_at?: string
           elevenlabs_voice_id?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          ideal_customer?: string | null
+          pricing_notes?: string | null
+          product_description?: string | null
+          product_name?: string | null
+          product_value_props?: string | null
+          proof_points?: string | null
           voicemail_settings?: Json
         }
         Update: {
+          call_to_action?: string | null
+          common_objections?: string | null
+          company_name?: string | null
+          competitors?: string | null
           created_at?: string
           elevenlabs_voice_id?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          ideal_customer?: string | null
+          pricing_notes?: string | null
+          product_description?: string | null
+          product_name?: string | null
+          product_value_props?: string | null
+          proof_points?: string | null
           voicemail_settings?: Json
         }
         Relationships: []
