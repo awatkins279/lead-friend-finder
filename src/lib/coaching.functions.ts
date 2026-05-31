@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { NEPQ_KNOWLEDGE } from "@/lib/coaching-knowledge/nepq";
+
 
 // ---------------------------------------------------------------------------
 // COACHING STYLES (admin curated)
@@ -361,8 +363,13 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
 
-    const systemPrompt = `${style?.system_prompt ?? "You are an elite cold-call coach. Tell the rep exactly what to say next in 1-3 sentences."}
+    const isNEPQ = /nepq|jeremy\s*miner/i.test(style?.name ?? "");
+    const knowledgeBlock = isNEPQ
+      ? `\n\n=== METHODOLOGY TRAINING (NEPQ — Jeremy Miner) ===\nThis is the full training the rep is being coached on. Every suggestion you produce MUST be consistent with these rules, tones, question types, and banned phrases.\n\n${NEPQ_KNOWLEDGE}\n=== END METHODOLOGY TRAINING ===\n`
+      : "";
 
+    const systemPrompt = `${style?.system_prompt ?? "You are an elite cold-call coach. Tell the rep exactly what to say next in 1-3 sentences."}
+${knowledgeBlock}
 ${style?.hard_rules ? `HARD RULES:\n${style.hard_rules}` : ""}
 
 You are listening to a LIVE cold call. Output JSON only:
