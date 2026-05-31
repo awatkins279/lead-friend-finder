@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Brain, Mic, MicOff, Loader2, Sparkles, AlertCircle, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLiveCoaching } from "@/hooks/useLiveCoaching";
 import type { CallScript } from "@/lib/calls.functions";
+
+type Coaching = ReturnType<typeof useLiveCoaching>;
 
 type Props = {
   listId: string;
@@ -13,6 +15,8 @@ type Props = {
   getRemoteStream?: () => MediaStream | null;
   /** Returns the heading of the script section the rep is currently on (best-effort match). */
   onCurrentSectionChange?: (heading: string | null) => void;
+  /** Externally-owned coaching state. When provided, this panel does not spin up its own mic. */
+  coaching?: Coaching;
 };
 
 /** AI co-pilot panel — shows live transcript, the AI's next-line suggestion, and an auto-followed script position. */
@@ -24,18 +28,23 @@ export function LiveCopilotPanel({
   script,
   getRemoteStream,
   onCurrentSectionChange,
+  coaching: sharedCoaching,
 }: Props) {
-  const { listening, error, turns, suggestion, suggesting, start, stop, requestSuggestion } = useLiveCoaching({
+  const localCoaching = useLiveCoaching({
     listId,
     leadId,
     callId: callId ?? null,
-    enabled,
+    enabled: enabled && !sharedCoaching,
     getRemoteStream,
   });
+  const { listening, error, turns, suggestion, suggesting, start, stop, requestSuggestion } =
+    sharedCoaching ?? localCoaching;
 
-  // auto-start when call is in progress
+
+  // auto-start when call is in progress (only when we own the mic)
   const startedRef = useRef(false);
   useEffect(() => {
+    if (sharedCoaching) return; // parent owns lifecycle
     if (enabled && callId && !startedRef.current) {
       startedRef.current = true;
       start();
@@ -45,7 +54,8 @@ export function LiveCopilotPanel({
       stop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, callId]);
+  }, [enabled, callId, sharedCoaching]);
+
 
   // Flatten script into searchable sections for auto-highlight.
   const sections = useMemo(() => {

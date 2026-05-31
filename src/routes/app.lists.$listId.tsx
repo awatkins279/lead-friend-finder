@@ -44,6 +44,8 @@ import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 import { LiveCopilotPanel } from "@/components/LiveCopilotPanel";
+import { FollowAlongTeleprompter } from "@/components/FollowAlongTeleprompter";
+import { useLiveCoaching } from "@/hooks/useLiveCoaching";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -1993,6 +1995,33 @@ function FocusCallView({
   onLogOutcome: (outcome: string) => void;
 }) {
 
+  // Single shared live-coaching session — drives both the mic-driven teleprompter
+  // (left) and the co-pilot panel (right). One mic, one Deepgram socket.
+  const coaching = useLiveCoaching({
+    listId,
+    leadId,
+    callId: callId ?? null,
+    enabled: aiCopilotEnabled,
+    getRemoteStream,
+  });
+
+  // Auto-start the mic once the call connects.
+  const coachStartedRef = useRef(false);
+  useEffect(() => {
+    if (!aiCopilotEnabled) return;
+    if (callId && !coachStartedRef.current) {
+      coachStartedRef.current = true;
+      coaching.start();
+    }
+    if (!callId) {
+      coachStartedRef.current = false;
+      coaching.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId, aiCopilotEnabled]);
+
+
+
 
   const outcomes = [
     { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
@@ -2123,7 +2152,11 @@ function FocusCallView({
       <div className="relative z-10 grid min-h-0 flex-1 grid-cols-12 gap-4 px-6 pb-6">
         {/* Script panel — teleprompter */}
         <section className="col-span-7 flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] shadow-[0_8px_40px_-12px_oklch(0_0_0/0.6)] backdrop-blur-xl">
-          <Teleprompter script={script} />
+          {aiCopilotEnabled ? (
+            <FollowAlongTeleprompter script={script} coaching={coaching} />
+          ) : (
+            <Teleprompter script={script} />
+          )}
         </section>
 
         {/* Objections panel */}
@@ -2136,7 +2169,9 @@ function FocusCallView({
               enabled={aiCopilotEnabled}
               script={script}
               getRemoteStream={getRemoteStream}
+              coaching={coaching}
             />
+
           ) : (
             <>
               <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
