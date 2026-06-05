@@ -263,6 +263,8 @@ function PeoplePage() {
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
   const cancelScoringJobCall = useServerFn(cancelScoringJobFn);
   const finalizeScoringJobCall = useServerFn(finalizeScoringJobFn);
+  const verifyLeadEmailsBatchCall = useServerFn(verifyLeadEmailsBatchFn);
+  const loadLeadVerificationsCall = useServerFn(loadLeadVerificationsFn);
 
   useEffect(() => setPage(0), [filters]);
 
