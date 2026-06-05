@@ -130,9 +130,9 @@ export function AddToListDialog({
   }, [lists, search]);
 
   const submit = async () => {
-    const idsToAdd = showScoreFilter ? effectiveIds : leadIds;
+    const idsToAdd = (showScoreFilter || showVerifyFilter) ? effectiveIds : leadIds;
     if (idsToAdd.length === 0) {
-      toast.error(showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
+      toast.error(showVerifyFilter ? "No deliverable prospects in the current filter." : showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
       return;
     }
     if (isCampaign && idsToAdd.length > CAMPAIGN_ADD_LIMIT) {
