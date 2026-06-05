@@ -19,7 +19,7 @@ import { toast } from "sonner";
 
 type ListRow = { id: string; name: string; sender_name: string | null };
 
-const CAMPAIGN_ADD_LIMIT = 10000;
+const CAMPAIGN_ADD_LIMIT = 75000;
 
 export function AddToListDialog({
   open,
