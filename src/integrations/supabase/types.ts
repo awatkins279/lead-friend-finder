@@ -545,6 +545,10 @@ export type Database = {
           score: number | null
           status: string
           updated_at: string
+          verification_quality: string | null
+          verification_result: string | null
+          verification_status: string | null
+          verified_at: string | null
         }
         Insert: {
           call_script?: Json | null
@@ -559,6 +563,10 @@ export type Database = {
           score?: number | null
           status?: string
           updated_at?: string
+          verification_quality?: string | null
+          verification_result?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
         }
         Update: {
           call_script?: Json | null
@@ -573,6 +581,10 @@ export type Database = {
           score?: number | null
           status?: string
           updated_at?: string
+          verification_quality?: string | null
+          verification_result?: string | null
+          verification_status?: string | null
+          verified_at?: string | null
         }
         Relationships: [
           {

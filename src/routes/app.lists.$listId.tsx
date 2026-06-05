@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { enrichLead } from "@/lib/enrich.functions";
+import { verifyLeadEmail } from "@/lib/verify.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,9 @@ type Row = {
   email_subject: string | null;
   email_body: string | null;
   call_script: CallScript | null;
+  verification_status: "deliverable" | "risky" | "invalid" | "disposable" | "unknown" | null;
+  verification_result: string | null;
+  verified_at: string | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
@@ -115,8 +119,10 @@ function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
   const enrichFn = useServerFn(enrichLead);
+  const verifyFn = useServerFn(verifyLeadEmail);
   const genScriptBulkFn = useServerFn(generateCallScript);
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [verifyFilter, setVerifyFilter] = useState<"all" | "deliverable" | "risky" | "invalid" | "unverified">("all");
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
@@ -153,7 +159,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("list_leads")
         .select(
-          "lead_id, score, status, emails, email_subject, email_body, call_script, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
+          "lead_id, score, status, emails, email_subject, email_body, call_script, verification_status, verification_result, verified_at, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
         )
         .eq("list_id", listId)
         .order("score", { ascending: false, nullsFirst: false });
@@ -266,6 +272,57 @@ function ListDetailPage() {
       toast.info(`Stopped after ${state.done} of ${state.total}`);
     }
   };
+
+  const runVerifyAll = async () => {
+    const pending = (rows ?? []).filter(
+      (r) => !!r.lead?.email && !r.verification_status,
+    );
+    if (pending.length === 0) return toast.info("Nothing to verify — every lead with an email is already verified");
+
+    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    setProgress({ ...state });
+
+    const CONCURRENCY = 10;
+    let cursor = 0;
+    let errors = 0;
+
+    const worker = async () => {
+      while (true) {
+        if (state.cancel) return;
+        const i = cursor++;
+        if (i >= pending.length) return;
+        const r = pending[i];
+        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+        state.currentName = name;
+        setProgress({ ...state });
+        try {
+          await verifyFn({ data: { listId, leadId: r.lead_id } });
+        } catch (e: any) {
+          errors++;
+          console.error("verify failed", r.lead_id, e);
+          if (errors === 1) toast.error(e?.message ?? "Verification error");
+        }
+        state.done += 1;
+        setProgress({ ...state });
+        if (state.done % 10 === 0) qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()),
+    );
+
+    qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+    setProgress((p) => (p?.cancel ? null : p));
+    if (!state.cancel) {
+      toast.success(`Verified ${state.done - errors} email${state.done - errors === 1 ? "" : "s"}${errors ? ` · ${errors} failed` : ""}`);
+      setTimeout(() => setProgress(null), 1500);
+    } else {
+      toast.info(`Stopped after ${state.done} of ${state.total}`);
+    }
+  };
+
+
 
   const requestRunAllScripts = async () => {
     const callCfgRow = await supabase
@@ -410,6 +467,17 @@ function ListDetailPage() {
             <Button variant="outline" size="sm" onClick={() => setCallConfigOpen(true)}>
               <Headphones className="mr-2 h-3.5 w-3.5" /> Calling config
             </Button>
+            {activeTab === "email" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runVerifyAll}
+                disabled={!rows || rows.length === 0 || isRunning}
+                title="Verify deliverability for every lead with an email (1 credit each)"
+              >
+                <Mail className="mr-2 h-3.5 w-3.5" /> Verify emails
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
@@ -483,14 +551,21 @@ function ListDetailPage() {
               </p>
             </Card>
           ) : (
-            <ProspectTable
-              listId={listId}
-              rows={rows}
-              busy={busy}
-              onOpenRow={(r) => setOpen(r)}
-              onGenerate={(leadId) => runOne(leadId)}
-              onRemove={(leadId) => remove(leadId)}
-            />
+            <>
+              <VerificationFilterBar
+                rows={rows}
+                value={verifyFilter}
+                onChange={setVerifyFilter}
+              />
+              <ProspectTable
+                listId={listId}
+                rows={filterRowsByVerification(rows, verifyFilter)}
+                busy={busy}
+                onOpenRow={(r) => setOpen(r)}
+                onGenerate={(leadId) => runOne(leadId)}
+                onRemove={(leadId) => remove(leadId)}
+              />
+            </>
           )}
         </TabsContent>
 
@@ -3084,6 +3159,7 @@ function ProspectTable({
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Mail className="h-3 w-3" />
                   <span className="truncate">{r.lead.email}</span>
+                  <VerificationDot status={r.verification_status} />
                 </div>
               ) : null}
               {!r.lead?.phone && !r.lead?.email ? (
@@ -3165,6 +3241,91 @@ function ProspectRowMenu({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// Email verification UI helpers
+// ============================================================
+
+type VerifyStatus = "deliverable" | "risky" | "invalid" | "disposable" | "unknown";
+type VerifyFilter = "all" | "deliverable" | "risky" | "invalid" | "unverified";
+
+function filterRowsByVerification(rows: Row[], filter: VerifyFilter): Row[] {
+  if (filter === "all") return rows;
+  if (filter === "unverified") return rows.filter((r) => !r.verification_status);
+  if (filter === "deliverable") return rows.filter((r) => r.verification_status === "deliverable");
+  if (filter === "risky") return rows.filter((r) => r.verification_status === "risky" || r.verification_status === "unknown");
+  if (filter === "invalid") return rows.filter((r) => r.verification_status === "invalid" || r.verification_status === "disposable");
+  return rows;
+}
+
+function VerificationDot({ status }: { status: VerifyStatus | null }) {
+  if (!status) return null;
+  const map: Record<VerifyStatus, { color: string; label: string }> = {
+    deliverable: { color: "bg-emerald-500", label: "Deliverable" },
+    risky: { color: "bg-amber-500", label: "Risky / catch-all" },
+    invalid: { color: "bg-rose-500", label: "Invalid" },
+    disposable: { color: "bg-rose-500", label: "Disposable" },
+    unknown: { color: "bg-slate-400", label: "Unknown" },
+  };
+  const m = map[status];
+  return (
+    <span
+      title={`Email: ${m.label}`}
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${m.color}`}
+    />
+  );
+}
+
+function VerificationFilterBar({
+  rows,
+  value,
+  onChange,
+}: {
+  rows: Row[];
+  value: VerifyFilter;
+  onChange: (v: VerifyFilter) => void;
+}) {
+  const counts = {
+    all: rows.length,
+    deliverable: rows.filter((r) => r.verification_status === "deliverable").length,
+    risky: rows.filter((r) => r.verification_status === "risky" || r.verification_status === "unknown").length,
+    invalid: rows.filter((r) => r.verification_status === "invalid" || r.verification_status === "disposable").length,
+    unverified: rows.filter((r) => !r.verification_status).length,
+  };
+  const anyVerified = counts.deliverable + counts.risky + counts.invalid > 0;
+  if (!anyVerified) return null;
+
+  const chips: { key: VerifyFilter; label: string; dot?: string }[] = [
+    { key: "all", label: `All (${counts.all})` },
+    { key: "deliverable", label: `Deliverable (${counts.deliverable})`, dot: "bg-emerald-500" },
+    { key: "risky", label: `Risky (${counts.risky})`, dot: "bg-amber-500" },
+    { key: "invalid", label: `Invalid (${counts.invalid})`, dot: "bg-rose-500" },
+    { key: "unverified", label: `Unverified (${counts.unverified})`, dot: "bg-slate-400" },
+  ];
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 text-[11px] uppercase tracking-wider text-muted-foreground">Email:</span>
+      {chips.map((c) => {
+        const active = value === c.key;
+        return (
+          <button
+            key={c.key}
+            onClick={() => onChange(c.key)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              active
+                ? "border-primary/40 bg-primary/10 text-foreground"
+                : "border-white/10 bg-white/[0.02] text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {c.dot && <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />}
+            {c.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
