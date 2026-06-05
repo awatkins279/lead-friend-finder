@@ -3159,6 +3159,7 @@ function ProspectTable({
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Mail className="h-3 w-3" />
                   <span className="truncate">{r.lead.email}</span>
+                  <VerificationDot status={r.verification_status} />
                 </div>
               ) : null}
               {!r.lead?.phone && !r.lead?.email ? (
