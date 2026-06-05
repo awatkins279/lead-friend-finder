@@ -1791,6 +1791,7 @@ function PeoplePage() {
         onOpenChange={setScoredCampaignOpen}
         leadIds={scoredEligibleIds}
         leadScores={scoredEligibleScores}
+        leadVerifications={verifications}
       />
     </div>
   );
