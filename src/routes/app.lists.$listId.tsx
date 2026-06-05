@@ -119,8 +119,10 @@ function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
   const enrichFn = useServerFn(enrichLead);
+  const verifyFn = useServerFn(verifyLeadEmail);
   const genScriptBulkFn = useServerFn(generateCallScript);
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [verifyFilter, setVerifyFilter] = useState<"all" | "deliverable" | "risky" | "invalid" | "unverified">("all");
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
