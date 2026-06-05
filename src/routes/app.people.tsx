@@ -351,14 +351,25 @@ function PeoplePage() {
     setBulkBusy(true);
     try {
       const requested = Math.min(total || MAX_BULK, MAX_BULK);
-      const ids = await fetchMatchingIds(filters, requested);
-      setPicked(new Set(ids));
-      if (ids.length < requested) {
+      // Over-fetch so we can drop already-scored leads (session dedupe) and
+      // still land near `requested`. Capped at MAX_BULK to honor the server cap.
+      const overFetch = Math.min(MAX_BULK, requested + scores.size);
+      const ids = await fetchMatchingIds(filters, overFetch);
+      const fresh = ids.filter((id) => !scores.has(id)).slice(0, requested);
+      const skipped = ids.length - fresh.length;
+      setPicked(new Set(fresh));
+      if (fresh.length === 0) {
+        toast.info("No unscored leads match these filters — every match has been scored already.");
+      } else if (skipped > 0) {
+        toast.success(
+          `${fresh.length.toLocaleString()} new leads selected (skipped ${skipped.toLocaleString()} already scored)`,
+        );
+      } else if (fresh.length < requested) {
         toast.info(
-          `Only ${ids.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+          `Only ${fresh.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
         );
       } else {
-        toast.success(`${ids.length.toLocaleString()} leads selected`);
+        toast.success(`${fresh.length.toLocaleString()} leads selected`);
       }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
@@ -377,14 +388,23 @@ function PeoplePage() {
     }
     setBulkBusy(true);
     try {
-      const ids = await fetchMatchingIds(filters, n);
-      setPicked(new Set(ids));
-      if (ids.length < n) {
+      const overFetch = Math.min(MAX_BULK, n + scores.size);
+      const ids = await fetchMatchingIds(filters, overFetch);
+      const fresh = ids.filter((id) => !scores.has(id)).slice(0, n);
+      const skipped = ids.length - fresh.length;
+      setPicked(new Set(fresh));
+      if (fresh.length === 0) {
+        toast.info("No unscored leads match — every match has been scored already.");
+      } else if (skipped > 0) {
+        toast.success(
+          `${fresh.length.toLocaleString()} new leads selected (skipped ${skipped.toLocaleString()} already scored)`,
+        );
+      } else if (fresh.length < n) {
         toast.info(
-          `Only ${ids.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+          `Only ${fresh.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
         );
       } else {
-        toast.success(`${ids.length.toLocaleString()} leads selected`);
+        toast.success(`${fresh.length.toLocaleString()} leads selected`);
       }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
