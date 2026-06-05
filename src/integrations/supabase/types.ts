@@ -406,6 +406,36 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_verifications: {
+        Row: {
+          email: string | null
+          lead_id: string
+          quality: string | null
+          result: string | null
+          status: string
+          user_id: string
+          verified_at: string
+        }
+        Insert: {
+          email?: string | null
+          lead_id: string
+          quality?: string | null
+          result?: string | null
+          status: string
+          user_id: string
+          verified_at?: string
+        }
+        Update: {
+          email?: string | null
+          lead_id?: string
+          quality?: string | null
+          result?: string | null
+          status?: string
+          user_id?: string
+          verified_at?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           city: string | null

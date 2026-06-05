@@ -28,6 +28,7 @@ export function AddToListDialog({
   onAdded,
   mode = "list",
   leadScores,
+  leadVerifications,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -38,6 +39,10 @@ export function AddToListDialog({
    * filter is shown and below-threshold leads are flagged but excluded unless
    * the user explicitly overrides them. */
   leadScores?: Map<string, number | null | undefined>;
+  /** Optional per-lead email-verification status. When provided in campaign mode,
+   * a "Deliverable only" toggle appears (default ON) that excludes any lead whose
+   * status isn't "deliverable". */
+  leadVerifications?: Map<string, "deliverable" | "risky" | "invalid" | "disposable" | "unknown">;
 }) {
   const [lists, setLists] = useState<ListRow[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
@@ -48,11 +53,14 @@ export function AddToListDialog({
   const [busy, setBusy] = useState(false);
   const [minScore, setMinScore] = useState(70);
   const [overrides, setOverrides] = useState<Set<string>>(new Set());
+  const [deliverableOnly, setDeliverableOnly] = useState(true);
 
   const isCampaign = mode === "campaign";
   const noun = isCampaign ? "campaign" : "list";
   const hasScores = !!leadScores && leadScores.size > 0;
   const showScoreFilter = isCampaign && hasScores;
+  const hasVerifications = !!leadVerifications && leadVerifications.size > 0;
+  const showVerifyFilter = isCampaign && hasVerifications;
 
   const scoreOf = (id: string): number | null => {
     if (!leadScores) return null;
@@ -60,16 +68,39 @@ export function AddToListDialog({
     return typeof v === "number" ? v : null;
   };
 
+  const verifiedCounts = useMemo(() => {
+    const counts = { deliverable: 0, risky: 0, invalid: 0, unknown: 0, unverified: 0 };
+    if (!showVerifyFilter) return counts;
+    for (const id of leadIds) {
+      const s = leadVerifications!.get(id);
+      if (!s) counts.unverified += 1;
+      else if (s === "deliverable") counts.deliverable += 1;
+      else if (s === "risky") counts.risky += 1;
+      else if (s === "invalid" || s === "disposable") counts.invalid += 1;
+      else counts.unknown += 1;
+    }
+    return counts;
+  }, [leadIds, leadVerifications, showVerifyFilter]);
+
   const effectiveIds = useMemo(() => {
-    if (!showScoreFilter) return leadIds;
-    return leadIds.filter((id) => {
-      if (overrides.has(id)) return true;
-      const s = scoreOf(id);
-      if (s == null) return false; // unscored excluded unless overridden
-      return s >= minScore;
-    });
+    let ids = leadIds;
+    if (showScoreFilter) {
+      ids = ids.filter((id) => {
+        if (overrides.has(id)) return true;
+        const s = scoreOf(id);
+        if (s == null) return false;
+        return s >= minScore;
+      });
+    }
+    if (showVerifyFilter && deliverableOnly) {
+      ids = ids.filter((id) => {
+        if (overrides.has(id)) return true;
+        return leadVerifications!.get(id) === "deliverable";
+      });
+    }
+    return ids;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadIds, leadScores, minScore, overrides, showScoreFilter]);
+  }, [leadIds, leadScores, minScore, overrides, showScoreFilter, leadVerifications, deliverableOnly, showVerifyFilter]);
 
   // Reset overrides when dialog opens
   useEffect(() => {
@@ -99,9 +130,9 @@ export function AddToListDialog({
   }, [lists, search]);
 
   const submit = async () => {
-    const idsToAdd = showScoreFilter ? effectiveIds : leadIds;
+    const idsToAdd = (showScoreFilter || showVerifyFilter) ? effectiveIds : leadIds;
     if (idsToAdd.length === 0) {
-      toast.error(showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
+      toast.error(showVerifyFilter ? "No deliverable prospects in the current filter." : showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
       return;
     }
     if (isCampaign && idsToAdd.length > CAMPAIGN_ADD_LIMIT) {
@@ -233,6 +264,42 @@ export function AddToListDialog({
           </div>
         )}
 
+        {showVerifyFilter && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            <label className="flex cursor-pointer items-center gap-2">
+              <Checkbox
+                checked={deliverableOnly}
+                onCheckedChange={(v) => setDeliverableOnly(v === true)}
+              />
+              <span className="text-sm font-medium">Only add deliverable emails</span>
+            </label>
+            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400">
+                {verifiedCounts.deliverable.toLocaleString()} deliverable
+              </Badge>
+              {verifiedCounts.risky > 0 && (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-400">
+                  {verifiedCounts.risky.toLocaleString()} risky
+                </Badge>
+              )}
+              {verifiedCounts.invalid > 0 && (
+                <Badge variant="outline" className="bg-rose-500/10 text-rose-400">
+                  {verifiedCounts.invalid.toLocaleString()} invalid
+                </Badge>
+              )}
+              {verifiedCounts.unknown > 0 && (
+                <Badge variant="outline">{verifiedCounts.unknown.toLocaleString()} unknown</Badge>
+              )}
+              {verifiedCounts.unverified > 0 && (
+                <Badge variant="outline">{verifiedCounts.unverified.toLocaleString()} not verified</Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be added.
+            </p>
+          </div>
+        )}
+
         {showScoreFilter && (
           <div className="space-y-3 rounded-md border bg-muted/30 p-3">
             <div>
@@ -338,7 +405,7 @@ export function AddToListDialog({
             {busy
               ? "Saving…"
               : isCampaign
-                ? `Add ${(showScoreFilter ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
+                ? `Add ${((showScoreFilter || showVerifyFilter) ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
                 : "Save Leads"}
           </Button>
 

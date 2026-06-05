@@ -63,6 +63,13 @@ import {
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
 import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import {
+  verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
+  loadLeadVerifications as loadLeadVerificationsFn,
+} from "@/lib/verify.functions";
+import { ShieldCheck } from "lucide-react";
+
+type VerificationStatus = "deliverable" | "risky" | "invalid" | "disposable" | "unknown";
 
 type Signal = { label: string; verdict: "strong" | "partial" | "weak" | "unknown"; note: string };
 type ScoreInfo = {
@@ -251,11 +258,19 @@ function PeoplePage() {
   } | null>(null);
   const scoringBusy = jobProgress?.status === "running";
 
+  // Per-user email verification cache (lead_id -> status). Persists across
+  // sessions on the server (lead_verifications table) but loaded lazily here.
+  const [verifications, setVerifications] = useState<Map<string, VerificationStatus>>(new Map());
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyProgress, setVerifyProgress] = useState<{ done: number; total: number } | null>(null);
+
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
   const cancelScoringJobCall = useServerFn(cancelScoringJobFn);
   const finalizeScoringJobCall = useServerFn(finalizeScoringJobFn);
+  const verifyLeadEmailsBatchCall = useServerFn(verifyLeadEmailsBatchFn);
+  const loadLeadVerificationsCall = useServerFn(loadLeadVerificationsFn);
 
   useEffect(() => setPage(0), [filters]);
 
@@ -336,14 +351,25 @@ function PeoplePage() {
     setBulkBusy(true);
     try {
       const requested = Math.min(total || MAX_BULK, MAX_BULK);
-      const ids = await fetchMatchingIds(filters, requested);
-      setPicked(new Set(ids));
-      if (ids.length < requested) {
+      // Over-fetch so we can drop already-scored leads (session dedupe) and
+      // still land near `requested`. Capped at MAX_BULK to honor the server cap.
+      const overFetch = Math.min(MAX_BULK, requested + scores.size);
+      const ids = await fetchMatchingIds(filters, overFetch);
+      const fresh = ids.filter((id) => !scores.has(id)).slice(0, requested);
+      const skipped = ids.length - fresh.length;
+      setPicked(new Set(fresh));
+      if (fresh.length === 0) {
+        toast.info("No unscored leads match these filters — every match has been scored already.");
+      } else if (skipped > 0) {
+        toast.success(
+          `${fresh.length.toLocaleString()} new leads selected (skipped ${skipped.toLocaleString()} already scored)`,
+        );
+      } else if (fresh.length < requested) {
         toast.info(
-          `Only ${ids.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+          `Only ${fresh.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
         );
       } else {
-        toast.success(`${ids.length.toLocaleString()} leads selected`);
+        toast.success(`${fresh.length.toLocaleString()} leads selected`);
       }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
@@ -362,14 +388,23 @@ function PeoplePage() {
     }
     setBulkBusy(true);
     try {
-      const ids = await fetchMatchingIds(filters, n);
-      setPicked(new Set(ids));
-      if (ids.length < n) {
+      const overFetch = Math.min(MAX_BULK, n + scores.size);
+      const ids = await fetchMatchingIds(filters, overFetch);
+      const fresh = ids.filter((id) => !scores.has(id)).slice(0, n);
+      const skipped = ids.length - fresh.length;
+      setPicked(new Set(fresh));
+      if (fresh.length === 0) {
+        toast.info("No unscored leads match — every match has been scored already.");
+      } else if (skipped > 0) {
+        toast.success(
+          `${fresh.length.toLocaleString()} new leads selected (skipped ${skipped.toLocaleString()} already scored)`,
+        );
+      } else if (fresh.length < n) {
         toast.info(
-          `Only ${ids.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+          `Only ${fresh.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
         );
       } else {
-        toast.success(`${ids.length.toLocaleString()} leads selected`);
+        toast.success(`${fresh.length.toLocaleString()} leads selected`);
       }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
@@ -688,6 +723,88 @@ function PeoplePage() {
     () => new Map(scoredEligibleIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
     [scoredEligibleIds, scores],
   );
+
+  // Load cached verifications for newly-scored leads so we don't re-charge
+  // for any email the user has already verified in a previous session.
+  useEffect(() => {
+    const missing = scoredEligibleIds.filter((id) => !verifications.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Chunk in 5k to stay under input cap
+        for (let i = 0; i < missing.length; i += 5000) {
+          const slice = missing.slice(i, i + 5000);
+          const { verifications: rows } = await loadLeadVerificationsCall({
+            data: { leadIds: slice },
+          });
+          if (cancelled) return;
+          setVerifications((prev) => {
+            const next = new Map(prev);
+            for (const r of rows as Array<{ lead_id: string; status: string }>) {
+              next.set(r.lead_id, r.status as VerificationStatus);
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to load cached verifications", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoredEligibleIds.length]);
+
+  const unverifiedScoredIds = useMemo(
+    () => scoredEligibleIds.filter((id) => !verifications.has(id)),
+    [scoredEligibleIds, verifications],
+  );
+
+  const deliverableScoredIds = useMemo(
+    () => scoredEligibleIds.filter((id) => verifications.get(id) === "deliverable"),
+    [scoredEligibleIds, verifications],
+  );
+
+  const verifyScoredEmails = async () => {
+    if (verifyBusy) return;
+    const ids = unverifiedScoredIds;
+    if (ids.length === 0) {
+      toast.info("All scored leads have already been verified.");
+      return;
+    }
+    setVerifyBusy(true);
+    setVerifyProgress({ done: 0, total: ids.length });
+    const BATCH = 50;
+    const PARALLEL = 3;
+    let done = 0;
+    try {
+      for (let i = 0; i < ids.length; i += BATCH * PARALLEL) {
+        const window = ids.slice(i, i + BATCH * PARALLEL);
+        const batches: string[][] = [];
+        for (let j = 0; j < window.length; j += BATCH) batches.push(window.slice(j, j + BATCH));
+        const results = await Promise.all(
+          batches.map((leadIds) => verifyLeadEmailsBatchCall({ data: { leadIds } })),
+        );
+        setVerifications((prev) => {
+          const next = new Map(prev);
+          for (const r of results) {
+            for (const v of r.results) next.set(v.leadId, v.status);
+          }
+          return next;
+        });
+        done += window.length;
+        setVerifyProgress({ done, total: ids.length });
+      }
+      toast.success(`Verified ${ids.length.toLocaleString()} emails`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Verification failed");
+    } finally {
+      setVerifyBusy(false);
+      setVerifyProgress(null);
+    }
+  };
 
   const hasSelection = picked.size > 0;
 
@@ -1351,15 +1468,58 @@ function PeoplePage() {
               </p>
             )}
             {scoredEligibleIds.length > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full border-white/10 bg-white/5"
-                onClick={() => setScoredCampaignOpen(true)}
-              >
-                <Send className="mr-1 h-3 w-3" />
-                Add {scoredEligibleIds.length.toLocaleString()} to campaign
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-white/10 bg-white/5"
+                  onClick={verifyScoredEmails}
+                  disabled={verifyBusy || unverifiedScoredIds.length === 0}
+                >
+                  {verifyBusy ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                  )}
+                  {unverifiedScoredIds.length === 0
+                    ? `All ${scoredEligibleIds.length.toLocaleString()} verified`
+                    : `Verify ${unverifiedScoredIds.length.toLocaleString()} email${unverifiedScoredIds.length === 1 ? "" : "s"} (1 credit each)`}
+                </Button>
+                {verifyProgress && (
+                  <div className="rounded-md border border-white/10 bg-white/[0.03] p-2 text-[11px]">
+                    <div className="flex justify-between">
+                      <span>Verifying…</span>
+                      <span className="font-mono-num text-muted-foreground">
+                        {verifyProgress.done.toLocaleString()} /{" "}
+                        {verifyProgress.total.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full bg-[var(--gradient-aurora)] transition-all"
+                        style={{
+                          width: `${verifyProgress.total === 0 ? 0 : Math.round((verifyProgress.done / verifyProgress.total) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-white/10 bg-white/5"
+                  onClick={() => setScoredCampaignOpen(true)}
+                >
+                  <Send className="mr-1 h-3 w-3" />
+                  Add {scoredEligibleIds.length.toLocaleString()} to campaign
+                  {deliverableScoredIds.length > 0 &&
+                    deliverableScoredIds.length !== scoredEligibleIds.length && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        ({deliverableScoredIds.length.toLocaleString()} deliverable)
+                      </span>
+                    )}
+                </Button>
+              </>
             )}
           </div>
 
@@ -1631,6 +1791,7 @@ function PeoplePage() {
         onOpenChange={setScoredCampaignOpen}
         leadIds={scoredEligibleIds}
         leadScores={scoredEligibleScores}
+        leadVerifications={verifications}
       />
     </div>
   );
