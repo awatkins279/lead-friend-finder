@@ -63,16 +63,14 @@ export const verifyLeadEmail = createServerFn({ method: "POST" })
     const apiKey = process.env.MILLIONVERIFIER_API_KEY;
     if (!apiKey) throw new Error("Missing MILLIONVERIFIER_API_KEY");
 
-    // Charge 1 credit up front (admin bypass automatic). Refunded below on API error.
-    const { data: chargedRem, error: chargeErr } = await supabaseAdmin.rpc("spend_credits", {
+    // Charge 1 credit up front (admin bypass automatic). spend_credits prefixes 'spend:' internally.
+    const { error: chargeErr } = await supabaseAdmin.rpc("spend_credits", {
       _user_id: userId,
-      _action: "spend:verify_email",
+      _action: "verify_email",
       _amount: 1,
       _note: `verify:${data.leadId}`,
     });
-    // spend_credits prefixes the action internally; we just call it via the helper pattern
     if (chargeErr) {
-      // bubble the friendly error (insufficient_credits / no_active_subscription)
       throw new Error(chargeErr.message);
     }
 
