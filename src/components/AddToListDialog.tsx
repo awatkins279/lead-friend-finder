@@ -405,7 +405,7 @@ export function AddToListDialog({
             {busy
               ? "Saving…"
               : isCampaign
-                ? `Add ${(showScoreFilter ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
+                ? `Add ${((showScoreFilter || showVerifyFilter) ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
                 : "Save Leads"}
           </Button>
 
