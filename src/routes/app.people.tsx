@@ -1468,15 +1468,58 @@ function PeoplePage() {
               </p>
             )}
             {scoredEligibleIds.length > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full border-white/10 bg-white/5"
-                onClick={() => setScoredCampaignOpen(true)}
-              >
-                <Send className="mr-1 h-3 w-3" />
-                Add {scoredEligibleIds.length.toLocaleString()} to campaign
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-white/10 bg-white/5"
+                  onClick={verifyScoredEmails}
+                  disabled={verifyBusy || unverifiedScoredIds.length === 0}
+                >
+                  {verifyBusy ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                  )}
+                  {unverifiedScoredIds.length === 0
+                    ? `All ${scoredEligibleIds.length.toLocaleString()} verified`
+                    : `Verify ${unverifiedScoredIds.length.toLocaleString()} email${unverifiedScoredIds.length === 1 ? "" : "s"} (1 credit each)`}
+                </Button>
+                {verifyProgress && (
+                  <div className="rounded-md border border-white/10 bg-white/[0.03] p-2 text-[11px]">
+                    <div className="flex justify-between">
+                      <span>Verifying…</span>
+                      <span className="font-mono-num text-muted-foreground">
+                        {verifyProgress.done.toLocaleString()} /{" "}
+                        {verifyProgress.total.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full bg-[var(--gradient-aurora)] transition-all"
+                        style={{
+                          width: `${verifyProgress.total === 0 ? 0 : Math.round((verifyProgress.done / verifyProgress.total) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-white/10 bg-white/5"
+                  onClick={() => setScoredCampaignOpen(true)}
+                >
+                  <Send className="mr-1 h-3 w-3" />
+                  Add {scoredEligibleIds.length.toLocaleString()} to campaign
+                  {deliverableScoredIds.length > 0 &&
+                    deliverableScoredIds.length !== scoredEligibleIds.length && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        ({deliverableScoredIds.length.toLocaleString()} deliverable)
+                      </span>
+                    )}
+                </Button>
+              </>
             )}
           </div>
 
