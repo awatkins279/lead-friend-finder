@@ -157,7 +157,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("list_leads")
         .select(
-          "lead_id, score, status, emails, email_subject, email_body, call_script, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
+          "lead_id, score, status, emails, email_subject, email_body, call_script, verification_status, verification_result, verified_at, research, lead:leads(id, first_name, last_name, title, email, phone, linkedin_url, org_name, org_industry, city, state, country)",
         )
         .eq("list_id", listId)
         .order("score", { ascending: false, nullsFirst: false });
