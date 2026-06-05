@@ -273,6 +273,57 @@ function ListDetailPage() {
     }
   };
 
+  const runVerifyAll = async () => {
+    const pending = (rows ?? []).filter(
+      (r) => !!r.lead?.email && !r.verification_status,
+    );
+    if (pending.length === 0) return toast.info("Nothing to verify — every lead with an email is already verified");
+
+    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    setProgress({ ...state });
+
+    const CONCURRENCY = 10;
+    let cursor = 0;
+    let errors = 0;
+
+    const worker = async () => {
+      while (true) {
+        if (state.cancel) return;
+        const i = cursor++;
+        if (i >= pending.length) return;
+        const r = pending[i];
+        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
+        state.currentName = name;
+        setProgress({ ...state });
+        try {
+          await verifyFn({ data: { listId, leadId: r.lead_id } });
+        } catch (e: any) {
+          errors++;
+          console.error("verify failed", r.lead_id, e);
+          if (errors === 1) toast.error(e?.message ?? "Verification error");
+        }
+        state.done += 1;
+        setProgress({ ...state });
+        if (state.done % 10 === 0) qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()),
+    );
+
+    qc.invalidateQueries({ queryKey: ["list-leads", listId] });
+    setProgress((p) => (p?.cancel ? null : p));
+    if (!state.cancel) {
+      toast.success(`Verified ${state.done - errors} email${state.done - errors === 1 ? "" : "s"}${errors ? ` · ${errors} failed` : ""}`);
+      setTimeout(() => setProgress(null), 1500);
+    } else {
+      toast.info(`Stopped after ${state.done} of ${state.total}`);
+    }
+  };
+
+
+
   const requestRunAllScripts = async () => {
     const callCfgRow = await supabase
       .from("list_call_configs")
