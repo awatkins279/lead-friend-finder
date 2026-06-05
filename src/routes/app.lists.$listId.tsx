@@ -115,6 +115,47 @@ function effectiveEmails(r: Row): EmailInSequence[] {
 
 type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null };
 
+const TWILIO_VOICE_SDK_URL = "https://media.twiliocdn.com/sdk/js/voice/releases/2.18.3/twilio.min.js";
+
+let twilioVoiceSdkPromise: Promise<any> | null = null;
+
+async function loadTwilioVoiceSdk() {
+  if (typeof window === "undefined") {
+    throw new Error("Twilio calling is only available in the browser.");
+  }
+
+  const existingTwilio = (window as any).Twilio;
+  if (existingTwilio?.Device) return existingTwilio;
+
+  if (!twilioVoiceSdkPromise) {
+    twilioVoiceSdkPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector<HTMLScriptElement>('script[data-twilio-voice-sdk="true"]');
+
+      const handleReady = () => {
+        const twilio = (window as any).Twilio;
+        if (twilio?.Device) resolve(twilio);
+        else reject(new Error("Twilio Voice SDK loaded, but Device is unavailable."));
+      };
+
+      if (existingScript) {
+        existingScript.addEventListener("load", handleReady, { once: true });
+        existingScript.addEventListener("error", () => reject(new Error("Failed to load Twilio Voice SDK.")), { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = TWILIO_VOICE_SDK_URL;
+      script.async = true;
+      script.dataset.twilioVoiceSdk = "true";
+      script.addEventListener("load", handleReady, { once: true });
+      script.addEventListener("error", () => reject(new Error("Failed to load Twilio Voice SDK.")), { once: true });
+      document.head.appendChild(script);
+    });
+  }
+
+  return twilioVoiceSdkPromise;
+}
+
 function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
@@ -1322,7 +1363,7 @@ function CallWorkstation({
     if (!phoneAccount) throw new Error("No phone account selected");
     if (device) return device;
     const { token } = await getTokenFn({ data: { phoneAccountId: phoneAccount.id } });
-    const { Device } = await import("@twilio/voice-sdk");
+    const { Device } = await loadTwilioVoiceSdk();
     const d = new Device(token, { codecPreferences: ["opus" as any, "pcmu" as any], logLevel: 1 } as any);
     await d.register();
     setDevice(d);
