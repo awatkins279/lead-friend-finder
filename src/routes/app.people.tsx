@@ -258,6 +258,12 @@ function PeoplePage() {
   } | null>(null);
   const scoringBusy = jobProgress?.status === "running";
 
+  // Per-user email verification cache (lead_id -> status). Persists across
+  // sessions on the server (lead_verifications table) but loaded lazily here.
+  const [verifications, setVerifications] = useState<Map<string, VerificationStatus>>(new Map());
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyProgress, setVerifyProgress] = useState<{ done: number; total: number } | null>(null);
+
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
   const getJobSnapshotCall = useServerFn(getJobSnapshotFn);
