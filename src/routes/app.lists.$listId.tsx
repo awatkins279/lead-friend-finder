@@ -467,6 +467,17 @@ function ListDetailPage() {
             <Button variant="outline" size="sm" onClick={() => setCallConfigOpen(true)}>
               <Headphones className="mr-2 h-3.5 w-3.5" /> Calling config
             </Button>
+            {activeTab === "email" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runVerifyAll}
+                disabled={!rows || rows.length === 0 || isRunning}
+                title="Verify deliverability for every lead with an email (1 credit each)"
+              >
+                <Mail className="mr-2 h-3.5 w-3.5" /> Verify emails
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
