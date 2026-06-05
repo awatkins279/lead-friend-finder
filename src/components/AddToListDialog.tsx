@@ -264,6 +264,42 @@ export function AddToListDialog({
           </div>
         )}
 
+        {showVerifyFilter && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            <label className="flex cursor-pointer items-center gap-2">
+              <Checkbox
+                checked={deliverableOnly}
+                onCheckedChange={(v) => setDeliverableOnly(v === true)}
+              />
+              <span className="text-sm font-medium">Only add deliverable emails</span>
+            </label>
+            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400">
+                {verifiedCounts.deliverable.toLocaleString()} deliverable
+              </Badge>
+              {verifiedCounts.risky > 0 && (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-400">
+                  {verifiedCounts.risky.toLocaleString()} risky
+                </Badge>
+              )}
+              {verifiedCounts.invalid > 0 && (
+                <Badge variant="outline" className="bg-rose-500/10 text-rose-400">
+                  {verifiedCounts.invalid.toLocaleString()} invalid
+                </Badge>
+              )}
+              {verifiedCounts.unknown > 0 && (
+                <Badge variant="outline">{verifiedCounts.unknown.toLocaleString()} unknown</Badge>
+              )}
+              {verifiedCounts.unverified > 0 && (
+                <Badge variant="outline">{verifiedCounts.unverified.toLocaleString()} not verified</Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be added.
+            </p>
+          </div>
+        )}
+
         {showScoreFilter && (
           <div className="space-y-3 rounded-md border bg-muted/30 p-3">
             <div>
