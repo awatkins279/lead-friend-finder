@@ -63,6 +63,13 @@ import {
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
 import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import {
+  verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
+  loadLeadVerifications as loadLeadVerificationsFn,
+} from "@/lib/verify.functions";
+import { ShieldCheck } from "lucide-react";
+
+type VerificationStatus = "deliverable" | "risky" | "invalid" | "disposable" | "unknown";
 
 type Signal = { label: string; verdict: "strong" | "partial" | "weak" | "unknown"; note: string };
 type ScoreInfo = {
