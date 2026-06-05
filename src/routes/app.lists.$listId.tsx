@@ -551,14 +551,21 @@ function ListDetailPage() {
               </p>
             </Card>
           ) : (
-            <ProspectTable
-              listId={listId}
-              rows={rows}
-              busy={busy}
-              onOpenRow={(r) => setOpen(r)}
-              onGenerate={(leadId) => runOne(leadId)}
-              onRemove={(leadId) => remove(leadId)}
-            />
+            <>
+              <VerificationFilterBar
+                rows={rows}
+                value={verifyFilter}
+                onChange={setVerifyFilter}
+              />
+              <ProspectTable
+                listId={listId}
+                rows={filterRowsByVerification(rows, verifyFilter)}
+                busy={busy}
+                onOpenRow={(r) => setOpen(r)}
+                onGenerate={(leadId) => runOne(leadId)}
+                onRemove={(leadId) => remove(leadId)}
+              />
+            </>
           )}
         </TabsContent>
 
