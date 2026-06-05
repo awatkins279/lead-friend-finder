@@ -69,6 +69,9 @@ type Row = {
   email_subject: string | null;
   email_body: string | null;
   call_script: CallScript | null;
+  verification_status: "deliverable" | "risky" | "invalid" | "disposable" | "unknown" | null;
+  verification_result: string | null;
+  verified_at: string | null;
   research: {
     reasoning?: string;
     pain_points?: string[];
