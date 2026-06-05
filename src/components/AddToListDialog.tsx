@@ -132,10 +132,14 @@ export function AddToListDialog({
       }
 
       const rows = idsToAdd.map((id) => ({ list_id: listId, lead_id: id }));
-      const { error: insErr } = await supabase
-        .from("list_leads")
-        .upsert(rows, { onConflict: "list_id,lead_id", ignoreDuplicates: !allowDuplicates });
-      if (insErr) throw insErr;
+      const CHUNK = 500;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const slice = rows.slice(i, i + CHUNK);
+        const { error: insErr } = await supabase
+          .from("list_leads")
+          .upsert(slice, { onConflict: "list_id,lead_id", ignoreDuplicates: !allowDuplicates });
+        if (insErr) throw insErr;
+      }
 
       toast.success(
         `Added ${idsToAdd.length} lead${idsToAdd.length === 1 ? "" : "s"} to ${noun}`,
