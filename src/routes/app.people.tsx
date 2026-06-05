@@ -724,6 +724,88 @@ function PeoplePage() {
     [scoredEligibleIds, scores],
   );
 
+  // Load cached verifications for newly-scored leads so we don't re-charge
+  // for any email the user has already verified in a previous session.
+  useEffect(() => {
+    const missing = scoredEligibleIds.filter((id) => !verifications.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Chunk in 5k to stay under input cap
+        for (let i = 0; i < missing.length; i += 5000) {
+          const slice = missing.slice(i, i + 5000);
+          const { verifications: rows } = await loadLeadVerificationsCall({
+            data: { leadIds: slice },
+          });
+          if (cancelled) return;
+          setVerifications((prev) => {
+            const next = new Map(prev);
+            for (const r of rows as Array<{ lead_id: string; status: string }>) {
+              next.set(r.lead_id, r.status as VerificationStatus);
+            }
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to load cached verifications", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoredEligibleIds.length]);
+
+  const unverifiedScoredIds = useMemo(
+    () => scoredEligibleIds.filter((id) => !verifications.has(id)),
+    [scoredEligibleIds, verifications],
+  );
+
+  const deliverableScoredIds = useMemo(
+    () => scoredEligibleIds.filter((id) => verifications.get(id) === "deliverable"),
+    [scoredEligibleIds, verifications],
+  );
+
+  const verifyScoredEmails = async () => {
+    if (verifyBusy) return;
+    const ids = unverifiedScoredIds;
+    if (ids.length === 0) {
+      toast.info("All scored leads have already been verified.");
+      return;
+    }
+    setVerifyBusy(true);
+    setVerifyProgress({ done: 0, total: ids.length });
+    const BATCH = 50;
+    const PARALLEL = 3;
+    let done = 0;
+    try {
+      for (let i = 0; i < ids.length; i += BATCH * PARALLEL) {
+        const window = ids.slice(i, i + BATCH * PARALLEL);
+        const batches: string[][] = [];
+        for (let j = 0; j < window.length; j += BATCH) batches.push(window.slice(j, j + BATCH));
+        const results = await Promise.all(
+          batches.map((leadIds) => verifyLeadEmailsBatchCall({ data: { leadIds } })),
+        );
+        setVerifications((prev) => {
+          const next = new Map(prev);
+          for (const r of results) {
+            for (const v of r.results) next.set(v.leadId, v.status);
+          }
+          return next;
+        });
+        done += window.length;
+        setVerifyProgress({ done, total: ids.length });
+      }
+      toast.success(`Verified ${ids.length.toLocaleString()} emails`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Verification failed");
+    } finally {
+      setVerifyBusy(false);
+      setVerifyProgress(null);
+    }
+  };
+
   const hasSelection = picked.size > 0;
 
   // Stable arrays/maps for child dialogs so they don't re-render every keystroke
