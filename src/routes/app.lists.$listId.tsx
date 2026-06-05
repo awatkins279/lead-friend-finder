@@ -3244,3 +3244,88 @@ function ProspectRowMenu({
     </div>
   );
 }
+
+// ============================================================
+// Email verification UI helpers
+// ============================================================
+
+type VerifyStatus = "deliverable" | "risky" | "invalid" | "disposable" | "unknown";
+type VerifyFilter = "all" | "deliverable" | "risky" | "invalid" | "unverified";
+
+function filterRowsByVerification(rows: Row[], filter: VerifyFilter): Row[] {
+  if (filter === "all") return rows;
+  if (filter === "unverified") return rows.filter((r) => !r.verification_status);
+  if (filter === "deliverable") return rows.filter((r) => r.verification_status === "deliverable");
+  if (filter === "risky") return rows.filter((r) => r.verification_status === "risky" || r.verification_status === "unknown");
+  if (filter === "invalid") return rows.filter((r) => r.verification_status === "invalid" || r.verification_status === "disposable");
+  return rows;
+}
+
+function VerificationDot({ status }: { status: VerifyStatus | null }) {
+  if (!status) return null;
+  const map: Record<VerifyStatus, { color: string; label: string }> = {
+    deliverable: { color: "bg-emerald-500", label: "Deliverable" },
+    risky: { color: "bg-amber-500", label: "Risky / catch-all" },
+    invalid: { color: "bg-rose-500", label: "Invalid" },
+    disposable: { color: "bg-rose-500", label: "Disposable" },
+    unknown: { color: "bg-slate-400", label: "Unknown" },
+  };
+  const m = map[status];
+  return (
+    <span
+      title={`Email: ${m.label}`}
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${m.color}`}
+    />
+  );
+}
+
+function VerificationFilterBar({
+  rows,
+  value,
+  onChange,
+}: {
+  rows: Row[];
+  value: VerifyFilter;
+  onChange: (v: VerifyFilter) => void;
+}) {
+  const counts = {
+    all: rows.length,
+    deliverable: rows.filter((r) => r.verification_status === "deliverable").length,
+    risky: rows.filter((r) => r.verification_status === "risky" || r.verification_status === "unknown").length,
+    invalid: rows.filter((r) => r.verification_status === "invalid" || r.verification_status === "disposable").length,
+    unverified: rows.filter((r) => !r.verification_status).length,
+  };
+  const anyVerified = counts.deliverable + counts.risky + counts.invalid > 0;
+  if (!anyVerified) return null;
+
+  const chips: { key: VerifyFilter; label: string; dot?: string }[] = [
+    { key: "all", label: `All (${counts.all})` },
+    { key: "deliverable", label: `Deliverable (${counts.deliverable})`, dot: "bg-emerald-500" },
+    { key: "risky", label: `Risky (${counts.risky})`, dot: "bg-amber-500" },
+    { key: "invalid", label: `Invalid (${counts.invalid})`, dot: "bg-rose-500" },
+    { key: "unverified", label: `Unverified (${counts.unverified})`, dot: "bg-slate-400" },
+  ];
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 text-[11px] uppercase tracking-wider text-muted-foreground">Email:</span>
+      {chips.map((c) => {
+        const active = value === c.key;
+        return (
+          <button
+            key={c.key}
+            onClick={() => onChange(c.key)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              active
+                ? "border-primary/40 bg-primary/10 text-foreground"
+                : "border-white/10 bg-white/[0.02] text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {c.dot && <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />}
+            {c.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
