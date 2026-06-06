@@ -465,8 +465,12 @@ function PeoplePage() {
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
   // re-opening the page resumes via the localStorage handle.
-  const WORKER_COUNT = 12;
+  const WORKER_COUNT = 24;
   const STORAGE_KEY = "active-scoring-job-id";
+  // Shared cooldown for all workers — set when the AI gateway returns 429 so
+  // workers slow down together instead of hammering the rate limit.
+  const cooldownUntilRef = useRef(0);
+  const cooldownStepRef = useRef(250); // ms; grows 250 → 500 → 1000 → 2000 → 4000
 
   const mergeScoreResults = useCallback(
     (
