@@ -93,102 +93,135 @@ export const processNextBatch = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
-    // Atomic claim — uses RPC with SECURITY DEFINER + FOR UPDATE SKIP LOCKED
-    const { data: claimed, error: claimErr } = await supabase.rpc("claim_scoring_batch", {
-      p_job_id: data.jobId,
-    });
-    if (claimErr) throw new Error(claimErr.message);
+    // Fan out: claim + score up to FANOUT_PER_CALL batches in parallel inside
+    // a single HTTP round-trip from the browser worker.
+    const tasks = Array.from({ length: FANOUT_PER_CALL }, () =>
+      processOneBatch(supabase, data.jobId, false),
+    );
+    const settled = await Promise.all(tasks);
 
-    const batch = Array.isArray(claimed) && claimed.length > 0 ? claimed[0] : null;
-    if (!batch) {
-      // Nothing to claim — check if job is complete
-      const { data: job } = await supabase
-        .from("scoring_jobs")
-        .select("status,total_batches,completed_batches,failed_batches,scored_leads,total_leads")
-        .eq("id", data.jobId)
-        .single();
-
-      if (
-        job &&
-        job.status === "running" &&
-        job.completed_batches + job.failed_batches >= job.total_batches
-      ) {
-        await supabase
-          .from("scoring_jobs")
-          .update({ status: job.failed_batches > 0 ? "completed_with_errors" : "completed" })
-          .eq("id", data.jobId);
+    let claimedAny = false;
+    const allResults: ScoreRow[] = [];
+    let lastJob: any = null;
+    let anyError: string | undefined;
+    for (const r of settled) {
+      if (r.claimed) {
+        claimedAny = true;
+        if (r.results) allResults.push(...r.results);
+        if (r.error) anyError = r.error;
+      } else if (r.job) {
+        lastJob = r.job;
       }
-
-      return { claimed: false as const, job: job ?? null };
     }
 
-    const batchId = batch.id as string;
-    const leadIds = batch.lead_ids as string[];
+    return {
+      claimed: claimedAny,
+      results: allResults,
+      job: lastJob,
+      error: anyError,
+    };
+  });
 
-    // Load job context
-    const { data: job, error: jobErr } = await supabase
+// Shared core: claim a single batch, score it, update bookkeeping.
+// Used by both the user-facing processNextBatch and the background cron tick.
+// When `admin` is true, calls the *_admin RPC variants that skip auth.uid()
+// checks (used by the cron route running with the service role key).
+export async function processOneBatch(
+  supabase: any,
+  jobId: string,
+  admin: boolean,
+): Promise<{
+  claimed: boolean;
+  results?: ScoreRow[];
+  job?: any;
+  error?: string;
+}> {
+  const claimRpc = admin ? "claim_scoring_batch_admin" : "claim_scoring_batch";
+
+  const { data: claimed, error: claimErr } = await supabase.rpc(claimRpc, {
+    p_job_id: jobId,
+  });
+  if (claimErr) throw new Error(claimErr.message);
+
+  const batch = Array.isArray(claimed) && claimed.length > 0 ? claimed[0] : null;
+  if (!batch) {
+    const { data: job } = await supabase
       .from("scoring_jobs")
-      .select("context")
-      .eq("id", data.jobId)
+      .select("status,total_batches,completed_batches,failed_batches,scored_leads,total_leads")
+      .eq("id", jobId)
       .single();
-    if (jobErr || !job) {
-      await markBatchFailed(supabase, data.jobId, batchId, "Job not found");
-      throw new Error("Job not found");
+
+    if (
+      job &&
+      job.status === "running" &&
+      job.completed_batches + job.failed_batches >= job.total_batches
+    ) {
+      await supabase
+        .from("scoring_jobs")
+        .update({ status: job.failed_batches > 0 ? "completed_with_errors" : "completed" })
+        .eq("id", jobId);
     }
 
-    try {
-      const results = await scoreBatch(supabase, leadIds, job.context);
+    return { claimed: false, job: job ?? null };
+  }
 
-      const { data: completedRows, error: completeErr } = await supabase
+  const batchId = batch.id as string;
+  const leadIds = batch.lead_ids as string[];
+
+  const { data: job, error: jobErr } = await supabase
+    .from("scoring_jobs")
+    .select("context")
+    .eq("id", jobId)
+    .single();
+  if (jobErr || !job) {
+    await markBatchFailed(supabase, jobId, batchId, "Job not found", admin);
+    throw new Error("Job not found");
+  }
+
+  try {
+    const results = await scoreBatch(supabase, leadIds, job.context);
+
+    const { data: completedRows, error: completeErr } = await supabase
+      .from("scoring_job_batches")
+      .update({ status: "done", results, error: null })
+      .eq("status", "processing")
+      .select("id")
+      .eq("id", batchId);
+    if (completeErr) throw new Error(completeErr.message);
+
+    if (!completedRows || completedRows.length === 0) {
+      return { claimed: true, results: [] };
+    }
+
+    await bumpJobCounters(supabase, jobId, { completed: 1, scored: results.length }, admin);
+    return { claimed: true, results };
+  } catch (err: any) {
+    const message = String(err?.message ?? "Unknown error").slice(0, 500);
+
+    const { data: batchRow } = await supabase
+      .from("scoring_job_batches")
+      .select("attempts")
+      .eq("id", batchId)
+      .single();
+
+    if (batchRow && batchRow.attempts < 3) {
+      const { data: retriedRows, error: retryErr } = await supabase
         .from("scoring_job_batches")
-        .update({ status: "done", results, error: null })
+        .update({ status: "retry", error: message })
         .eq("status", "processing")
         .select("id")
         .eq("id", batchId);
-      if (completeErr) throw new Error(completeErr.message);
-
-      if (!completedRows || completedRows.length === 0) {
-        return { claimed: true as const, results: [], ignored: true };
+      if (retryErr) throw new Error(retryErr.message);
+      if (!retriedRows || retriedRows.length === 0) {
+        return { claimed: true, results: [] };
       }
-
-      await bumpJobCounters(supabase, data.jobId, {
-        completed: 1,
-        scored: results.length,
-      });
-
-      // Skip the extra SELECT + maybe-mark-completed round-trip here. The
-      // worker loop calls finalize_scoring_job once all workers idle out,
-      // which closes the job atomically. Returning a lightweight progress
-      // hint keeps the UI updating without an extra query per batch.
-      return { claimed: true as const, results, job: null };
-    } catch (err: any) {
-      const message = String(err?.message ?? "Unknown error").slice(0, 500);
-
-      // Re-queue for retry if under attempt limit, else mark failed
-      const { data: batchRow } = await supabase
-        .from("scoring_job_batches")
-        .select("attempts")
-        .eq("id", batchId)
-        .single();
-
-      if (batchRow && batchRow.attempts < 3) {
-        const { data: retriedRows, error: retryErr } = await supabase
-          .from("scoring_job_batches")
-          .update({ status: "retry", error: message })
-          .eq("status", "processing")
-          .select("id")
-          .eq("id", batchId);
-        if (retryErr) throw new Error(retryErr.message);
-        if (!retriedRows || retriedRows.length === 0) {
-          return { claimed: true as const, results: [], ignored: true };
-        }
-        return { claimed: true as const, results: [], retried: true, error: message };
-      }
-
-      await markBatchFailed(supabase, data.jobId, batchId, message);
-      return { claimed: true as const, results: [], failed: true, error: message };
+      return { claimed: true, results: [], error: message };
     }
-  });
+
+    await markBatchFailed(supabase, jobId, batchId, message, admin);
+    return { claimed: true, results: [], error: message };
+  }
+}
 
 // ---------- getJobSnapshot ----------
 
