@@ -561,10 +561,24 @@ function PeoplePage() {
       let emptyClaims = 0;
       while (!token.cancelled && workerRunIdRef.current === runId) {
         try {
+          // Respect shared cooldown if the gateway is rate-limiting us.
+          const wait = cooldownUntilRef.current - Date.now();
+          if (wait > 0) {
+            await new Promise((r) => setTimeout(r, wait));
+            continue;
+          }
+
           const res = await processNextBatchCall({ data: { jobId } });
           if (res.claimed) {
             emptyClaims = 0;
             if (res.results && res.results.length > 0) mergeScoreResults(res.results);
+            // Decay cooldown step after a successful pull
+            cooldownStepRef.current = Math.max(250, cooldownStepRef.current / 2);
+            // If any batch in this fan-out hit a rate-limit, back off briefly.
+            if (res.error && /rate limit|429/i.test(res.error)) {
+              cooldownUntilRef.current = Date.now() + cooldownStepRef.current;
+              cooldownStepRef.current = Math.min(5000, cooldownStepRef.current * 2);
+            }
             continue;
           }
 
@@ -595,8 +609,13 @@ function PeoplePage() {
           }
 
           await new Promise((r) => setTimeout(r, 1500));
-        } catch (error) {
+        } catch (error: any) {
           console.error("Scoring worker loop failed", error);
+          const msg = String(error?.message ?? error);
+          if (/rate limit|429/i.test(msg)) {
+            cooldownUntilRef.current = Date.now() + cooldownStepRef.current;
+            cooldownStepRef.current = Math.min(5000, cooldownStepRef.current * 2);
+          }
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
