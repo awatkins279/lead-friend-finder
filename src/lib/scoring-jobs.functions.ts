@@ -349,11 +349,13 @@ async function bumpJobCounters(
   supabase: any,
   jobId: string,
   delta: { completed?: number; failed?: number; scored?: number },
+  admin: boolean = false,
 ) {
   // Atomic SQL-side increment via SECURITY DEFINER RPC. Avoids the
   // read-modify-write race that caused workers to lose progress updates
   // near the end of a run (and made the UI hang on the final ~10% of leads).
-  await supabase.rpc("bump_scoring_job_counters", {
+  const rpc = admin ? "bump_scoring_job_counters_admin" : "bump_scoring_job_counters";
+  await supabase.rpc(rpc, {
     p_job_id: jobId,
     p_completed: delta.completed ?? 0,
     p_failed: delta.failed ?? 0,
@@ -361,12 +363,18 @@ async function bumpJobCounters(
   });
 }
 
-async function markBatchFailed(supabase: any, jobId: string, batchId: string, message: string) {
+async function markBatchFailed(
+  supabase: any,
+  jobId: string,
+  batchId: string,
+  message: string,
+  admin: boolean = false,
+) {
   await supabase
     .from("scoring_job_batches")
     .update({ status: "failed", error: message })
     .eq("id", batchId);
-  await bumpJobCounters(supabase, jobId, { failed: 1 });
+  await bumpJobCounters(supabase, jobId, { failed: 1 }, admin);
 }
 
 // Core scoring logic — same prompt as score.functions.ts
