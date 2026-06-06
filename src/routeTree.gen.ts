@@ -35,6 +35,7 @@ import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/t
 import { Route as ApiPublicTwilioRecordingRouteImport } from './routes/api/public/twilio.recording'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
+import { Route as ApiPublicHooksScoringTickRouteImport } from './routes/api/public/hooks/scoring-tick'
 
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
@@ -171,6 +172,12 @@ const ApiPublicInboxIngestRoute = ApiPublicInboxIngestRouteImport.update({
   path: '/api/public/inbox/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksScoringTickRoute =
+  ApiPublicHooksScoringTickRouteImport.update({
+    id: '/api/public/hooks/scoring-tick',
+    path: '/api/public/hooks/scoring-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -193,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
@@ -221,6 +229,7 @@ export interface FileRoutesByTo {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
+  '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
@@ -250,6 +259,7 @@ export interface FileRoutesById {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists/'
+    | '/api/public/hooks/scoring-tick'
     | '/api/public/inbox/ingest'
     | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists'
+    | '/api/public/hooks/scoring-tick'
     | '/api/public/inbox/ingest'
     | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
@@ -336,6 +348,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists/'
+    | '/api/public/hooks/scoring-tick'
     | '/api/public/inbox/ingest'
     | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
@@ -352,6 +365,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ApiGoogleCalendarCallbackRoute: typeof ApiGoogleCalendarCallbackRoute
   ApiGoogleCalendarConnectRoute: typeof ApiGoogleCalendarConnectRoute
+  ApiPublicHooksScoringTickRoute: typeof ApiPublicHooksScoringTickRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicTwilioRecordingRoute: typeof ApiPublicTwilioRecordingRoute
@@ -544,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInboxIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/scoring-tick': {
+      id: '/api/public/hooks/scoring-tick'
+      path: '/api/public/hooks/scoring-tick'
+      fullPath: '/api/public/hooks/scoring-tick'
+      preLoaderRoute: typeof ApiPublicHooksScoringTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -599,6 +620,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ApiGoogleCalendarCallbackRoute: ApiGoogleCalendarCallbackRoute,
   ApiGoogleCalendarConnectRoute: ApiGoogleCalendarConnectRoute,
+  ApiPublicHooksScoringTickRoute: ApiPublicHooksScoringTickRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicTwilioRecordingRoute: ApiPublicTwilioRecordingRoute,
@@ -609,13 +631,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

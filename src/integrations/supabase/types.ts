@@ -1634,7 +1634,23 @@ export type Database = {
           total_leads: number
         }[]
       }
+      bump_scoring_job_counters_admin: {
+        Args: {
+          p_completed?: number
+          p_failed?: number
+          p_job_id: string
+          p_scored?: number
+        }
+        Returns: undefined
+      }
       claim_scoring_batch: {
+        Args: { p_job_id: string }
+        Returns: {
+          id: string
+          lead_ids: string[]
+        }[]
+      }
+      claim_scoring_batch_admin: {
         Args: { p_job_id: string }
         Returns: {
           id: string
@@ -1651,6 +1667,10 @@ export type Database = {
           total_batches: number
           total_leads: number
         }[]
+      }
+      finalize_scoring_job_admin: {
+        Args: { p_job_id: string }
+        Returns: undefined
       }
       get_credit_summary: {
         Args: { _user_id: string }

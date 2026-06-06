@@ -465,8 +465,12 @@ function PeoplePage() {
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
   // re-opening the page resumes via the localStorage handle.
-  const WORKER_COUNT = 12;
+  const WORKER_COUNT = 24;
   const STORAGE_KEY = "active-scoring-job-id";
+  // Shared cooldown for all workers — set when the AI gateway returns 429 so
+  // workers slow down together instead of hammering the rate limit.
+  const cooldownUntilRef = useRef(0);
+  const cooldownStepRef = useRef(250); // ms; grows 250 → 500 → 1000 → 2000 → 4000
 
   const mergeScoreResults = useCallback(
     (
@@ -557,10 +561,24 @@ function PeoplePage() {
       let emptyClaims = 0;
       while (!token.cancelled && workerRunIdRef.current === runId) {
         try {
+          // Respect shared cooldown if the gateway is rate-limiting us.
+          const wait = cooldownUntilRef.current - Date.now();
+          if (wait > 0) {
+            await new Promise((r) => setTimeout(r, wait));
+            continue;
+          }
+
           const res = await processNextBatchCall({ data: { jobId } });
           if (res.claimed) {
             emptyClaims = 0;
             if (res.results && res.results.length > 0) mergeScoreResults(res.results);
+            // Decay cooldown step after a successful pull
+            cooldownStepRef.current = Math.max(250, cooldownStepRef.current / 2);
+            // If any batch in this fan-out hit a rate-limit, back off briefly.
+            if (res.error && /rate limit|429/i.test(res.error)) {
+              cooldownUntilRef.current = Date.now() + cooldownStepRef.current;
+              cooldownStepRef.current = Math.min(5000, cooldownStepRef.current * 2);
+            }
             continue;
           }
 
@@ -591,8 +609,13 @@ function PeoplePage() {
           }
 
           await new Promise((r) => setTimeout(r, 1500));
-        } catch (error) {
+        } catch (error: any) {
           console.error("Scoring worker loop failed", error);
+          const msg = String(error?.message ?? error);
+          if (/rate limit|429/i.test(msg)) {
+            cooldownUntilRef.current = Date.now() + cooldownStepRef.current;
+            cooldownStepRef.current = Math.min(5000, cooldownStepRef.current * 2);
+          }
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
