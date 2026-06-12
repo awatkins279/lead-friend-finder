@@ -112,10 +112,12 @@ function SdrAgentsPage() {
       <Card className="mb-6 flex items-start gap-3 border-primary/30 bg-primary/5 p-4">
         <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div className="text-sm">
-          <p className="font-medium">Setup is live · Inbox + auto-reply pipeline coming next</p>
+          <p className="font-medium">AI replies are live · connect Instantly to send</p>
           <p className="mt-1 text-muted-foreground">
-            You can build agents, upload knowledge, and assign them to campaigns now.
-            Connecting Gmail / Outlook so the agent can read &amp; reply to threads ships in the next update.
+            Build agents, upload knowledge, and try them in the <strong>Test</strong> tab now —
+            every reply is grounded in your knowledge and saved as a draft for you to approve.
+            Connect your Instantly account under <strong>Sending accounts</strong> to import your
+            mailboxes; live send &amp; receive is the final step.
           </p>
         </div>
       </Card>

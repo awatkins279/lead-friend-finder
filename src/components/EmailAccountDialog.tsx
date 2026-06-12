@@ -41,7 +41,7 @@ const PROVIDERS = [
   { id: "gmail", name: "Gmail / Google Workspace" },
   { id: "outlook", name: "Outlook / Microsoft 365" },
   { id: "smtp", name: "Custom SMTP/IMAP" },
-  { id: "manual", name: "Other (placeholder)" },
+  { id: "manual", name: "Other (manual entry)" },
 ];
 
 export function EmailAccountDialog({
