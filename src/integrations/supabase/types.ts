@@ -597,6 +597,45 @@ export type Database = {
           },
         ]
       }
+      list_email_accounts: {
+        Row: {
+          created_at: string
+          email_account_id: string
+          id: string
+          list_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_account_id: string
+          id?: string
+          list_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_account_id?: string
+          id?: string
+          list_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_email_accounts_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "list_email_accounts_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       list_leads: {
         Row: {
           call_script: Json | null
