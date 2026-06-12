@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,9 +54,38 @@ export function CampaignConfigDialog({
   const [cfg, setCfg] = useState<CampaignConfig>(initial);
   const [saving, setSaving] = useState(false);
 
+  // Per-campaign mailbox pool.
+  const [mailboxes, setMailboxes] = useState<{ id: string; email_address: string }[]>([]);
+  const [selectedMailboxes, setSelectedMailboxes] = useState<Set<string>>(new Set());
+  const [mailboxSearch, setMailboxSearch] = useState("");
+
   useEffect(() => {
-    if (open) setCfg(initial);
-  }, [open, initial]);
+    if (!open) return;
+    setCfg(initial);
+    setMailboxSearch("");
+    (async () => {
+      const sb = supabase as any;
+      const [{ data: accts }, { data: assigned }] = await Promise.all([
+        supabase
+          .from("email_accounts")
+          .select("id, email_address")
+          .order("email_address", { ascending: true }),
+        sb.from("list_email_accounts").select("email_account_id").eq("list_id", listId),
+      ]);
+      setMailboxes((accts ?? []) as { id: string; email_address: string }[]);
+      setSelectedMailboxes(
+        new Set(((assigned ?? []) as { email_account_id: string }[]).map((r) => r.email_account_id)),
+      );
+    })();
+  }, [open, initial, listId]);
+
+  const toggleMailbox = (id: string, on: boolean) =>
+    setSelectedMailboxes((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
   const update = <K extends keyof CampaignConfig>(k: K, v: CampaignConfig[K]) =>
     setCfg((c) => ({ ...c, [k]: v }));
@@ -82,8 +112,38 @@ export function CampaignConfigDialog({
         extra_instructions: cfg.extra_instructions,
       })
       .eq("id", listId);
+    if (error) {
+      setSaving(false);
+      return toast.error(error.message);
+    }
+
+    // Sync the campaign's mailbox pool.
+    try {
+      const sb = supabase as any;
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+      await sb.from("list_email_accounts").delete().eq("list_id", listId);
+      if (selectedMailboxes.size && uid) {
+        const rows = [...selectedMailboxes].map((email_account_id) => ({
+          list_id: listId,
+          email_account_id,
+          user_id: uid,
+        }));
+        const { error: mErr } = await sb.from("list_email_accounts").insert(rows);
+        if (mErr) throw new Error(mErr.message);
+      }
+    } catch (e) {
+      setSaving(false);
+      const msg = (e as Error).message;
+      if (/list_email_accounts/i.test(msg)) {
+        return toast.error(
+          "Campaign saved, but mailbox assignment needs its database table (migration not applied yet).",
+        );
+      }
+      return toast.error(msg);
+    }
+
     setSaving(false);
-    if (error) return toast.error(error.message);
     toast.success("Campaign saved");
     onSaved();
     onOpenChange(false);
@@ -213,6 +273,63 @@ export function CampaignConfigDialog({
               onChange={(e) => update("extra_instructions", e.target.value)}
               placeholder="Friendly, conversational tone. First email CTA should be like: 'if you could save 50% on your call center costs…'"
             />
+          </Field>
+
+          <Field
+            label={`Sending mailboxes — ${selectedMailboxes.size} selected`}
+            hint="This campaign sends only from the mailboxes you pick here, rotating across them to spread volume and protect deliverability. Connect Instantly under Sending accounts to import mailboxes."
+          >
+            {mailboxes.length === 0 ? (
+              <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                No mailboxes yet. Connect your Instantly account under{" "}
+                <strong>Sending accounts → Email</strong> to import them, then assign them here.
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={mailboxSearch}
+                    onChange={(e) => setMailboxSearch(e.target.value)}
+                    placeholder="Filter mailboxes…"
+                    className="h-8"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedMailboxes(new Set(mailboxes.map((m) => m.id)))}
+                  >
+                    Select all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedMailboxes(new Set())}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <div className="mt-2 max-h-52 space-y-0.5 overflow-y-auto rounded-md border p-1.5">
+                  {mailboxes
+                    .filter((m) =>
+                      m.email_address.toLowerCase().includes(mailboxSearch.toLowerCase()),
+                    )
+                    .map((m) => (
+                      <label
+                        key={m.id}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                      >
+                        <Checkbox
+                          checked={selectedMailboxes.has(m.id)}
+                          onCheckedChange={(c) => toggleMailbox(m.id, c === true)}
+                        />
+                        <span className="truncate">{m.email_address}</span>
+                      </label>
+                    ))}
+                </div>
+              </>
+            )}
           </Field>
         </div>
 

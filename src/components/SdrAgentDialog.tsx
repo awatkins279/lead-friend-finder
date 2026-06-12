@@ -62,12 +62,6 @@ type KnowledgeDoc = {
   chunk_count: number;
 };
 
-type EmailAccountOption = {
-  id: string;
-  email_address: string;
-  display_name: string | null;
-  status: string;
-};
 
 const EMPTY: AgentForm = {
   name: "",
@@ -105,7 +99,6 @@ export function SdrAgentDialog({
 }) {
   const [form, setForm] = useState<AgentForm>(EMPTY);
   const [docs, setDocs] = useState<KnowledgeDoc[]>([]);
-  const [emailAccounts, setEmailAccounts] = useState<EmailAccountOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -129,11 +122,6 @@ export function SdrAgentDialog({
 
   useEffect(() => {
     if (!open) return;
-    supabase
-      .from("email_accounts")
-      .select("id, email_address, display_name, status")
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setEmailAccounts((data ?? []) as EmailAccountOption[]));
     if (!agentId) {
       setForm(EMPTY);
       setDocs([]);
@@ -382,32 +370,10 @@ export function SdrAgentDialog({
                   placeholder={"Sarah Chen\nAcme Co · sarah@acme.com\nacme.com"}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Reply through inbox</Label>
-                <Select
-                  value={form.email_account_id ?? "none"}
-                  onValueChange={(v) =>
-                    update("email_account_id", v === "none" ? null : v)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="No inbox assigned yet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No inbox assigned</SelectItem>
-                    {emailAccounts.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.email_address}
-                        {e.status !== "active" ? " · pending" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  This agent will reply through this inbox. Add accounts in{" "}
-                  <strong>Sending accounts → Email accounts</strong>. Replies
-                  start sending once credentials are connected.
-                </p>
+              <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+                Mailboxes are assigned per <strong>campaign</strong> now (in the campaign's
+                settings), so one agent can run across many inboxes. Replies go out from
+                the inbox the prospect was originally contacted on.
               </div>
             </TabsContent>
 
