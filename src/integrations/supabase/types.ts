@@ -406,6 +406,42 @@ export type Database = {
         }
         Relationships: []
       }
+      instantly_connections: {
+        Row: {
+          account_count: number
+          api_key: string
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          workspace_name: string | null
+        }
+        Insert: {
+          account_count?: number
+          api_key: string
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          workspace_name?: string | null
+        }
+        Update: {
+          account_count?: number
+          api_key?: string
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          workspace_name?: string | null
+        }
+        Relationships: []
+      }
       lead_verifications: {
         Row: {
           email: string | null
