@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAccountDialog";
 import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { EmailAccountDialog, type EmailAccountRow } from "@/components/EmailAccountDialog";
+import { InstantlyConnectCard } from "@/components/InstantlyConnectCard";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/accounts")({
@@ -226,10 +227,12 @@ function AccountsPage() {
 
         {/* EMAIL TAB */}
         <TabsContent value="email" className="space-y-4">
+          {userId && <InstantlyConnectCard onChanged={load} />}
+
           <div className="flex items-start justify-between">
             <p className="text-sm text-muted-foreground">
-              Register the inboxes your AI SDR will reply through. Credentials &amp; OAuth
-              hook up after — for now you can save addresses and assign them to agents.
+              Register the inboxes your AI SDR will reply through. Connect Instantly above
+              to import all your mailboxes at once, or add one manually below.
             </p>
             <Button
               onClick={() => {
