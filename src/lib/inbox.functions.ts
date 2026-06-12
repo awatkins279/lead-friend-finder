@@ -242,25 +242,57 @@ export const generateAgentReply = createServerFn({ method: "POST" })
       );
     }
 
-    // 2. Agent config, thread, and this agent's knowledge — in parallel.
-    const [{ data: agent, error: aErr }, { data: msgs, error: mErr }, { data: chunks }] =
-      await Promise.all([
-        supabase.from("sdr_agents").select("*").eq("id", agentId).maybeSingle(),
-        supabase
-          .from("sdr_messages")
-          .select("direction, from_name, body_text, created_at")
-          .eq("conversation_id", data.conversation_id)
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("sdr_knowledge_chunks")
-          .select("content")
-          .eq("agent_id", agentId)
-          .order("chunk_index", { ascending: true })
-          .limit(100),
-      ]);
+    // 2. Agent config, thread, this agent's knowledge, and — Tier 1 web research —
+    // any CRM record we already hold on this prospect (matched by email). All in parallel.
+    const [
+      { data: agent, error: aErr },
+      { data: msgs, error: mErr },
+      { data: chunks },
+      { data: leadRow },
+    ] = await Promise.all([
+      supabase.from("sdr_agents").select("*").eq("id", agentId).maybeSingle(),
+      supabase
+        .from("sdr_messages")
+        .select("direction, from_name, body_text, created_at")
+        .eq("conversation_id", data.conversation_id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("sdr_knowledge_chunks")
+        .select("content")
+        .eq("agent_id", agentId)
+        .order("chunk_index", { ascending: true })
+        .limit(100),
+      supabase
+        .from("leads")
+        .select(
+          "title, org_name, org_industry, org_employee_count, org_technologies_used, org_website_url, org_description, city, state, country, linkedin_url",
+        )
+        .eq("email", convo.lead_email)
+        .limit(1)
+        .maybeSingle(),
+    ]);
     if (aErr) throw new Error(aErr.message);
     if (mErr) throw new Error(mErr.message);
     if (!agent) throw new Error("Assigned agent not found");
+
+    // Tier 1 "research": structured facts we already know about the prospect's
+    // company. Reliable (not scraped) — used to personalize, never to invent.
+    const lead = (leadRow ?? null) as Record<string, any> | null;
+    const intelLines = lead
+      ? [
+          lead.title ? `Prospect title: ${lead.title}` : "",
+          lead.org_name ? `Company: ${lead.org_name}` : "",
+          lead.org_industry ? `Industry: ${lead.org_industry}` : "",
+          lead.org_employee_count ? `Headcount: ${lead.org_employee_count}` : "",
+          lead.org_technologies_used ? `Tech stack: ${lead.org_technologies_used}` : "",
+          lead.org_website_url ? `Website: ${lead.org_website_url}` : "",
+          [lead.city, lead.state, lead.country].filter(Boolean).length
+            ? `Location: ${[lead.city, lead.state, lead.country].filter(Boolean).join(", ")}`
+            : "",
+          lead.org_description ? `About: ${String(lead.org_description).slice(0, 800)}` : "",
+        ].filter(Boolean)
+      : [];
+    const prospectIntel = intelLines.join("\n");
 
     const a = agent as Record<string, any>;
     const { text: knowledge, truncated } = buildKnowledgeBlock(
@@ -312,7 +344,7 @@ PROSPECT CONTEXT:
 - Name: ${convo.lead_name ?? "unknown"}
 - Company: ${convo.company ?? "unknown"}
 - Subject: ${convo.subject ?? "(none)"}
-
+${prospectIntel ? `\nPROSPECT INTEL (facts we already hold on this prospect's company — use to personalize naturally; do NOT invent beyond this, and never use it to make claims about OUR product):\n${prospectIntel}\n` : ""}
 THREAD (oldest to newest — reply to the latest PROSPECT message):
 ${threadText || "(no messages)"}
 
