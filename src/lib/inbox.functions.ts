@@ -206,6 +206,92 @@ function tryParseJson(raw: string): Record<string, unknown> | null {
   }
 }
 
+// --- Tier 2 live web research: best-effort summary of the prospect's own site ---
+const GENERIC_EMAIL_DOMAINS = new Set([
+  "gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com",
+  "aol.com", "proton.me", "protonmail.com", "live.com", "msn.com",
+]);
+
+// Resolve a safe https origin for the prospect's company from CRM data or their
+// email domain. Returns null for generic mailboxes and unsafe/private hosts.
+function prospectWebsiteUrl(orgWebsite: string | null | undefined, email: string): string | null {
+  const clean = (raw: string): string | null => {
+    let s = raw.trim();
+    if (!s) return null;
+    if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+    try {
+      const url = new URL(s);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+      const host = url.hostname.toLowerCase();
+      if (
+        host === "localhost" ||
+        host.endsWith(".local") ||
+        /^\d{1,3}(\.\d{1,3}){3}$/.test(host) // bare IPs (SSRF guard)
+      ) {
+        return null;
+      }
+      return url.origin;
+    } catch {
+      return null;
+    }
+  };
+  if (orgWebsite) {
+    const u = clean(orgWebsite);
+    if (u) return u;
+  }
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (domain && !GENERIC_EMAIL_DOMAINS.has(domain)) return clean(domain);
+  return null;
+}
+
+async function researchProspectWebsite(url: string, apiKey: string): Promise<string | null> {
+  if (!apiKey) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SDR-Research/1.0)" },
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 6000);
+    if (text.length < 80) return null;
+
+    const res2 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You summarize a company's website for a salesperson. Use ONLY the provided page text — invent nothing. Give 4-6 short factual bullets: what they do, who they serve, size/stage if stated, any notable recent fact. If the text is uninformative or just navigation/boilerplate, reply exactly 'NONE'.",
+          },
+          { role: "user", content: `Company page text:\n${text}` },
+        ],
+        max_tokens: 400,
+      }),
+    });
+    if (!res2.ok) return null;
+    const payload = await res2.json();
+    const summary = String(payload.choices?.[0]?.message?.content ?? "").trim();
+    if (!summary || summary.toUpperCase().includes("NONE")) return null;
+    return summary.slice(0, 1500);
+  } catch {
+    return null; // research is best-effort; never block a reply
+  }
+}
+
 export const generateAgentReply = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -294,6 +380,15 @@ export const generateAgentReply = createServerFn({ method: "POST" })
       : [];
     const prospectIntel = intelLines.join("\n");
 
+    // Tier 2 live web research: best-effort summary of the prospect's company site.
+    // Runs when we can resolve a real company URL; never blocks the reply on failure.
+    let webResearch = "";
+    const siteUrl = prospectWebsiteUrl(lead?.org_website_url ?? null, convo.lead_email);
+    if (siteUrl) {
+      const summary = await researchProspectWebsite(siteUrl, process.env.LOVABLE_API_KEY ?? "");
+      if (summary) webResearch = summary;
+    }
+
     const a = agent as Record<string, any>;
     const { text: knowledge, truncated } = buildKnowledgeBlock(
       (chunks ?? []) as { content: string }[],
@@ -344,7 +439,7 @@ PROSPECT CONTEXT:
 - Name: ${convo.lead_name ?? "unknown"}
 - Company: ${convo.company ?? "unknown"}
 - Subject: ${convo.subject ?? "(none)"}
-${prospectIntel ? `\nPROSPECT INTEL (facts we already hold on this prospect's company — use to personalize naturally; do NOT invent beyond this, and never use it to make claims about OUR product):\n${prospectIntel}\n` : ""}
+${prospectIntel ? `\nPROSPECT INTEL (facts we already hold on this prospect's company — use to personalize naturally; do NOT invent beyond this, and never use it to make claims about OUR product):\n${prospectIntel}\n` : ""}${webResearch ? `\nLIVE WEB RESEARCH (auto-summarized from the prospect's own website — EXTERNAL & UNVERIFIED. Use ONLY to personalize about the PROSPECT. Never use it to state facts about OUR product, and don't assert anything not listed here):\n${webResearch}\n` : ""}
 THREAD (oldest to newest — reply to the latest PROSPECT message):
 ${threadText || "(no messages)"}
 
