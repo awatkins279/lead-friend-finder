@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { SDR_REPLY_SYSTEM_PROMPT, buildKnowledgeBlock } from "./sdr-reply-prompt";
 
 // ============== Schemas ==============
 
@@ -339,4 +340,126 @@ export const processKnowledgeDoc = createServerFn({ method: "POST" })
         .eq("id", doc.id);
       throw new Error(msg);
     }
+  });
+
+// ============== Agent sandbox ==============
+
+const testAgentSchema = z.object({
+  agent_id: z.string().uuid(),
+  prospect_email: z.string().trim().min(10).max(12000),
+});
+
+type AgentTestResult = {
+  reply: string;
+  confidence: number;
+  needs_handoff: boolean;
+  handoff_reason: string;
+  knowledge_chunks: number;
+};
+
+function parseAgentTestResult(raw: string): Record<string, unknown> | null {
+  const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+export const testSdrAgent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => testAgentSchema.parse(input))
+  .handler(async ({ data, context }): Promise<AgentTestResult> => {
+    const { supabase } = context;
+    const [{ data: agent, error: agentError }, { data: chunks, error: chunksError }] =
+      await Promise.all([
+        supabase.from("sdr_agents").select("*").eq("id", data.agent_id).maybeSingle(),
+        supabase
+          .from("sdr_knowledge_chunks")
+          .select("content")
+          .eq("agent_id", data.agent_id)
+          .order("chunk_index", { ascending: true })
+          .limit(100),
+      ]);
+    if (agentError) throw new Error(agentError.message);
+    if (chunksError) throw new Error(chunksError.message);
+    if (!agent) throw new Error("Agent not found");
+
+    const a = agent as Record<string, unknown>;
+    const { text: knowledge, truncated } = buildKnowledgeBlock(
+      (chunks ?? []) as { content: string }[],
+    );
+    const triggers = String(a.handoff_triggers ?? "")
+      .split(",")
+      .map((trigger) => trigger.trim().toLowerCase())
+      .filter(Boolean);
+    const flagged = triggers.filter((trigger) =>
+      data.prospect_email.toLowerCase().includes(trigger),
+    );
+    const sdrName = String(a.sdr_display_name || a.name || "the rep");
+    const profile = [
+      `SDR display name: ${sdrName}`,
+      `Tone: ${a.tone ?? "consultative"}`,
+      `Formality (0 casual – 100 formal): ${a.formality ?? 50}`,
+      a.what_selling ? `What we sell: ${a.what_selling}` : "",
+      a.key_differentiators ? `Differentiators: ${a.key_differentiators}` : "",
+      a.booking_url ? `Booking link: ${a.booking_url}` : "",
+      a.extra_instructions ? `Playbook notes: ${a.extra_instructions}` : "",
+      a.hard_rules ? `HARD RULES:\n${a.hard_rules}` : "",
+      a.signature ? `Signature:\n${a.signature}` : "",
+    ].filter(Boolean);
+
+    const prompt = `SELLER PROFILE:\n${profile.join("\n")}\n\nKNOWLEDGE BASE${
+      truncated ? " (partial — lower confidence if a needed fact may be missing)" : ""
+    }:\n${knowledge || "(none provided — do not invent product facts)"}\n\nTHREAD:\nPROSPECT:\n${
+      data.prospect_email
+    }\n\n${
+      flagged.length
+        ? `SYSTEM FLAG: Handoff trigger(s) matched: ${flagged.join(", ")}. A human handoff is required.`
+        : ""
+    }\n\nWrite the reply now as JSON.`;
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI is not configured");
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2000,
+      }),
+    });
+    if (response.status === 429) throw new Error("AI rate limit — try again in a moment");
+    if (response.status === 402) throw new Error("AI credits exhausted");
+    if (!response.ok) throw new Error(`AI error ${response.status}`);
+
+    const payload = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const parsed = parseAgentTestResult(payload.choices?.[0]?.message?.content ?? "");
+    if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
+      throw new Error("The AI returned an unreadable reply — try again");
+    }
+    const rawConfidence = Number(parsed.confidence);
+    let confidence = Number.isFinite(rawConfidence) ? Math.round(rawConfidence) : 50;
+    confidence = Math.max(0, Math.min(100, confidence));
+    const needsHandoff = parsed.needs_handoff === true || flagged.length > 0;
+    if (needsHandoff) confidence = Math.min(confidence, 40);
+
+    return {
+      reply: parsed.reply.slice(0, 20000),
+      confidence,
+      needs_handoff: needsHandoff,
+      handoff_reason:
+        typeof parsed.handoff_reason === "string" ? parsed.handoff_reason.slice(0, 500) : "",
+      knowledge_chunks: chunks?.length ?? 0,
+    };
   });
