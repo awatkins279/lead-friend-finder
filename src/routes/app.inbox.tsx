@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Calendar,
   X,
+  Loader2,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ import {
   setConversationIntent,
   saveDraftReply,
   approveAndSend,
+  generateAgentReply,
   getInboxAnalytics,
   listInboxFilterOptions,
 } from "@/lib/inbox.functions";
@@ -180,6 +182,7 @@ function InboxPage() {
   const [draft, setDraft] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const listFn = useServerFn(listConversations);
   const getFn = useServerFn(getConversation);
@@ -187,6 +190,7 @@ function InboxPage() {
   const intentFn = useServerFn(setConversationIntent);
   const draftFn = useServerFn(saveDraftReply);
   const sendFn = useServerFn(approveAndSend);
+  const generateFn = useServerFn(generateAgentReply);
   const analyticsFn = useServerFn(getInboxAnalytics);
   const optionsFn = useServerFn(listInboxFilterOptions);
 
@@ -326,6 +330,34 @@ function InboxPage() {
       openThread(thread.conversation.id);
     } catch (e) {
       toast.error((e as Error).message);
+    }
+  };
+
+  const generateDraft = async () => {
+    if (!thread) return;
+    if (demoMode) {
+      toast.info("This is sample data — open a real conversation to draft with AI.");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const r = await generateFn({ data: { conversation_id: thread.conversation.id } });
+      setDraft(r.reply);
+      if (r.needs_handoff) {
+        toast.warning(
+          `⚠ Flagged for your review${r.handoff_reason ? `: ${r.handoff_reason}` : ""}. Read carefully before sending.`,
+        );
+      } else if (r.confidence < 70) {
+        toast.warning(
+          `Draft ready, but the AI is only ${r.confidence}% confident — double-check it before sending.`,
+        );
+      } else {
+        toast.success(`Draft ready · ${r.confidence}% confident · grounded on ${r.knowledge_used} knowledge chunk(s)`);
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -513,6 +545,8 @@ function InboxPage() {
               onArchive={() => archive(thread.conversation.id)}
               onChangeIntent={(v) => changeIntent(thread.conversation.id, v)}
               onSend={saveAndSend}
+              onGenerate={generateDraft}
+              generating={generating}
               loading={loadingThread}
             />
           )}
@@ -607,6 +641,8 @@ function ThreadView({
   onArchive,
   onChangeIntent,
   onSend,
+  onGenerate,
+  generating,
   loading,
 }: {
   thread: { conversation: Conversation; messages: Message[] };
@@ -615,6 +651,8 @@ function ThreadView({
   onArchive: () => void;
   onChangeIntent: (v: string) => void;
   onSend: () => void;
+  onGenerate: () => void;
+  generating: boolean;
   loading: boolean;
 }) {
   const c = thread.conversation;
@@ -682,8 +720,16 @@ function ThreadView({
           <span className="text-xs text-muted-foreground">
             Reply as {c.sdr_agents?.sdr_display_name || c.sdr_agents?.name || "you"}
           </span>
-          <Button variant="ghost" size="sm" disabled>
-            <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Generate AI draft
+          <Button variant="ghost" size="sm" onClick={onGenerate} disabled={generating}>
+            {generating ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Drafting…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Generate AI draft
+              </>
+            )}
           </Button>
         </div>
         <Textarea

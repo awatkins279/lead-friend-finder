@@ -222,3 +222,121 @@ export const assignAgentToList = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============== Knowledge ingestion (parse -> chunk -> store) ==============
+//
+// Turns an uploaded knowledge file into text chunks the SDR reply generator can
+// ground on. Supports PDF, DOCX/DOC, TXT, MD. Parser libs are imported
+// dynamically so they only load server-side (never in the browser bundle).
+// Idempotent: re-running replaces this doc's chunks.
+
+const CHUNK_CHARS = 2800; // ~700 tokens per chunk
+const CHUNK_OVERLAP = 300; // carry-over context between chunks
+
+function chunkText(text: string, size = CHUNK_CHARS, overlap = CHUNK_OVERLAP): string[] {
+  const clean = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  if (clean.length <= size) return clean ? [clean] : [];
+  // Split on paragraph boundaries first, then pack into ~size windows.
+  const paras = clean.split(/\n\n+/);
+  const chunks: string[] = [];
+  let cur = "";
+  for (const p of paras) {
+    if (p.length > size) {
+      // A single huge paragraph — hard-split it.
+      if (cur) { chunks.push(cur); cur = ""; }
+      for (let i = 0; i < p.length; i += size - overlap) {
+        chunks.push(p.slice(i, i + size));
+      }
+      continue;
+    }
+    if (cur.length + p.length + 2 > size) {
+      chunks.push(cur);
+      // start next chunk with a little overlap from the end of the previous one
+      cur = cur.slice(-overlap) + "\n\n" + p;
+    } else {
+      cur += (cur ? "\n\n" : "") + p;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks.filter((c) => c.trim().length > 0);
+}
+
+async function extractTextFromFile(buf: Buffer, filename: string): Promise<string> {
+  const ext = (filename.split(".").pop() ?? "").toLowerCase();
+  if (ext === "pdf") {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const { text } = await extractText(pdf, { mergePages: true });
+    return Array.isArray(text) ? text.join("\n\n") : text;
+  }
+  if (ext === "docx" || ext === "doc") {
+    const mammoth = await import("mammoth");
+    const { value } = await mammoth.extractRawText({ buffer: buf });
+    return value;
+  }
+  // txt, md, and anything else readable as plain text
+  return buf.toString("utf-8");
+}
+
+export const processKnowledgeDoc = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => idSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: doc, error: dErr } = await supabase
+      .from("sdr_knowledge_docs")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (dErr) throw new Error(dErr.message);
+    if (!doc) throw new Error("Document not found");
+
+    await supabase
+      .from("sdr_knowledge_docs")
+      .update({ status: "processing", error: null })
+      .eq("id", doc.id);
+
+    try {
+      const { data: blob, error: sErr } = await supabase.storage
+        .from("sdr-knowledge")
+        .download(doc.storage_path);
+      if (sErr || !blob) throw new Error(sErr?.message ?? "Could not download file");
+
+      const buf = Buffer.from(await blob.arrayBuffer());
+      const text = await extractTextFromFile(buf, doc.filename);
+      const chunks = chunkText(text);
+
+      if (chunks.length === 0) {
+        throw new Error("No readable text found in this file");
+      }
+
+      // Replace any existing chunks for this doc (idempotent re-process).
+      await supabase.from("sdr_knowledge_chunks").delete().eq("doc_id", doc.id);
+
+      const rows = chunks.map((content, i) => ({
+        doc_id: doc.id,
+        agent_id: doc.agent_id,
+        user_id: userId,
+        chunk_index: i,
+        content,
+        token_count: Math.ceil(content.length / 4),
+      }));
+      const { error: iErr } = await supabase.from("sdr_knowledge_chunks").insert(rows);
+      if (iErr) throw new Error(iErr.message);
+
+      await supabase
+        .from("sdr_knowledge_docs")
+        .update({ status: "processed", chunk_count: chunks.length, error: null })
+        .eq("id", doc.id);
+
+      return { ok: true, chunk_count: chunks.length };
+    } catch (e) {
+      const msg = String((e as Error).message ?? e).slice(0, 500);
+      await supabase
+        .from("sdr_knowledge_docs")
+        .update({ status: "error", error: msg })
+        .eq("id", doc.id);
+      throw new Error(msg);
+    }
+  });

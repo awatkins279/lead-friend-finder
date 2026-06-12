@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { SDR_REPLY_SYSTEM_PROMPT, buildKnowledgeBlock } from "./sdr-reply-prompt";
 
 const filtersSchema = z.object({
   status: z.enum(["all", "open", "needs_approval", "archived", "snoozed", "closed"]).optional(),
@@ -176,6 +177,235 @@ export const approveAndSend = createServerFn({ method: "POST" })
       .eq("id", data.message_id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ============== AI reply generation (grounded, draft-only) ==============
+//
+// Reads the conversation + the assigned agent's config + that agent's knowledge
+// base, then drafts a grounded reply with the anti-hallucination system prompt.
+// ALWAYS saves as a draft (never sends). Stores the model's self-confidence and
+// any handoff flag in the message's `raw` column for the UI to surface.
+
+function tryParseJson(raw: string): Record<string, unknown> | null {
+  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const start = s.search(/[{[]/);
+  const end = Math.max(s.lastIndexOf("}"), s.lastIndexOf("]"));
+  if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
+  try {
+    return JSON.parse(s);
+  } catch {
+    /* fall through */
+  }
+  const repaired = s
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
+    .replace(/,\s*([}\]])/g, "$1");
+  try {
+    return JSON.parse(repaired);
+  } catch {
+    return null;
+  }
+}
+
+export const generateAgentReply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ conversation_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    // 1. Conversation (+ campaign fallback for the agent, + the sending inbox).
+    const { data: convoRaw, error: cErr } = await supabase
+      .from("sdr_conversations")
+      .select(
+        "id, lead_email, lead_name, company, subject, agent_id, list_id, lists(sdr_agent_id), email_accounts(email_address)",
+      )
+      .eq("id", data.conversation_id)
+      .maybeSingle();
+    if (cErr) throw new Error(cErr.message);
+    if (!convoRaw) throw new Error("Conversation not found");
+    const convo = convoRaw as unknown as {
+      id: string;
+      lead_email: string;
+      lead_name: string | null;
+      company: string | null;
+      subject: string | null;
+      agent_id: string | null;
+      lists: { sdr_agent_id: string | null } | null;
+      email_accounts: { email_address: string } | null;
+    };
+
+    const agentId = convo.agent_id ?? convo.lists?.sdr_agent_id ?? null;
+    if (!agentId) {
+      throw new Error(
+        "No SDR agent is assigned to this conversation or its campaign. Assign one first.",
+      );
+    }
+
+    // 2. Agent config, thread, and this agent's knowledge — in parallel.
+    const [{ data: agent, error: aErr }, { data: msgs, error: mErr }, { data: chunks }] =
+      await Promise.all([
+        supabase.from("sdr_agents").select("*").eq("id", agentId).maybeSingle(),
+        supabase
+          .from("sdr_messages")
+          .select("direction, from_name, body_text, created_at")
+          .eq("conversation_id", data.conversation_id)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("sdr_knowledge_chunks")
+          .select("content")
+          .eq("agent_id", agentId)
+          .order("chunk_index", { ascending: true })
+          .limit(100),
+      ]);
+    if (aErr) throw new Error(aErr.message);
+    if (mErr) throw new Error(mErr.message);
+    if (!agent) throw new Error("Assigned agent not found");
+
+    const a = agent as Record<string, any>;
+    const { text: knowledge, truncated } = buildKnowledgeBlock(
+      (chunks ?? []) as { content: string }[],
+    );
+
+    // 3. Keyword handoff pre-check on the latest inbound message.
+    const triggers = String(a.handoff_triggers ?? "")
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    const messages = (msgs ?? []) as {
+      direction: string;
+      from_name: string | null;
+      body_text: string | null;
+    }[];
+    const lastInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+    const lastInboundText = (lastInbound?.body_text ?? "").toLowerCase();
+    const flagged = triggers.filter((t) => lastInboundText.includes(t));
+
+    // 4. Build the user prompt from the seller profile + knowledge + thread.
+    const sdrName = a.sdr_display_name || a.name || "the rep";
+    const profileLines = [
+      `SDR display name: ${sdrName}`,
+      `Tone: ${a.tone ?? "consultative"}`,
+      `Formality (0 casual – 100 formal): ${a.formality ?? 50}`,
+      a.what_selling ? `What we sell: ${a.what_selling}` : "",
+      a.key_differentiators ? `Differentiators: ${a.key_differentiators}` : "",
+      a.booking_url ? `Booking link (offer when it fits): ${a.booking_url}` : "",
+      a.extra_instructions ? `Playbook notes: ${a.extra_instructions}` : "",
+      a.hard_rules ? `HARD RULES (absolute):\n${a.hard_rules}` : "",
+      a.signature ? `Signature to end with:\n${a.signature}` : "",
+    ].filter(Boolean);
+
+    const threadText = messages
+      .map((m) => {
+        const who = m.direction === "inbound" ? "PROSPECT" : `US (${sdrName})`;
+        return `${who}:\n${(m.body_text ?? "").slice(0, 4000)}`;
+      })
+      .join("\n\n---\n\n");
+
+    const userPrompt = `SELLER PROFILE:
+${profileLines.join("\n")}
+
+KNOWLEDGE BASE${truncated ? " (partial — truncated; if a needed fact may be missing, lower confidence)" : knowledge ? "" : " (EMPTY — you have no product facts beyond the seller profile; do not invent any, defer to a human/call for specifics)"}:
+${knowledge || "(none provided)"}
+
+PROSPECT CONTEXT:
+- Name: ${convo.lead_name ?? "unknown"}
+- Company: ${convo.company ?? "unknown"}
+- Subject: ${convo.subject ?? "(none)"}
+
+THREAD (oldest to newest — reply to the latest PROSPECT message):
+${threadText || "(no messages)"}
+
+${flagged.length ? `SYSTEM FLAG: This message hit handoff trigger(s): ${flagged.join(", ")}. Treat as requiring human handoff.` : ""}
+
+Write the reply now as JSON.`;
+
+    // 5. Call the AI gateway.
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2000,
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate limit — try again in a moment");
+    if (res.status === 402)
+      throw new Error("AI credits exhausted — add credits in Workspace settings");
+    if (!res.ok) throw new Error(`AI error ${res.status}`);
+
+    const payload = await res.json();
+    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
+    const parsed = tryParseJson(content);
+    if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
+      throw new Error("The AI returned an unreadable reply — try again");
+    }
+
+    let confidence = Number(parsed.confidence);
+    if (!Number.isFinite(confidence)) confidence = 50;
+    confidence = Math.max(0, Math.min(100, Math.round(confidence)));
+    const needsHandoff = parsed.needs_handoff === true || flagged.length > 0;
+    if (needsHandoff) confidence = Math.min(confidence, 40);
+    const handoffReason =
+      typeof parsed.handoff_reason === "string" ? parsed.handoff_reason : "";
+    const replyBody = String(parsed.reply).slice(0, 20000);
+
+    // 6. Save as a DRAFT (never send). Stash metadata in `raw`.
+    const subject = convo.subject
+      ? convo.subject.toLowerCase().startsWith("re:")
+        ? convo.subject
+        : `Re: ${convo.subject}`
+      : "Re:";
+    const from = convo.email_accounts?.email_address ?? "pending@inbox";
+    const { data: inserted, error: insErr } = await supabase
+      .from("sdr_messages")
+      .insert({
+        conversation_id: convo.id,
+        user_id: userId,
+        direction: "outbound",
+        from_email: from,
+        to_emails: [convo.lead_email],
+        subject,
+        body_text: replyBody,
+        snippet: replyBody.slice(0, 200),
+        ai_generated: true,
+        agent_id: agentId,
+        status: "draft",
+        raw: {
+          confidence,
+          needs_handoff: needsHandoff,
+          handoff_reason: handoffReason,
+          knowledge_chunks: (chunks ?? []).length,
+          knowledge_truncated: truncated,
+          model: "google/gemini-2.5-flash",
+        },
+      })
+      .select("id")
+      .single();
+    if (insErr) throw new Error(insErr.message);
+
+    // Flag the conversation for review.
+    await supabase
+      .from("sdr_conversations")
+      .update({ status: "needs_approval" })
+      .eq("id", convo.id);
+
+    return {
+      message_id: inserted.id as string,
+      reply: replyBody,
+      confidence,
+      needs_handoff: needsHandoff,
+      handoff_reason: handoffReason,
+      knowledge_used: (chunks ?? []).length,
+    };
   });
 
 export const getInboxAnalytics = createServerFn({ method: "POST" })

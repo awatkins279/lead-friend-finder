@@ -30,6 +30,7 @@ import {
   getSdrAgent,
   recordKnowledgeDoc,
   deleteKnowledgeDoc,
+  processKnowledgeDoc,
 } from "@/lib/sdr.functions";
 
 type AgentForm = {
@@ -113,6 +114,7 @@ export function SdrAgentDialog({
   const getAgent = useServerFn(getSdrAgent);
   const recordDoc = useServerFn(recordKnowledgeDoc);
   const removeDoc = useServerFn(deleteKnowledgeDoc);
+  const processDoc = useServerFn(processKnowledgeDoc);
 
   useEffect(() => {
     if (!open) return;
@@ -202,12 +204,50 @@ export function SdrAgentDialog({
           size_bytes: file.size,
         },
       });
-      setDocs((d) => [doc as KnowledgeDoc, ...d]);
-      toast.success("Uploaded");
+      const newDoc = { ...(doc as KnowledgeDoc), status: "processing" };
+      setDocs((d) => [newDoc, ...d]);
+
+      // Parse + chunk it so the AI can actually use it.
+      try {
+        const r = await processDoc({ data: { id: newDoc.id } });
+        setDocs((d) =>
+          d.map((x) =>
+            x.id === newDoc.id
+              ? { ...x, status: "processed", chunk_count: r.chunk_count, error: null }
+              : x,
+          ),
+        );
+        toast.success(`Added — ${r.chunk_count} chunks ready for the AI`);
+      } catch (pe) {
+        const msg = (pe as Error).message;
+        setDocs((d) =>
+          d.map((x) => (x.id === newDoc.id ? { ...x, status: "error", error: msg } : x)),
+        );
+        toast.error(`Uploaded, but couldn't read it: ${msg}`);
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleReprocessDoc = async (id: string) => {
+    setDocs((d) => d.map((x) => (x.id === id ? { ...x, status: "processing" } : x)));
+    try {
+      const r = await processDoc({ data: { id } });
+      setDocs((d) =>
+        d.map((x) =>
+          x.id === id
+            ? { ...x, status: "processed", chunk_count: r.chunk_count, error: null }
+            : x,
+        ),
+      );
+      toast.success(`Re-read — ${r.chunk_count} chunks ready`);
+    } catch (e) {
+      const msg = (e as Error).message;
+      setDocs((d) => d.map((x) => (x.id === id ? { ...x, status: "error", error: msg } : x)));
+      toast.error(msg);
     }
   };
 
@@ -493,10 +533,11 @@ export function SdrAgentDialog({
                     </label>
                   </div>
 
-                  <div className="rounded-md border border-amber-500/30 bg-amber-50/30 p-3 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-400">
+                  <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
                     <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
-                    Files are stored and listed now. The chunk &amp; embed pipeline that
-                    lets the AI cite from them ships in the next update.
+                    The AI only states facts it can find here or in the agent's Offer
+                    tab. The more accurate your pricing, FAQs, and product docs, the
+                    less it has to guess — which is how you prevent made-up answers.
                   </div>
 
                   {docs.length === 0 ? (
@@ -513,11 +554,40 @@ export function SdrAgentDialog({
                           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{d.filename}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {d.size_bytes ? `${(d.size_bytes / 1024).toFixed(0)} KB` : "—"} ·{" "}
-                              {d.status}
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <span>
+                                {d.size_bytes ? `${(d.size_bytes / 1024).toFixed(0)} KB` : "—"}
+                              </span>
+                              <span>·</span>
+                              {d.status === "processing" ? (
+                                <span className="inline-flex items-center text-amber-600 dark:text-amber-400">
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" /> Reading…
+                                </span>
+                              ) : d.status === "processed" ? (
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  Ready · {d.chunk_count} chunk{d.chunk_count === 1 ? "" : "s"}
+                                </span>
+                              ) : d.status === "error" ? (
+                                <span
+                                  className="truncate text-destructive"
+                                  title={d.error ?? "Failed to read"}
+                                >
+                                  Couldn't read — {d.error ?? "unknown error"}
+                                </span>
+                              ) : (
+                                <span>{d.status}</span>
+                              )}
                             </div>
                           </div>
+                          {d.status === "error" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleReprocessDoc(d.id)}
+                            >
+                              Retry
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
