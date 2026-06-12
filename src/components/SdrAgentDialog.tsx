@@ -635,6 +635,64 @@ export function SdrAgentDialog({
                 </>
               )}
             </TabsContent>
+
+            <TabsContent value="test" className="space-y-4 pt-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-medium">Test this agent</h3>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Paste a fake prospect email to preview the exact reply this agent would draft. Nothing is sent or saved.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="agent-test-email">Prospect email</Label>
+                <Textarea
+                  id="agent-test-email"
+                  rows={7}
+                  value={testEmail}
+                  onChange={(event) => setTestEmail(event.target.value)}
+                  placeholder="Hi Sarah, this sounds interesting. Does it integrate with our CRM, and what does pricing look like?"
+                  disabled={testing}
+                />
+              </div>
+              <Button onClick={handleAgentTest} disabled={testing || testEmail.trim().length < 10}>
+                {testing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                )}
+                {testing ? "Writing reply…" : "Generate test reply"}
+              </Button>
+
+              {testResult && (
+                <div className="space-y-3 rounded-md border bg-muted/20 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={testResult.confidence >= 80 ? "secondary" : "outline"}>
+                      {testResult.confidence}% confidence
+                    </Badge>
+                    <Badge variant={testResult.needs_handoff ? "destructive" : "secondary"}>
+                      {testResult.needs_handoff ? "Human handoff" : "No handoff"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Used {testResult.knowledge_chunks} knowledge chunk{testResult.knowledge_chunks === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {testResult.needs_handoff && testResult.handoff_reason && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                      {testResult.handoff_reason}
+                    </div>
+                  )}
+                  <div>
+                    <Label>Agent reply</Label>
+                    <div className="mt-2 whitespace-pre-wrap rounded-md border bg-background p-4 text-sm leading-relaxed">
+                      {testResult.reply}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
           </Tabs>
         )}
 
