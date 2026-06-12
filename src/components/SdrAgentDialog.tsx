@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Upload, FileText, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Upload, FileText, Trash2, AlertTriangle, FlaskConical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   upsertSdrAgent,
@@ -31,6 +31,7 @@ import {
   recordKnowledgeDoc,
   deleteKnowledgeDoc,
   processKnowledgeDoc,
+  testSdrAgent,
 } from "@/lib/sdr.functions";
 
 type AgentForm = {
@@ -109,12 +110,22 @@ export function SdrAgentDialog({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    reply: string;
+    confidence: number;
+    needs_handoff: boolean;
+    handoff_reason: string;
+    knowledge_chunks: number;
+  } | null>(null);
 
   const upsert = useServerFn(upsertSdrAgent);
   const getAgent = useServerFn(getSdrAgent);
   const recordDoc = useServerFn(recordKnowledgeDoc);
   const removeDoc = useServerFn(deleteKnowledgeDoc);
   const processDoc = useServerFn(processKnowledgeDoc);
+  const runAgentTest = useServerFn(testSdrAgent);
 
   useEffect(() => {
     if (!open) return;
@@ -127,6 +138,8 @@ export function SdrAgentDialog({
       setForm(EMPTY);
       setDocs([]);
       setSavedId(null);
+      setTestEmail("");
+      setTestResult(null);
       return;
     }
     setLoading(true);
@@ -262,6 +275,25 @@ export function SdrAgentDialog({
     }
   };
 
+  const handleAgentTest = async () => {
+    if (!savedId || testEmail.trim().length < 10) {
+      toast.error("Paste a prospect email first");
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const result = await runAgentTest({
+        data: { agent_id: savedId, prospect_email: testEmail.trim() },
+      });
+      setTestResult(result);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setTesting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -278,7 +310,7 @@ export function SdrAgentDialog({
           </div>
         ) : (
           <Tabs defaultValue="identity" className="mt-2">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="identity">Identity</TabsTrigger>
               <TabsTrigger value="offer">Offer</TabsTrigger>
               <TabsTrigger value="behavior">Behavior</TabsTrigger>
@@ -289,6 +321,7 @@ export function SdrAgentDialog({
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="test" disabled={!savedId}>Test</TabsTrigger>
             </TabsList>
 
             <TabsContent value="identity" className="space-y-4 pt-4">
