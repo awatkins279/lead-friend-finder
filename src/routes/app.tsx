@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Users,
-  Linkedin,
   Bookmark,
   LogOut,
   Send,
@@ -67,7 +66,12 @@ function AppShell() {
     );
   }
 
-  const nav_items = [
+  const nav_items: Array<{
+    to: string;
+    icon: typeof Users;
+    label: string;
+    disabled?: boolean;
+  }> = [
     { to: "/app/people", icon: Users, label: "People Search" },
     { to: "/app/lists", icon: Send, label: "Campaigns" },
     { to: "/app/calendar", icon: Calendar, label: "Calendar" },
@@ -77,7 +81,6 @@ function AppShell() {
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
     { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
     { to: "/app/product-info", icon: Package, label: "Product Info" },
-    { to: "/app/linkedin", icon: Linkedin, label: "LinkedIn (soon)", disabled: true },
     ...(isAdmin ? [{ to: "/app/admin", icon: Shield, label: "Admin" }] : []),
   ];
 

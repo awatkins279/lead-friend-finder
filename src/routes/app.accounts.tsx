@@ -24,7 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAccountDialog";
 import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
-import { EmailAccountDialog, type EmailAccountRow } from "@/components/EmailAccountDialog";
+import { type EmailAccountRow } from "@/components/EmailAccountDialog";
 import { InstantlyConnectCard } from "@/components/InstantlyConnectCard";
 import { toast } from "sonner";
 
@@ -44,11 +44,6 @@ type PhoneProvider = {
 
 const PHONE_PROVIDERS: PhoneProvider[] = [
   { id: "twilio", name: "Twilio", description: "Programmable Voice — most popular, pay-as-you-go.", available: true },
-  { id: "ringcentral", name: "RingCentral", description: "Business phone system with RingOut API.", available: true },
-  { id: "vonage", name: "Vonage", description: "Voice API (formerly Nexmo).", available: false },
-  { id: "plivo", name: "Plivo", description: "Twilio alternative, cheaper international rates.", available: false },
-  { id: "telnyx", name: "Telnyx", description: "Carrier-grade voice API.", available: false },
-  { id: "bandwidth", name: "Bandwidth", description: "Enterprise voice + messaging.", available: false },
 ];
 
 function AccountsPage() {
@@ -60,8 +55,6 @@ function AccountsPage() {
   const [providerOpen, setProviderOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<PhoneAccountRow | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [emailOpen, setEmailOpen] = useState(false);
-  const [editingEmail, setEditingEmail] = useState<EmailAccountRow | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -154,9 +147,15 @@ function AccountsPage() {
         <TabsContent value="phone" className="space-y-4">
           <div className="flex items-start justify-between">
             <p className="text-sm text-muted-foreground">
-              Connect a calling provider. Pick from supported providers below.
+              Connect your Twilio account for outbound calling.
             </p>
-            <Button onClick={() => setPickerOpen(true)} disabled={!userId}>
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+              disabled={!userId}
+            >
               <Plus className="mr-2 h-4 w-4" /> Add phone account
             </Button>
           </div>
@@ -229,21 +228,10 @@ function AccountsPage() {
         <TabsContent value="email" className="space-y-4">
           {userId && <InstantlyConnectCard onChanged={load} />}
 
-          <div className="flex items-start justify-between">
-            <p className="text-sm text-muted-foreground">
-              Register the inboxes your AI SDR will reply through. Connect Instantly above
-              to import all your mailboxes at once, or add one manually below.
-            </p>
-            <Button
-              onClick={() => {
-                setEditingEmail(null);
-                setEmailOpen(true);
-              }}
-              disabled={!userId}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add email account
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            These are the inboxes your AI SDR sends &amp; replies through. Connect
+            Instantly above to import all your mailboxes automatically.
+          </p>
 
           {loading ? (
             <Card className="p-8 text-center text-sm text-muted-foreground">Loading…</Card>
@@ -254,9 +242,8 @@ function AccountsPage() {
               </div>
               <p className="text-sm font-medium">No email accounts yet</p>
               <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
-                Add the inbox addresses you bought / will receive. Your AI SDR agents
-                can be wired to them now and will start sending the moment credentials
-                are connected.
+                Connect Instantly above to import your domains &amp; mailboxes. They'll
+                appear here and your SDR agents can send through them.
               </p>
             </Card>
           ) : (
@@ -284,21 +271,9 @@ function AccountsPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingEmail(a);
-                        setEmailOpen(true);
-                      }}
-                    >
-                      <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => removeEmail(a.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => removeEmail(a.id)}>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
                 </Card>
               ))}
             </div>
@@ -362,15 +337,6 @@ function AccountsPage() {
         />
       )}
 
-      {userId && (
-        <EmailAccountDialog
-          userId={userId}
-          open={emailOpen}
-          onOpenChange={setEmailOpen}
-          onSaved={load}
-          existing={editingEmail}
-        />
-      )}
     </div>
   );
 }
