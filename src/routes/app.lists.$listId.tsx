@@ -18,7 +18,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2, Rocket, PauseCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
@@ -47,6 +47,7 @@ import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 import { LiveCopilotPanel } from "@/components/LiveCopilotPanel";
 import { FollowAlongTeleprompter } from "@/components/FollowAlongTeleprompter";
 import { useLiveCoaching } from "@/hooks/useLiveCoaching";
+import { launchCampaign, pauseCampaign } from "@/lib/campaign-launch.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -113,7 +114,7 @@ function effectiveEmails(r: Row): EmailInSequence[] {
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null };
+type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null; campaign_status: "draft" | "active" | "paused" | "completed"; instantly_campaign_id: string | null };
 
 const TWILIO_VOICE_SDK_URL = "https://media.twiliocdn.com/sdk/js/voice/releases/2.18.3/twilio.min.js";
 
@@ -162,6 +163,8 @@ function ListDetailPage() {
   const enrichFn = useServerFn(enrichLead);
   const verifyFn = useServerFn(verifyLeadEmail);
   const genScriptBulkFn = useServerFn(generateCallScript);
+  const launchCampaignFn = useServerFn(launchCampaign);
+  const pauseCampaignFn = useServerFn(pauseCampaign);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [verifyFilter, setVerifyFilter] = useState<"all" | "deliverable" | "risky" | "invalid" | "unverified">("all");
   const [open, setOpen] = useState<Row | null>(null);
@@ -170,6 +173,8 @@ function ListDetailPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "email" | "calling">("email");
   const [pendingCallLeadId, setPendingCallLeadId] = useState<string | null>(null);
   const [confirmScripts, setConfirmScripts] = useState(false);
+  const [confirmLaunch, setConfirmLaunch] = useState(false);
+  const [launchBusy, setLaunchBusy] = useState(false);
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
     total: number;
@@ -185,7 +190,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled, campaign_status, instantly_campaign_id",
         )
         .eq("id", listId)
         .maybeSingle();
@@ -439,6 +444,33 @@ function ListDetailPage() {
     else refetch();
   };
 
+  const handleLaunch = async () => {
+    setConfirmLaunch(false);
+    setLaunchBusy(true);
+    try {
+      const result = await launchCampaignFn({ data: { listId } });
+      toast.success(result.resumed ? "Campaign resumed" : `Campaign launched for ${result.prospects ?? 0} prospect${result.prospects === 1 ? "" : "s"}`);
+      await refetchList();
+    } catch (error) {
+      toast.error((error as Error).message || "Campaign could not be launched");
+    } finally {
+      setLaunchBusy(false);
+    }
+  };
+
+  const handlePause = async () => {
+    setLaunchBusy(true);
+    try {
+      await pauseCampaignFn({ data: { listId } });
+      toast.success("Campaign paused");
+      await refetchList();
+    } catch (error) {
+      toast.error((error as Error).message || "Campaign could not be paused");
+    } finally {
+      setLaunchBusy(false);
+    }
+  };
+
   const cfgInitial: CampaignConfig = list
     ? {
         name: list.name ?? "",
@@ -470,6 +502,7 @@ function ListDetailPage() {
       };
 
   const enrichedCount = (rows ?? []).filter((r) => r.status === "enriched").length;
+  const campaignStatus = list?.campaign_status ?? "draft";
 
   // Re-render every second while running so ETA ticks down
   const [, setTick] = useState(0);
@@ -493,8 +526,9 @@ function ListDetailPage() {
               <h1 className="min-w-0 truncate text-3xl font-semibold tracking-tight text-foreground">
                 {list?.name ?? "Loading…"}
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Active
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                <span className={`h-1.5 w-1.5 rounded-full ${campaignStatus === "active" ? "bg-primary" : "bg-muted-foreground"}`} />
+                {campaignStatus === "active" ? "Sending" : campaignStatus === "paused" ? "Paused" : campaignStatus === "completed" ? "Completed" : "Draft"}
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -502,6 +536,17 @@ function ListDetailPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            {campaignStatus === "active" ? (
+              <Button size="sm" variant="outline" onClick={handlePause} disabled={launchBusy}>
+                {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <PauseCircle className="mr-2 h-3.5 w-3.5" />}
+                Pause campaign
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setConfirmLaunch(true)} disabled={launchBusy || !rows?.length}>
+                {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Rocket className="mr-2 h-3.5 w-3.5" />}
+                {campaignStatus === "paused" ? "Resume campaign" : "Launch campaign"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-3.5 w-3.5" /> Campaign config
             </Button>
@@ -643,6 +688,25 @@ function ListDetailPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={runAllScripts}>Rewrite all scripts</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmLaunch} onOpenChange={setConfirmLaunch}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{campaignStatus === "paused" ? "Resume this campaign?" : "Launch this campaign?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {campaignStatus === "paused"
+                ? "Sending will continue through your assigned mailboxes using the existing schedule."
+                : `This will start the generated email sequence for ${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length} ready prospect${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length === 1 ? "" : "s"}. Emails send on weekdays from 9 AM–5 PM Eastern, stop when a prospect replies, and use the mailboxes selected in Campaign config.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLaunch}>
+              {campaignStatus === "paused" ? "Resume sending" : "Launch and start sending"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

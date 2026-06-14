@@ -134,6 +134,81 @@ export type Database = {
           },
         ]
       }
+      campaign_email_sends: {
+        Row: {
+          attempts: number
+          body: string
+          created_at: string
+          email_account_id: string
+          error: string | null
+          id: string
+          lead_id: string
+          list_id: string
+          locked_at: string | null
+          provider_message_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          sequence_step: number
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          created_at?: string
+          email_account_id: string
+          error?: string | null
+          id?: string
+          lead_id: string
+          list_id: string
+          locked_at?: string | null
+          provider_message_id?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          sequence_step: number
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          created_at?: string
+          email_account_id?: string
+          error?: string | null
+          id?: string
+          lead_id?: string
+          list_id?: string
+          locked_at?: string | null
+          provider_message_id?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          sequence_step?: number
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_email_sends_email_account_id_fkey"
+            columns: ["email_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_email_sends_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaching_knowledge_chunks: {
         Row: {
           chunk_index: number
@@ -711,13 +786,16 @@ export type Database = {
       lists: {
         Row: {
           ai_copilot_enabled: boolean
+          campaign_status: string
           coaching_style_id: string | null
           created_at: string
           cta_type: string
           description: string | null
           extra_instructions: string | null
           id: string
+          instantly_campaign_id: string | null
           key_selling_points: string | null
+          launched_at: string | null
           name: string
           num_emails: number
           personalization_level: string
@@ -738,13 +816,16 @@ export type Database = {
         }
         Insert: {
           ai_copilot_enabled?: boolean
+          campaign_status?: string
           coaching_style_id?: string | null
           created_at?: string
           cta_type?: string
           description?: string | null
           extra_instructions?: string | null
           id?: string
+          instantly_campaign_id?: string | null
           key_selling_points?: string | null
+          launched_at?: string | null
           name: string
           num_emails?: number
           personalization_level?: string
@@ -765,13 +846,16 @@ export type Database = {
         }
         Update: {
           ai_copilot_enabled?: boolean
+          campaign_status?: string
           coaching_style_id?: string | null
           created_at?: string
           cta_type?: string
           description?: string | null
           extra_instructions?: string | null
           id?: string
+          instantly_campaign_id?: string | null
           key_selling_points?: string | null
+          launched_at?: string | null
           name?: string
           num_emails?: number
           personalization_level?: string
@@ -1836,6 +1920,34 @@ export type Database = {
           p_scored?: number
         }
         Returns: undefined
+      }
+      claim_campaign_email_sends_admin: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          body: string
+          created_at: string
+          email_account_id: string
+          error: string | null
+          id: string
+          lead_id: string
+          list_id: string
+          locked_at: string | null
+          provider_message_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          sequence_step: number
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "campaign_email_sends"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       claim_scoring_batch: {
         Args: { p_job_id: string }
