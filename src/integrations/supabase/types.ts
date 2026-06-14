@@ -1636,6 +1636,7 @@ export type Database = {
           inbound_message_id: string
           locked_at: string | null
           max_attempts: number
+          positive_alert_sent_at: string | null
           scheduled_for: string
           status: string
           updated_at: string
@@ -1653,6 +1654,7 @@ export type Database = {
           inbound_message_id: string
           locked_at?: string | null
           max_attempts?: number
+          positive_alert_sent_at?: string | null
           scheduled_for?: string
           status?: string
           updated_at?: string
@@ -1670,6 +1672,7 @@ export type Database = {
           inbound_message_id?: string
           locked_at?: string | null
           max_attempts?: number
+          positive_alert_sent_at?: string | null
           scheduled_for?: string
           status?: string
           updated_at?: string
@@ -2001,6 +2004,7 @@ export type Database = {
           inbound_message_id: string
           locked_at: string | null
           max_attempts: number
+          positive_alert_sent_at: string | null
           scheduled_for: string
           status: string
           updated_at: string
