@@ -83,6 +83,53 @@ async function importMailboxes(
 const tableMissing = (msg: string) =>
   /instantly_connections/i.test(msg) && /(does not exist|relation|schema cache|not find)/i.test(msg);
 
+// ---------- Outbound: send a threaded reply through Instantly ----------
+
+// List recent emails for a mailbox (used to find the inbound email to reply to).
+export async function instantlyListEmails(apiKey: string, eaccount: string): Promise<any[]> {
+  try {
+    const url = new URL(`${INSTANTLY_BASE}/emails`);
+    url.searchParams.set("eaccount", eaccount);
+    url.searchParams.set("limit", "30");
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    return Array.isArray(json) ? json : (json.items ?? json.data ?? []);
+  } catch {
+    return [];
+  }
+}
+
+// POST a reply to an existing Instantly email. Throws on failure.
+export async function instantlySendReply(opts: {
+  apiKey: string;
+  eaccount: string;
+  replyToUuid: string;
+  subject: string;
+  text: string;
+  html?: string;
+}): Promise<void> {
+  const res = await fetch(`${INSTANTLY_BASE}/emails/reply`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      eaccount: opts.eaccount,
+      reply_to_uuid: opts.replyToUuid,
+      subject: opts.subject,
+      body: { text: opts.text, ...(opts.html ? { html: opts.html } : {}) },
+    }),
+  });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error("Instantly rejected the send — check your API key and that it has email send scope.");
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`Instantly send failed (${res.status})${t ? `: ${t.slice(0, 200)}` : ""}`);
+  }
+}
+
 export const connectInstantly = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>

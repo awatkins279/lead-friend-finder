@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { SDR_REPLY_SYSTEM_PROMPT, buildKnowledgeBlock } from "./sdr-reply-prompt";
+import { instantlyListEmails, instantlySendReply } from "./instantly.functions";
 
 const filtersSchema = z.object({
   status: z.enum(["all", "open", "needs_approval", "archived", "snoozed", "closed"]).optional(),
@@ -164,19 +165,126 @@ export const saveDraftReply = createServerFn({ method: "POST" })
     return { id: inserted.id };
   });
 
+// Pull a UUID-shaped Instantly email id out of a stored inbound payload.
+function extractInstantlyUuid(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const obj = raw as Record<string, unknown>;
+  for (const key of ["reply_to_uuid", "email_id", "id", "message_uuid", "uuid"]) {
+    const v = obj[key];
+    if (typeof v === "string" && uuidRe.test(v)) return v;
+  }
+  return null;
+}
+
 export const approveAndSend = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ message_id: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    // No inbox credentials yet — flip to queued so the future sender picks it up.
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+
+    // 1) Load the draft we're about to send + its conversation/mailbox.
+    const { data: msg, error: msgErr } = await supabase
       .from("sdr_messages")
-      .update({ status: "queued" })
+      .select("id, conversation_id, subject, body_text, body_html, from_email")
+      .eq("id", data.message_id)
+      .maybeSingle();
+    if (msgErr) throw new Error(msgErr.message);
+    if (!msg) throw new Error("Message not found");
+
+    const { data: convoRaw } = await supabase
+      .from("sdr_conversations")
+      .select("id, lead_email, email_accounts(email_address)")
+      .eq("id", (msg as { conversation_id: string }).conversation_id)
+      .maybeSingle();
+    const convo = convoRaw as unknown as {
+      id: string;
+      lead_email: string;
+      email_accounts: { email_address: string } | null;
+    } | null;
+    const eaccount =
+      convo?.email_accounts?.email_address ?? (msg as { from_email: string }).from_email;
+
+    // 2) Get this user's Instantly API key (stored when they connected).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: conn } = await (supabase as any)
+      .from("instantly_connections")
+      .select("api_key")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    // Not connected → keep the reply safe as "queued" and tell the user.
+    if (!conn?.api_key) {
+      await supabase
+        .from("sdr_messages")
+        .update({ status: "queued" })
+        .eq("id", data.message_id);
+      throw new Error(
+        "Connect your Instantly account (Sending accounts) to actually send — your reply is saved as queued for now.",
+      );
+    }
+
+    // 3) Find the inbound email's Instantly id to thread the reply to.
+    const { data: lastInbound } = await supabase
+      .from("sdr_messages")
+      .select("raw")
+      .eq("conversation_id", (msg as { conversation_id: string }).conversation_id)
+      .eq("direction", "inbound")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let replyToUuid = extractInstantlyUuid((lastInbound as { raw: unknown } | null)?.raw);
+    if (!replyToUuid && convo?.lead_email && eaccount) {
+      // Fall back to looking the email up in Instantly by sender.
+      const emails = await instantlyListEmails(conn.api_key as string, eaccount);
+      const lead = convo.lead_email.toLowerCase();
+      const match = emails.find((e: any) =>
+        [e?.from_address_email, e?.from, e?.lead_email, e?.from_email]
+          .filter(Boolean)
+          .some((v: string) => String(v).toLowerCase() === lead),
+      );
+      replyToUuid = (match?.id as string) ?? null;
+    }
+    if (!replyToUuid) {
+      await supabase
+        .from("sdr_messages")
+        .update({ status: "queued" })
+        .eq("id", data.message_id);
+      throw new Error(
+        "Couldn't find the original email in Instantly to reply to. (It may not have synced yet — your reply is saved as queued.)",
+      );
+    }
+
+    // 4) Send it through Instantly.
+    const m = msg as { subject: string | null; body_text: string | null; body_html: string | null };
+    const subject = m.subject ?? "Re:";
+    try {
+      await instantlySendReply({
+        apiKey: conn.api_key as string,
+        eaccount,
+        replyToUuid,
+        subject,
+        text: m.body_text ?? "",
+        html: m.body_html ?? undefined,
+      });
+    } catch (e) {
+      await supabase
+        .from("sdr_messages")
+        .update({ status: "queued" })
+        .eq("id", data.message_id);
+      throw e;
+    }
+
+    // 5) Mark sent.
+    await supabase
+      .from("sdr_messages")
+      .update({ status: "sent", sent_at: new Date().toISOString() })
       .eq("id", data.message_id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+
+    return { ok: true, sent: true };
   });
 
 // ============== AI reply generation (grounded, draft-only) ==============

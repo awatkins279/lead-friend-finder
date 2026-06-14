@@ -326,7 +326,7 @@ function InboxPage() {
     try {
       const r = await draftFn({ data: { conversation_id: thread.conversation.id, body: draft } });
       await sendFn({ data: { message_id: r.id } });
-      toast.success("Queued — will send once inbox is connected");
+      toast.success("Reply sent ✓");
       setDraft("");
       openThread(thread.conversation.id);
     } catch (e) {
