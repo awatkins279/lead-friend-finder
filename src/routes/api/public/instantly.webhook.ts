@@ -30,6 +30,31 @@ const payloadSchema = z
   })
   .passthrough();
 
+// Record an opt-out (best-effort — table may not exist yet).
+async function recordUnsubscribe(
+  userId: string,
+  leadEmail: string,
+  mailbox: string,
+  campaignName?: string,
+): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabaseAdmin as any).from("unsubscribes").upsert(
+      {
+        user_id: userId,
+        lead_email: leadEmail,
+        email_account: mailbox,
+        campaign_name: campaignName ?? null,
+        source: "instantly",
+        unsubscribed_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,lead_email" },
+    );
+  } catch {
+    /* table not present yet — skip */
+  }
+}
+
 export const Route = createFileRoute("/api/public/instantly/webhook")({
   server: {
     handlers: {
@@ -55,10 +80,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         if (!parsed.success) return new Response("Invalid payload", { status: 400 });
         const p = parsed.data;
 
-        // 3) Only handle reply events; ack everything else so Instantly stops retrying.
-        if (p.event_type && !/repl/i.test(p.event_type)) {
-          return Response.json({ ok: true, ignored: p.event_type });
-        }
+        // 3) We need at least the lead + mailbox to do anything.
         if (!p.lead_email || !p.email_account) {
           return Response.json({ ok: true, ignored: "missing lead_email or email_account" });
         }
@@ -78,6 +100,23 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         if (!account) {
           // Mailbox not imported into the app yet — accept but skip.
           return Response.json({ ok: true, ignored: "mailbox not registered" });
+        }
+
+        // Unsubscribe event from Instantly — record and stop here.
+        if (p.event_type && /unsub/i.test(p.event_type)) {
+          await recordUnsubscribe(account.user_id, leadEmail, mailbox, p.campaign_name);
+          await supabaseAdmin
+            .from("sdr_conversations")
+            .update({ intent: "unsubscribe" })
+            .eq("user_id", account.user_id)
+            .eq("email_account_id", account.id)
+            .eq("lead_email", leadEmail);
+          return Response.json({ ok: true, unsubscribed: leadEmail });
+        }
+
+        // Any other non-reply event — ack and ignore.
+        if (p.event_type && !/repl/i.test(p.event_type)) {
+          return Response.json({ ok: true, ignored: p.event_type });
         }
 
         // 5) Find an open conversation for this lead on this mailbox, else create.
@@ -158,6 +197,10 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
             .from("sdr_conversations")
             .update({ intent: cls.intent, intent_confidence: cls.confidence })
             .eq("id", conversationId);
+          // A reply asking to opt out counts as an unsubscribe too.
+          if (cls.intent === "unsubscribe") {
+            await recordUnsubscribe(account.user_id, leadEmail, mailbox, p.campaign_name);
+          }
         }
 
         return Response.json({

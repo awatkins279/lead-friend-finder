@@ -173,6 +173,7 @@ function InboxPage() {
   const [analytics, setAnalytics] = useState<{
     total: number;
     meetings: number;
+    unsubscribes: number;
     intent_counts: Record<string, number>;
     campaigns: { id: string; name: string; count: number }[];
   } | null>(null);
@@ -792,6 +793,7 @@ function AnalyticsStrip({
   data: {
     total: number;
     meetings: number;
+    unsubscribes: number;
     intent_counts: Record<string, number>;
     campaigns: { id: string; name: string; count: number }[];
   } | null;
@@ -808,9 +810,10 @@ function AnalyticsStrip({
     { label: "Objections", value: objection, accent: "text-amber-600" },
     { label: "Not interested", value: notInterested, accent: "text-rose-600" },
     { label: "Meetings booked", value: data.meetings, accent: "text-violet-600" },
+    { label: "Unsubscribes", value: data.unsubscribes ?? 0, accent: "text-zinc-500" },
   ];
   return (
-    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6">
       {cards.map((c) => (
         <Card key={c.label} className="px-3 py-2">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{c.label}</div>
@@ -818,7 +821,7 @@ function AnalyticsStrip({
         </Card>
       ))}
       {data.campaigns.length > 0 && (
-        <Card className="col-span-2 px-3 py-2 sm:col-span-5">
+        <Card className="col-span-2 px-3 py-2 sm:col-span-6">
           <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
             Top campaigns by replies
           </div>
@@ -1084,6 +1087,7 @@ const DEMO_MESSAGES: Record<string, Message[]> = {
 const DEMO_ANALYTICS = {
   total: 47,
   meetings: 6,
+  unsubscribes: 3,
   intent_counts: {
     interested: 14,
     objection: 9,

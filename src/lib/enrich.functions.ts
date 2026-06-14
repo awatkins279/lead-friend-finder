@@ -8,6 +8,9 @@ const inputSchema = z.object({
   leadId: z.string().min(1),
 });
 
+const DEFAULT_UNSUB_FOOTER =
+  'If you\'d rather not hear from me, just reply "unsubscribe" and I\'ll take you off my list.';
+
 type EmailInSequence = {
   step: number;
   subject: string;
@@ -173,13 +176,33 @@ Return JSON with this exact shape:
     }
 
     const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
-    const emails = (parsed.emails ?? []).slice(0, numEmails).map((e, i) => ({
-      step: i + 1,
-      subject: String(e.subject ?? "").slice(0, 200),
-      body: String(e.body ?? ""),
-      cta: String(e.cta ?? ""),
-      send_after_days: Number.isFinite(Number(e.send_after_days)) ? Number(e.send_after_days) : i * 3,
-    }));
+
+    // Resolve the campaign's unsubscribe footer (best-effort — columns may not exist yet).
+    let unsubFooter = "";
+    try {
+      const sb = supabase as any;
+      const { data: f } = await sb
+        .from("lists")
+        .select("unsubscribe_footer_enabled, unsubscribe_footer_text")
+        .eq("id", data.listId)
+        .maybeSingle();
+      if (f && f.unsubscribe_footer_enabled !== false) {
+        unsubFooter = (f.unsubscribe_footer_text && String(f.unsubscribe_footer_text).trim()) || DEFAULT_UNSUB_FOOTER;
+      }
+    } catch {
+      /* footer columns not present yet — skip */
+    }
+
+    const emails = (parsed.emails ?? []).slice(0, numEmails).map((e, i) => {
+      const rawBody = String(e.body ?? "");
+      return {
+        step: i + 1,
+        subject: String(e.subject ?? "").slice(0, 200),
+        body: unsubFooter ? `${rawBody}\n\n${unsubFooter}` : rawBody,
+        cta: String(e.cta ?? ""),
+        send_after_days: Number.isFinite(Number(e.send_after_days)) ? Number(e.send_after_days) : i * 3,
+      };
+    });
 
     const { error: updErr } = await supabase
       .from("list_leads")

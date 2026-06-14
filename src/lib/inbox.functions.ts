@@ -575,9 +575,25 @@ export const getInboxAnalytics = createServerFn({ method: "POST" })
       if (r.meeting_booked_at) meetings += 1;
     }
 
+    // Unsubscribe count (best-effort — table may not exist yet).
+    let unsubscribes = 0;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let uq = (supabase as any)
+        .from("unsubscribes")
+        .select("id", { count: "exact", head: true });
+      if (data.date_from) uq = uq.gte("unsubscribed_at", data.date_from);
+      if (data.date_to) uq = uq.lte("unsubscribed_at", data.date_to);
+      const { count } = await uq;
+      unsubscribes = count ?? 0;
+    } catch {
+      /* table not present yet */
+    }
+
     return {
       total: list.length,
       meetings,
+      unsubscribes,
       intent_counts: intentCounts,
       campaigns: Object.entries(campaignCounts)
         .map(([id, v]) => ({ id, name: v.name, count: v.count }))

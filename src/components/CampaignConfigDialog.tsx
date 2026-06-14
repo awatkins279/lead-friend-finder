@@ -20,8 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+export const DEFAULT_UNSUB_FOOTER =
+  "If you'd rather not hear from me, just reply \"unsubscribe\" and I'll take you off my list.";
 
 export type CampaignConfig = {
   name: string;
@@ -59,23 +63,36 @@ export function CampaignConfigDialog({
   const [selectedMailboxes, setSelectedMailboxes] = useState<Set<string>>(new Set());
   const [mailboxSearch, setMailboxSearch] = useState("");
 
+  // Unsubscribe footer (appended to every generated email).
+  const [footerEnabled, setFooterEnabled] = useState(true);
+  const [footerText, setFooterText] = useState(DEFAULT_UNSUB_FOOTER);
+
   useEffect(() => {
     if (!open) return;
     setCfg(initial);
     setMailboxSearch("");
     (async () => {
       const sb = supabase as any;
-      const [{ data: accts }, { data: assigned }] = await Promise.all([
+      const [{ data: accts }, { data: assigned }, { data: listRow }] = await Promise.all([
         supabase
           .from("email_accounts")
           .select("id, email_address")
           .order("email_address", { ascending: true }),
         sb.from("list_email_accounts").select("email_account_id").eq("list_id", listId),
+        sb
+          .from("lists")
+          .select("unsubscribe_footer_enabled, unsubscribe_footer_text")
+          .eq("id", listId)
+          .maybeSingle(),
       ]);
       setMailboxes((accts ?? []) as { id: string; email_address: string }[]);
       setSelectedMailboxes(
         new Set(((assigned ?? []) as { email_account_id: string }[]).map((r) => r.email_account_id)),
       );
+      if (listRow) {
+        setFooterEnabled((listRow as any).unsubscribe_footer_enabled ?? true);
+        setFooterText((listRow as any).unsubscribe_footer_text || DEFAULT_UNSUB_FOOTER);
+      }
     })();
   }, [open, initial, listId]);
 
@@ -138,6 +155,28 @@ export function CampaignConfigDialog({
       if (/list_email_accounts/i.test(msg)) {
         return toast.error(
           "Campaign saved, but mailbox assignment needs its database table (migration not applied yet).",
+        );
+      }
+      return toast.error(msg);
+    }
+
+    // Save the unsubscribe footer (best-effort — columns may not exist yet).
+    try {
+      const sb = supabase as any;
+      const { error: fErr } = await sb
+        .from("lists")
+        .update({
+          unsubscribe_footer_enabled: footerEnabled,
+          unsubscribe_footer_text: footerText.trim() || null,
+        })
+        .eq("id", listId);
+      if (fErr) throw new Error(fErr.message);
+    } catch (e) {
+      setSaving(false);
+      const msg = (e as Error).message;
+      if (/unsubscribe_footer/i.test(msg)) {
+        return toast.error(
+          "Campaign saved, but the unsubscribe footer needs its database columns (migration not applied yet).",
         );
       }
       return toast.error(msg);
@@ -329,6 +368,27 @@ export function CampaignConfigDialog({
                     ))}
                 </div>
               </>
+            )}
+          </Field>
+
+          <Field
+            label="Unsubscribe footer"
+            hint="Appended to the bottom of every generated email so recipients always have an opt-out. A reply-based opt-out is auto-detected and counted. Also turn on Instantly's unsubscribe link (campaign Options) for the one-click compliance header."
+          >
+            <div className="flex items-center gap-2">
+              <Switch checked={footerEnabled} onCheckedChange={setFooterEnabled} />
+              <span className="text-sm text-muted-foreground">
+                {footerEnabled ? "On — added to every email" : "Off"}
+              </span>
+            </div>
+            {footerEnabled && (
+              <Textarea
+                rows={2}
+                value={footerText}
+                onChange={(e) => setFooterText(e.target.value)}
+                placeholder={DEFAULT_UNSUB_FOOTER}
+                className="mt-2"
+              />
             )}
           </Field>
         </div>
