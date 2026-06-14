@@ -42,6 +42,7 @@ function replyDelayMs(speed: string): number {
 
 // Record an opt-out (best-effort — table may not exist yet).
 async function recordUnsubscribe(
+  supabaseAdmin: any,
   userId: string,
   leadEmail: string,
   mailbox: string,
@@ -131,7 +132,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
 
         // Unsubscribe event from Instantly — record and stop here.
         if (p.event_type && /unsub/i.test(p.event_type)) {
-          await recordUnsubscribe(account.user_id, leadEmail, mailbox, p.campaign_name);
+          await recordUnsubscribe(supabaseAdmin, account.user_id, leadEmail, mailbox, p.campaign_name);
           await supabaseAdmin
             .from("sdr_conversations")
             .update({ intent: "unsubscribe" })
@@ -238,7 +239,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
             .eq("id", conversationId);
           // A reply asking to opt out counts as an unsubscribe too.
           if (cls.intent === "unsubscribe") {
-            await recordUnsubscribe(account.user_id, leadEmail, mailbox, p.campaign_name);
+            await recordUnsubscribe(supabaseAdmin, account.user_id, leadEmail, mailbox, p.campaign_name);
           }
         }
 
