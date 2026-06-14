@@ -146,6 +146,11 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     .single();
   if (draftError) throw new Error(draftError.message);
 
+  await supabase
+    .from("sdr_reply_jobs")
+    .update({ draft_message_id: draft.id })
+    .eq("id", job.id);
+
   const canAutoSend = agent.mode === "auto" && !needsHandoff && confidence >= Number(agent.confidence_threshold ?? 80);
   if (!canAutoSend) {
     await Promise.all([
@@ -161,7 +166,13 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     .select("api_key")
     .eq("user_id", conversation.user_id)
     .maybeSingle();
-  if (!connection?.api_key) throw new Error("Instantly is not connected");
+  if (!connection?.api_key) {
+    await Promise.all([
+      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
+      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", error: "Instantly is not connected", completed_at: new Date().toISOString() }).eq("id", job.id),
+    ]);
+    return { status: "needs_approval" as const };
+  }
 
   let replyToUuid = extractInstantlyUuid(inbound.raw);
   if (!replyToUuid) {
@@ -174,9 +185,23 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     );
     replyToUuid = typeof match?.id === "string" ? match.id : null;
   }
-  if (!replyToUuid) throw new Error("The original Instantly email could not be found for threading");
+  if (!replyToUuid) {
+    await Promise.all([
+      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
+      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", error: "Original Instantly email could not be found for threading", completed_at: new Date().toISOString() }).eq("id", job.id),
+    ]);
+    return { status: "needs_approval" as const };
+  }
 
-  await instantlySendReply({ apiKey: connection.api_key, eaccount: from, replyToUuid, subject, text: reply });
+  try {
+    await instantlySendReply({ apiKey: connection.api_key, eaccount: from, replyToUuid, subject, text: reply });
+  } catch (error) {
+    await Promise.all([
+      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
+      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", error: String((error as Error).message ?? error).slice(0, 500), completed_at: new Date().toISOString() }).eq("id", job.id),
+    ]);
+    return { status: "needs_approval" as const };
+  }
   const completedAt = new Date().toISOString();
   await Promise.all([
     supabase.from("sdr_messages").update({ status: "sent", sent_at: completedAt }).eq("id", draft.id),
