@@ -173,6 +173,12 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         if (existing) {
           conversationId = existing.id as string;
           priorUnread = (existing as { unread_count: number }).unread_count ?? 0;
+          if (!existing.agent_id && matchedList?.sdr_agent_id) {
+            await supabaseAdmin
+              .from("sdr_conversations")
+              .update({ agent_id: matchedList.sdr_agent_id, list_id: matchedList.id })
+              .eq("id", conversationId);
+          }
         } else {
           const { data: convo, error: cErr } = await supabaseAdmin
             .from("sdr_conversations")
@@ -245,7 +251,15 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
 
 
         const agentId = existing?.agent_id ?? matchedList?.sdr_agent_id ?? null;
-        if (agentId && cls?.intent !== "unsubscribe") {
+        const { data: unsubscribed } = agentId
+          ? await (supabaseAdmin as any)
+              .from("unsubscribes")
+              .select("id")
+              .eq("user_id", account.user_id)
+              .eq("lead_email", leadEmail)
+              .maybeSingle()
+          : { data: null };
+        if (agentId && !unsubscribed && cls?.intent !== "unsubscribe") {
           const { data: agent } = await supabaseAdmin
             .from("sdr_agents")
             .select("response_speed")
