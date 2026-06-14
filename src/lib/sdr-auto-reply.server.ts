@@ -146,14 +146,6 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     .single();
   if (draftError) throw new Error(draftError.message);
 
-  await sendPositiveReplyAlert(supabase, {
-    job,
-    conversation,
-    inboundText: String(inbound.body_text ?? ""),
-    aiReply: reply,
-    from,
-  });
-
   await supabase
     .from("sdr_reply_jobs")
     .update({ draft_message_id: draft.id })
@@ -216,6 +208,13 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     supabase.from("sdr_conversations").update({ status: "open", last_direction: "outbound", last_message_at: completedAt }).eq("id", conversation.id),
     supabase.from("sdr_reply_jobs").update({ status: "completed", draft_message_id: draft.id, completed_at: completedAt }).eq("id", job.id),
   ]);
+  await sendPositiveReplyAlert(supabase, {
+    job,
+    conversation,
+    inboundText: String(inbound.body_text ?? ""),
+    aiReply: reply,
+    from,
+  });
   return { status: "completed" as const };
 }
 
