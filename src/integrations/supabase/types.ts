@@ -791,7 +791,9 @@ export type Database = {
           created_at: string
           cta_type: string
           description: string | null
+          email_gap_minutes: number
           extra_instructions: string | null
+          follow_up_delay_days: number
           id: string
           instantly_campaign_id: string | null
           key_selling_points: string | null
@@ -799,6 +801,8 @@ export type Database = {
           name: string
           num_emails: number
           personalization_level: string
+          positive_reply_alert_email: string | null
+          positive_reply_alerts_enabled: boolean
           sdr_agent_id: string | null
           sdr_booking_url_override: string | null
           sdr_hard_rules_override: string | null
@@ -806,6 +810,10 @@ export type Database = {
           sender_company: string | null
           sender_name: string | null
           sender_title: string | null
+          sending_days: Json
+          sending_end_time: string
+          sending_start_time: string
+          sending_timezone: string
           unsubscribe_footer_enabled: boolean
           unsubscribe_footer_text: string | null
           updated_at: string
@@ -821,7 +829,9 @@ export type Database = {
           created_at?: string
           cta_type?: string
           description?: string | null
+          email_gap_minutes?: number
           extra_instructions?: string | null
+          follow_up_delay_days?: number
           id?: string
           instantly_campaign_id?: string | null
           key_selling_points?: string | null
@@ -829,6 +839,8 @@ export type Database = {
           name: string
           num_emails?: number
           personalization_level?: string
+          positive_reply_alert_email?: string | null
+          positive_reply_alerts_enabled?: boolean
           sdr_agent_id?: string | null
           sdr_booking_url_override?: string | null
           sdr_hard_rules_override?: string | null
@@ -836,6 +848,10 @@ export type Database = {
           sender_company?: string | null
           sender_name?: string | null
           sender_title?: string | null
+          sending_days?: Json
+          sending_end_time?: string
+          sending_start_time?: string
+          sending_timezone?: string
           unsubscribe_footer_enabled?: boolean
           unsubscribe_footer_text?: string | null
           updated_at?: string
@@ -851,7 +867,9 @@ export type Database = {
           created_at?: string
           cta_type?: string
           description?: string | null
+          email_gap_minutes?: number
           extra_instructions?: string | null
+          follow_up_delay_days?: number
           id?: string
           instantly_campaign_id?: string | null
           key_selling_points?: string | null
@@ -859,6 +877,8 @@ export type Database = {
           name?: string
           num_emails?: number
           personalization_level?: string
+          positive_reply_alert_email?: string | null
+          positive_reply_alerts_enabled?: boolean
           sdr_agent_id?: string | null
           sdr_booking_url_override?: string | null
           sdr_hard_rules_override?: string | null
@@ -866,6 +886,10 @@ export type Database = {
           sender_company?: string | null
           sender_name?: string | null
           sender_title?: string | null
+          sending_days?: Json
+          sending_end_time?: string
+          sending_start_time?: string
+          sending_timezone?: string
           unsubscribe_footer_enabled?: boolean
           unsubscribe_footer_text?: string | null
           updated_at?: string
@@ -1612,6 +1636,7 @@ export type Database = {
           inbound_message_id: string
           locked_at: string | null
           max_attempts: number
+          positive_alert_sent_at: string | null
           scheduled_for: string
           status: string
           updated_at: string
@@ -1629,6 +1654,7 @@ export type Database = {
           inbound_message_id: string
           locked_at?: string | null
           max_attempts?: number
+          positive_alert_sent_at?: string | null
           scheduled_for?: string
           status?: string
           updated_at?: string
@@ -1646,6 +1672,7 @@ export type Database = {
           inbound_message_id?: string
           locked_at?: string | null
           max_attempts?: number
+          positive_alert_sent_at?: string | null
           scheduled_for?: string
           status?: string
           updated_at?: string
@@ -1977,6 +2004,7 @@ export type Database = {
           inbound_message_id: string
           locked_at: string | null
           max_attempts: number
+          positive_alert_sent_at: string | null
           scheduled_for: string
           status: string
           updated_at: string

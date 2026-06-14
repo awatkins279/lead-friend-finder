@@ -190,7 +190,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled, campaign_status, instantly_campaign_id",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled, campaign_status, instantly_campaign_id, sending_days, sending_start_time, sending_end_time, sending_timezone, follow_up_delay_days, email_gap_minutes, positive_reply_alerts_enabled, positive_reply_alert_email",
         )
         .eq("id", listId)
         .maybeSingle();
@@ -485,6 +485,14 @@ function ListDetailPage() {
         personalization_level: list.personalization_level ?? "high",
         cta_type: list.cta_type ?? "auto",
         extra_instructions: list.extra_instructions,
+        sending_days: Array.isArray(list.sending_days) ? list.sending_days : [1, 2, 3, 4, 5],
+        sending_start_time: String(list.sending_start_time ?? "09:00").slice(0, 5),
+        sending_end_time: String(list.sending_end_time ?? "17:00").slice(0, 5),
+        sending_timezone: list.sending_timezone ?? "America/Detroit",
+        follow_up_delay_days: list.follow_up_delay_days ?? 3,
+        email_gap_minutes: list.email_gap_minutes ?? 10,
+        positive_reply_alerts_enabled: list.positive_reply_alerts_enabled ?? true,
+        positive_reply_alert_email: list.positive_reply_alert_email,
       }
     : {
         name: "",
@@ -499,6 +507,14 @@ function ListDetailPage() {
         personalization_level: "high",
         cta_type: "auto",
         extra_instructions: null,
+        sending_days: [1, 2, 3, 4, 5],
+        sending_start_time: "09:00",
+        sending_end_time: "17:00",
+        sending_timezone: "America/Detroit",
+        follow_up_delay_days: 3,
+        email_gap_minutes: 10,
+        positive_reply_alerts_enabled: true,
+        positive_reply_alert_email: null,
       };
 
   const enrichedCount = (rows ?? []).filter((r) => r.status === "enriched").length;

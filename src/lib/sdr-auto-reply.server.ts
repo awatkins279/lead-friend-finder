@@ -31,7 +31,7 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     await Promise.all([
       supabase
         .from("sdr_conversations")
-        .select("id, user_id, lead_email, lead_name, company, subject, email_account_id, email_accounts(email_address)")
+        .select("id, user_id, list_id, intent, lead_email, lead_name, company, subject, email_account_id, email_accounts(email_address)")
         .eq("id", job.conversation_id)
         .maybeSingle(),
       supabase.from("sdr_agents").select("*").eq("id", job.agent_id).maybeSingle(),
@@ -208,5 +208,68 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     supabase.from("sdr_conversations").update({ status: "open", last_direction: "outbound", last_message_at: completedAt }).eq("id", conversation.id),
     supabase.from("sdr_reply_jobs").update({ status: "completed", draft_message_id: draft.id, completed_at: completedAt }).eq("id", job.id),
   ]);
+  await sendPositiveReplyAlert(supabase, {
+    job,
+    conversation,
+    inboundText: String(inbound.body_text ?? ""),
+    aiReply: reply,
+    from,
+  });
   return { status: "completed" as const };
+}
+
+async function sendPositiveReplyAlert(
+  supabase: AdminClient,
+  opts: { job: Record<string, any>; conversation: Record<string, any>; inboundText: string; aiReply: string; from: string },
+) {
+  if (!opts.conversation.list_id || !["interested", "meeting_booked"].includes(String(opts.conversation.intent))) return;
+  if (opts.job.positive_alert_sent_at) return;
+
+  const [{ data: list }, { data: profile }, { data: connection }] = await Promise.all([
+    supabase
+      .from("lists")
+      .select("name, positive_reply_alerts_enabled, positive_reply_alert_email")
+      .eq("id", opts.conversation.list_id)
+      .eq("user_id", opts.conversation.user_id)
+      .maybeSingle(),
+    supabase.from("profiles").select("email").eq("id", opts.conversation.user_id).maybeSingle(),
+    supabase.from("instantly_connections").select("api_key").eq("user_id", opts.conversation.user_id).maybeSingle(),
+  ]);
+  if (!list?.positive_reply_alerts_enabled || !connection?.api_key) return;
+  const recipient = String(list.positive_reply_alert_email || profile?.email || "").trim();
+  if (!recipient) return;
+
+  const prospect = opts.conversation.lead_name || opts.conversation.lead_email;
+  const subject = `Positive reply from ${prospect}${opts.conversation.company ? ` at ${opts.conversation.company}` : ""}`;
+  const text = [
+    `Campaign: ${list.name}`,
+    `Prospect: ${prospect} <${opts.conversation.lead_email}>`,
+    `Intent: ${String(opts.conversation.intent).replace(/_/g, " ")}`,
+    "",
+    "PROSPECT REPLIED:",
+    opts.inboundText,
+    "",
+    "AI SDR REPLY:",
+    opts.aiReply,
+  ].join("\n").slice(0, 45000);
+
+  const response = await fetch("https://api.instantly.ai/api/v2/emails/test", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${connection.api_key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      eaccount: opts.from,
+      to_address_email_list: recipient,
+      subject,
+      body: { text, html: `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif">${escapeHtml(text)}</pre>` },
+    }),
+  });
+  if (!response.ok) {
+    console.error("Positive reply alert failed", response.status, (await response.text()).slice(0, 300));
+    return;
+  }
+  await supabase.from("sdr_reply_jobs").update({ positive_alert_sent_at: new Date().toISOString() }).eq("id", opts.job.id);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char] ?? char);
 }

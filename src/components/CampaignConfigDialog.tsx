@@ -40,7 +40,21 @@ export type CampaignConfig = {
   personalization_level: string;
   cta_type: string;
   extra_instructions: string | null;
+  sending_days: number[];
+  sending_start_time: string;
+  sending_end_time: string;
+  sending_timezone: string;
+  follow_up_delay_days: number;
+  email_gap_minutes: number;
+  positive_reply_alerts_enabled: boolean;
+  positive_reply_alert_email: string | null;
 };
+
+const SEND_DAYS = [
+  { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
 
 export function CampaignConfigDialog({
   listId,
@@ -75,7 +89,7 @@ export function CampaignConfigDialog({
     setMailboxSearch("");
     (async () => {
       const sb = supabase as any;
-      const [{ data: accts }, { data: assigned }, { data: listRow }] = await Promise.all([
+      const [{ data: accts }, { data: assigned }, { data: listRow }, { data: authData }] = await Promise.all([
         supabase
           .from("email_accounts")
           .select("id, email_address")
@@ -86,7 +100,11 @@ export function CampaignConfigDialog({
           .select("unsubscribe_footer_enabled, unsubscribe_footer_text")
           .eq("id", listId)
           .maybeSingle(),
+        supabase.auth.getUser(),
       ]);
+      if (!initial.positive_reply_alert_email && authData.user?.email) {
+        setCfg((current) => ({ ...current, positive_reply_alert_email: authData.user?.email ?? null }));
+      }
       setMailboxes((accts ?? []) as { id: string; email_address: string }[]);
       setSelectedMailboxes(
         new Set(((assigned ?? []) as { email_account_id: string }[]).map((r) => r.email_account_id)),
@@ -113,6 +131,9 @@ export function CampaignConfigDialog({
     if (!cfg.name.trim()) return toast.error("Campaign name required");
     if (!cfg.sender_name?.trim()) return toast.error("Your name required");
     if (!cfg.what_selling?.trim()) return toast.error("What you're selling required");
+    if (!cfg.sending_days.length) return toast.error("Choose at least one sending day");
+    if (cfg.sending_start_time >= cfg.sending_end_time) return toast.error("Sending end time must be after the start time");
+    if (cfg.positive_reply_alerts_enabled && !cfg.positive_reply_alert_email?.trim()) return toast.error("Enter an email for positive reply alerts");
     setSaving(true);
     const { error } = await supabase
       .from("lists")
@@ -129,6 +150,14 @@ export function CampaignConfigDialog({
         personalization_level: cfg.personalization_level,
         cta_type: cfg.cta_type,
         extra_instructions: cfg.extra_instructions,
+        sending_days: cfg.sending_days,
+        sending_start_time: cfg.sending_start_time,
+        sending_end_time: cfg.sending_end_time,
+        sending_timezone: cfg.sending_timezone,
+        follow_up_delay_days: cfg.follow_up_delay_days,
+        email_gap_minutes: cfg.email_gap_minutes,
+        positive_reply_alerts_enabled: cfg.positive_reply_alerts_enabled,
+        positive_reply_alert_email: cfg.positive_reply_alert_email?.trim() || null,
       })
       .eq("id", listId);
     if (error) {
@@ -321,6 +350,61 @@ export function CampaignConfigDialog({
               onChange={(e) => update("extra_instructions", e.target.value)}
               placeholder="Friendly, conversational tone. First email CTA should be like: 'if you could save 50% on your call center costs…'"
             />
+          </Field>
+
+          <div className="space-y-4 rounded-lg border p-4">
+            <div>
+              <p className="text-sm font-medium">Sending schedule</p>
+              <p className="text-xs text-muted-foreground">Emails only send during this window. Follow-ups wait the number of days you choose.</p>
+            </div>
+            <Field label="Sending days">
+              <div className="flex flex-wrap gap-2">
+                {SEND_DAYS.map((day) => {
+                  const selected = cfg.sending_days.includes(day.value);
+                  return (
+                    <Button
+                      key={day.value}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      onClick={() => update("sending_days", selected ? cfg.sending_days.filter((value) => value !== day.value) : [...cfg.sending_days, day.value])}
+                    >
+                      {day.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Start time"><Input type="time" value={cfg.sending_start_time} onChange={(e) => update("sending_start_time", e.target.value)} /></Field>
+              <Field label="End time"><Input type="time" value={cfg.sending_end_time} onChange={(e) => update("sending_end_time", e.target.value)} /></Field>
+              <Field label="Time zone">
+                <Select value={cfg.sending_timezone} onValueChange={(value) => update("sending_timezone", value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="America/New_York">Eastern</SelectItem>
+                    <SelectItem value="America/Chicago">Central</SelectItem>
+                    <SelectItem value="America/Denver">Mountain</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific</SelectItem>
+                    <SelectItem value="America/Phoenix">Arizona</SelectItem>
+                    <SelectItem value="America/Anchorage">Alaska</SelectItem>
+                    <SelectItem value="Pacific/Honolulu">Hawaii</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Days between sequence emails"><Input type="number" min={1} max={30} value={cfg.follow_up_delay_days} onChange={(e) => update("follow_up_delay_days", Math.max(1, Math.min(30, Number(e.target.value) || 1)))} /></Field>
+              <Field label="Minutes between sends"><Input type="number" min={1} max={1440} value={cfg.email_gap_minutes} onChange={(e) => update("email_gap_minutes", Math.max(1, Math.min(1440, Number(e.target.value) || 1)))} /></Field>
+            </div>
+          </div>
+
+          <Field label="Positive reply alerts" hint="When a prospect is interested or books a meeting, send an alert containing their reply and the AI SDR's response. Add this email to your phone's mail app for phone alerts.">
+            <div className="flex items-center gap-2">
+              <Switch checked={cfg.positive_reply_alerts_enabled} onCheckedChange={(value) => update("positive_reply_alerts_enabled", value)} />
+              <span className="text-sm text-muted-foreground">{cfg.positive_reply_alerts_enabled ? "On" : "Off"}</span>
+            </div>
+            {cfg.positive_reply_alerts_enabled && <Input type="email" value={cfg.positive_reply_alert_email ?? ""} onChange={(e) => update("positive_reply_alert_email", e.target.value)} placeholder="you@company.com" className="mt-2" />}
           </Field>
 
           <Field
