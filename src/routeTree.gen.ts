@@ -34,6 +34,7 @@ import { Route as ApiPublicTwilioVoiceRouteImport } from './routes/api/public/tw
 import { Route as ApiPublicTwilioStatusRouteImport } from './routes/api/public/twilio.status'
 import { Route as ApiPublicTwilioRecordingRouteImport } from './routes/api/public/twilio.recording'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
+import { Route as ApiPublicInstantlyWebhookRouteImport } from './routes/api/public/instantly.webhook'
 import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
 import { Route as ApiPublicHooksScoringTickRouteImport } from './routes/api/public/hooks/scoring-tick'
 
@@ -167,6 +168,12 @@ const ApiPublicPaymentsWebhookRoute =
     path: '/api/public/payments/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicInstantlyWebhookRoute =
+  ApiPublicInstantlyWebhookRouteImport.update({
+    id: '/api/public/instantly/webhook',
+    path: '/api/public/instantly/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicInboxIngestRoute = ApiPublicInboxIngestRouteImport.update({
   id: '/api/public/inbox/ingest',
   path: '/api/public/inbox/ingest',
@@ -202,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
+  '/api/public/instantly/webhook': typeof ApiPublicInstantlyWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
@@ -231,6 +239,7 @@ export interface FileRoutesByTo {
   '/app/lists': typeof AppListsIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
+  '/api/public/instantly/webhook': typeof ApiPublicInstantlyWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
@@ -261,6 +270,7 @@ export interface FileRoutesById {
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
+  '/api/public/instantly/webhook': typeof ApiPublicInstantlyWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/twilio/recording': typeof ApiPublicTwilioRecordingRoute
   '/api/public/twilio/status': typeof ApiPublicTwilioStatusRoute
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/app/lists/'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/inbox/ingest'
+    | '/api/public/instantly/webhook'
     | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/app/lists'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/inbox/ingest'
+    | '/api/public/instantly/webhook'
     | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
@@ -350,6 +362,7 @@ export interface FileRouteTypes {
     | '/app/lists/'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/inbox/ingest'
+    | '/api/public/instantly/webhook'
     | '/api/public/payments/webhook'
     | '/api/public/twilio/recording'
     | '/api/public/twilio/status'
@@ -367,6 +380,7 @@ export interface RootRouteChildren {
   ApiGoogleCalendarConnectRoute: typeof ApiGoogleCalendarConnectRoute
   ApiPublicHooksScoringTickRoute: typeof ApiPublicHooksScoringTickRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
+  ApiPublicInstantlyWebhookRoute: typeof ApiPublicInstantlyWebhookRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicTwilioRecordingRoute: typeof ApiPublicTwilioRecordingRoute
   ApiPublicTwilioStatusRoute: typeof ApiPublicTwilioStatusRoute
@@ -551,6 +565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/instantly/webhook': {
+      id: '/api/public/instantly/webhook'
+      path: '/api/public/instantly/webhook'
+      fullPath: '/api/public/instantly/webhook'
+      preLoaderRoute: typeof ApiPublicInstantlyWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/inbox/ingest': {
       id: '/api/public/inbox/ingest'
       path: '/api/public/inbox/ingest'
@@ -622,6 +643,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGoogleCalendarConnectRoute: ApiGoogleCalendarConnectRoute,
   ApiPublicHooksScoringTickRoute: ApiPublicHooksScoringTickRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
+  ApiPublicInstantlyWebhookRoute: ApiPublicInstantlyWebhookRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicTwilioRecordingRoute: ApiPublicTwilioRecordingRoute,
   ApiPublicTwilioStatusRoute: ApiPublicTwilioStatusRoute,
@@ -631,3 +653,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
