@@ -18,7 +18,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2, Rocket, PauseCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
@@ -47,6 +47,7 @@ import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 import { LiveCopilotPanel } from "@/components/LiveCopilotPanel";
 import { FollowAlongTeleprompter } from "@/components/FollowAlongTeleprompter";
 import { useLiveCoaching } from "@/hooks/useLiveCoaching";
+import { launchCampaign, pauseCampaign } from "@/lib/campaign-launch.functions";
 
 export const Route = createFileRoute("/app/lists/$listId")({
   component: ListDetailPage,
@@ -113,7 +114,7 @@ function effectiveEmails(r: Row): EmailInSequence[] {
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null };
+type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null; campaign_status: "draft" | "active" | "paused" | "completed"; instantly_campaign_id: string | null };
 
 const TWILIO_VOICE_SDK_URL = "https://media.twiliocdn.com/sdk/js/voice/releases/2.18.3/twilio.min.js";
 
@@ -162,6 +163,8 @@ function ListDetailPage() {
   const enrichFn = useServerFn(enrichLead);
   const verifyFn = useServerFn(verifyLeadEmail);
   const genScriptBulkFn = useServerFn(generateCallScript);
+  const launchCampaignFn = useServerFn(launchCampaign);
+  const pauseCampaignFn = useServerFn(pauseCampaign);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [verifyFilter, setVerifyFilter] = useState<"all" | "deliverable" | "risky" | "invalid" | "unverified">("all");
   const [open, setOpen] = useState<Row | null>(null);
@@ -170,6 +173,8 @@ function ListDetailPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "email" | "calling">("email");
   const [pendingCallLeadId, setPendingCallLeadId] = useState<string | null>(null);
   const [confirmScripts, setConfirmScripts] = useState(false);
+  const [confirmLaunch, setConfirmLaunch] = useState(false);
+  const [launchBusy, setLaunchBusy] = useState(false);
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
   const [progress, setProgress] = useState<{
     total: number;
@@ -185,7 +190,7 @@ function ListDetailPage() {
       const { data, error } = await supabase
         .from("lists")
         .select(
-          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled",
+          "id, name, description, sender_name, sender_title, sender_company, what_selling, key_selling_points, num_emails, word_count, personalization_level, cta_type, extra_instructions, sdr_agent_id, voicemail_audio_url, ai_copilot_enabled, campaign_status, instantly_campaign_id",
         )
         .eq("id", listId)
         .maybeSingle();
