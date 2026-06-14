@@ -30,6 +30,17 @@ const payloadSchema = z
   })
   .passthrough();
 
+function replyDelayMs(speed: string): number {
+  const ranges: Record<string, [number, number]> = {
+    instant: [0, 45_000],
+    fast: [5 * 60_000, 30 * 60_000],
+    medium: [30 * 60_000, 2 * 60 * 60_000],
+    slow: [2 * 60 * 60_000, 8 * 60 * 60_000],
+  };
+  const [min, max] = ranges[speed] ?? ranges.medium;
+  return Math.floor(min + Math.random() * (max - min));
+}
+
 // Record an opt-out (best-effort — table may not exist yet).
 async function recordUnsubscribe(
   userId: string,
@@ -90,6 +101,10 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         const receivedAt = p.timestamp ?? new Date().toISOString();
         const bodyText = p.reply_text ?? null;
         const snippet = (p.reply_text_snippet ?? p.reply_text ?? "").slice(0, 200);
+        const rawPayload = p as Record<string, unknown>;
+        const providerMessageId = ["email_id", "message_uuid", "uuid", "id"]
+          .map((key) => rawPayload[key])
+          .find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
 
         // 4) Resolve which user/mailbox this landed on.
         const { data: account } = await supabaseAdmin
@@ -100,6 +115,18 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         if (!account) {
           // Mailbox not imported into the app yet — accept but skip.
           return Response.json({ ok: true, ignored: "mailbox not registered" });
+        }
+
+        if (providerMessageId) {
+          const { data: duplicate } = await supabaseAdmin
+            .from("sdr_messages")
+            .select("conversation_id")
+            .eq("user_id", account.user_id)
+            .eq("message_id", providerMessageId)
+            .maybeSingle();
+          if (duplicate) {
+            return Response.json({ ok: true, duplicate: true, conversation_id: duplicate.conversation_id });
+          }
         }
 
         // Unsubscribe event from Instantly — record and stop here.
@@ -124,7 +151,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         let priorUnread = 0;
         const { data: existing } = await supabaseAdmin
           .from("sdr_conversations")
-          .select("id, unread_count")
+          .select("id, unread_count, list_id, agent_id")
           .eq("user_id", account.user_id)
           .eq("email_account_id", account.id)
           .eq("lead_email", leadEmail)
@@ -132,6 +159,15 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
           .order("last_message_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        const { data: matchedList } = p.campaign_name
+          ? await supabaseAdmin
+              .from("lists")
+              .select("id, sdr_agent_id")
+              .eq("user_id", account.user_id)
+              .eq("name", p.campaign_name)
+              .maybeSingle()
+          : { data: null };
 
         if (existing) {
           conversationId = existing.id as string;
@@ -142,6 +178,8 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
             .insert({
               user_id: account.user_id,
               email_account_id: account.id,
+              list_id: matchedList?.id ?? null,
+              agent_id: matchedList?.sdr_agent_id ?? null,
               lead_email: leadEmail,
               subject: p.reply_subject ?? null,
               last_message_at: receivedAt,
@@ -156,7 +194,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         }
 
         // 6) Append the inbound message (Instantly payload kept in `raw`).
-        const { error: mErr } = await supabaseAdmin.from("sdr_messages").insert({
+        const { data: inboundMessage, error: mErr } = await supabaseAdmin.from("sdr_messages").insert({
           conversation_id: conversationId,
           user_id: account.user_id,
           direction: "inbound",
@@ -166,11 +204,12 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
           body_text: bodyText,
           body_html: p.reply_html ?? null,
           snippet,
+          message_id: providerMessageId,
           received_at: receivedAt,
           status: "received",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           raw: p as any,
-        });
+        }).select("id").single();
         if (mErr) return new Response(mErr.message, { status: 500 });
 
         // 7) Bump the conversation if it already existed.
@@ -200,6 +239,29 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
           // A reply asking to opt out counts as an unsubscribe too.
           if (cls.intent === "unsubscribe") {
             await recordUnsubscribe(account.user_id, leadEmail, mailbox, p.campaign_name);
+          }
+        }
+
+
+        const agentId = existing?.agent_id ?? matchedList?.sdr_agent_id ?? null;
+        if (agentId && cls?.intent !== "unsubscribe") {
+          const { data: agent } = await supabaseAdmin
+            .from("sdr_agents")
+            .select("response_speed")
+            .eq("id", agentId)
+            .maybeSingle();
+          if (agent) {
+            await (supabaseAdmin as any).from("sdr_reply_jobs").upsert(
+              {
+                user_id: account.user_id,
+                conversation_id: conversationId,
+                inbound_message_id: inboundMessage.id,
+                agent_id: agentId,
+                scheduled_for: new Date(Date.now() + replyDelayMs(agent.response_speed)).toISOString(),
+                status: "pending",
+              },
+              { onConflict: "inbound_message_id", ignoreDuplicates: true },
+            );
           }
         }
 
