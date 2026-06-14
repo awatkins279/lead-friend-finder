@@ -161,12 +161,19 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
           .limit(1)
           .maybeSingle();
 
-        const { data: matchedList } = p.campaign_name
+        const { data: matchedList } = p.campaign_id
           ? await supabaseAdmin
               .from("lists")
               .select("id, sdr_agent_id")
               .eq("user_id", account.user_id)
-              .eq("name", p.campaign_name)
+              .eq("instantly_campaign_id", p.campaign_id)
+              .maybeSingle()
+          : p.campaign_name
+          ? await supabaseAdmin
+              .from("lists")
+              .select("id, sdr_agent_id")
+              .eq("user_id", account.user_id)
+              .or(`name.eq.${p.campaign_name},name.eq.${p.campaign_name.replace(/ — NexusAi$/, "")}`)
               .maybeSingle()
           : { data: null };
 
