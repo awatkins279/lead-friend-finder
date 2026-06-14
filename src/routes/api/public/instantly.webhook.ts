@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { classifyIntent } from "@/lib/intent";
 
 // Instantly Unibox -> app inbox sync.
 //
@@ -146,7 +147,24 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
             .eq("id", conversationId);
         }
 
-        return Response.json({ ok: true, conversation_id: conversationId });
+        // 8) Auto-classify the reply's intent so the inbox sorts itself (best-effort).
+        const cls = await classifyIntent({
+          text: bodyText ?? snippet,
+          subject: p.reply_subject ?? null,
+          apiKey: process.env.LOVABLE_API_KEY ?? "",
+        });
+        if (cls) {
+          await supabaseAdmin
+            .from("sdr_conversations")
+            .update({ intent: cls.intent, intent_confidence: cls.confidence })
+            .eq("id", conversationId);
+        }
+
+        return Response.json({
+          ok: true,
+          conversation_id: conversationId,
+          intent: cls?.intent ?? null,
+        });
       },
     },
   },
