@@ -37,7 +37,7 @@ function replyDelayMs(speed: string): number {
     medium: [30 * 60_000, 2 * 60 * 60_000],
     slow: [2 * 60 * 60_000, 8 * 60 * 60_000],
   };
-  const [min, max] = ranges[speed] ?? ranges.medium;
+  const [min, max] = ranges[speed] ?? [30 * 60_000, 2 * 60 * 60_000];
   return Math.floor(min + Math.random() * (max - min));
 }
 

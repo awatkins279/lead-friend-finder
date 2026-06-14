@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { processSdrReplyJob } from "@/lib/sdr-auto-reply.server";
 
 const MAX_JOBS_PER_TICK = 10;
 
@@ -14,6 +13,7 @@ export const Route = createFileRoute("/api/public/hooks/sdr-reply-tick")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { processSdrReplyJob } = await import("@/lib/sdr-auto-reply.server");
         const { data: jobs, error } = await (supabaseAdmin as any).rpc(
           "claim_sdr_reply_jobs_admin",
           { p_limit: MAX_JOBS_PER_TICK },
