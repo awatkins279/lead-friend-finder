@@ -793,6 +793,7 @@ export type Database = {
           description: string | null
           extra_instructions: string | null
           id: string
+          instantly_campaign_id: string | null
           key_selling_points: string | null
           launched_at: string | null
           name: string
@@ -822,6 +823,7 @@ export type Database = {
           description?: string | null
           extra_instructions?: string | null
           id?: string
+          instantly_campaign_id?: string | null
           key_selling_points?: string | null
           launched_at?: string | null
           name: string
@@ -851,6 +853,7 @@ export type Database = {
           description?: string | null
           extra_instructions?: string | null
           id?: string
+          instantly_campaign_id?: string | null
           key_selling_points?: string | null
           launched_at?: string | null
           name?: string
