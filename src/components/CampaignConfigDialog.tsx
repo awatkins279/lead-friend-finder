@@ -89,7 +89,7 @@ export function CampaignConfigDialog({
     setMailboxSearch("");
     (async () => {
       const sb = supabase as any;
-      const [{ data: accts }, { data: assigned }, { data: listRow }] = await Promise.all([
+      const [{ data: accts }, { data: assigned }, { data: listRow }, { data: authData }] = await Promise.all([
         supabase
           .from("email_accounts")
           .select("id, email_address")
@@ -100,7 +100,11 @@ export function CampaignConfigDialog({
           .select("unsubscribe_footer_enabled, unsubscribe_footer_text")
           .eq("id", listId)
           .maybeSingle(),
+        supabase.auth.getUser(),
       ]);
+      if (!initial.positive_reply_alert_email && authData.user?.email) {
+        setCfg((current) => ({ ...current, positive_reply_alert_email: authData.user?.email ?? null }));
+      }
       setMailboxes((accts ?? []) as { id: string; email_address: string }[]);
       setSelectedMailboxes(
         new Set(((assigned ?? []) as { email_account_id: string }[]).map((r) => r.email_account_id)),
