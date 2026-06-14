@@ -173,7 +173,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
               .from("lists")
               .select("id, sdr_agent_id")
               .eq("user_id", account.user_id)
-              .or(`name.eq.${p.campaign_name},name.eq.${p.campaign_name.replace(/ — NexusAi$/, "")}`)
+              .eq("name", p.campaign_name.replace(/ — NexusAi$/, ""))
               .maybeSingle()
           : { data: null };
 
