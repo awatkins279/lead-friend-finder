@@ -526,8 +526,9 @@ function ListDetailPage() {
               <h1 className="min-w-0 truncate text-3xl font-semibold tracking-tight text-foreground">
                 {list?.name ?? "Loading…"}
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Active
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                <span className={`h-1.5 w-1.5 rounded-full ${campaignStatus === "active" ? "bg-primary" : "bg-muted-foreground"}`} />
+                {campaignStatus === "active" ? "Sending" : campaignStatus === "paused" ? "Paused" : campaignStatus === "completed" ? "Completed" : "Draft"}
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -535,6 +536,17 @@ function ListDetailPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            {campaignStatus === "active" ? (
+              <Button size="sm" variant="outline" onClick={handlePause} disabled={launchBusy}>
+                {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <PauseCircle className="mr-2 h-3.5 w-3.5" />}
+                Pause campaign
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setConfirmLaunch(true)} disabled={launchBusy || !rows?.length}>
+                {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Rocket className="mr-2 h-3.5 w-3.5" />}
+                {campaignStatus === "paused" ? "Resume campaign" : "Launch campaign"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
               <Settings2 className="mr-2 h-3.5 w-3.5" /> Campaign config
             </Button>
@@ -676,6 +688,25 @@ function ListDetailPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={runAllScripts}>Rewrite all scripts</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmLaunch} onOpenChange={setConfirmLaunch}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{campaignStatus === "paused" ? "Resume this campaign?" : "Launch this campaign?"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {campaignStatus === "paused"
+                ? "Sending will continue through your assigned mailboxes using the existing schedule."
+                : `This will start the generated email sequence for ${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length} ready prospect${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length === 1 ? "" : "s"}. Emails send on weekdays from 9 AM–5 PM Eastern, stop when a prospect replies, and use the mailboxes selected in Campaign config.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLaunch}>
+              {campaignStatus === "paused" ? "Resume sending" : "Launch and start sending"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
