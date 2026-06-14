@@ -40,7 +40,21 @@ export type CampaignConfig = {
   personalization_level: string;
   cta_type: string;
   extra_instructions: string | null;
+  sending_days: number[];
+  sending_start_time: string;
+  sending_end_time: string;
+  sending_timezone: string;
+  follow_up_delay_days: number;
+  email_gap_minutes: number;
+  positive_reply_alerts_enabled: boolean;
+  positive_reply_alert_email: string | null;
 };
+
+const SEND_DAYS = [
+  { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
 
 export function CampaignConfigDialog({
   listId,
@@ -113,6 +127,9 @@ export function CampaignConfigDialog({
     if (!cfg.name.trim()) return toast.error("Campaign name required");
     if (!cfg.sender_name?.trim()) return toast.error("Your name required");
     if (!cfg.what_selling?.trim()) return toast.error("What you're selling required");
+    if (!cfg.sending_days.length) return toast.error("Choose at least one sending day");
+    if (cfg.sending_start_time >= cfg.sending_end_time) return toast.error("Sending end time must be after the start time");
+    if (cfg.positive_reply_alerts_enabled && !cfg.positive_reply_alert_email?.trim()) return toast.error("Enter an email for positive reply alerts");
     setSaving(true);
     const { error } = await supabase
       .from("lists")
@@ -129,6 +146,14 @@ export function CampaignConfigDialog({
         personalization_level: cfg.personalization_level,
         cta_type: cfg.cta_type,
         extra_instructions: cfg.extra_instructions,
+        sending_days: cfg.sending_days,
+        sending_start_time: cfg.sending_start_time,
+        sending_end_time: cfg.sending_end_time,
+        sending_timezone: cfg.sending_timezone,
+        follow_up_delay_days: cfg.follow_up_delay_days,
+        email_gap_minutes: cfg.email_gap_minutes,
+        positive_reply_alerts_enabled: cfg.positive_reply_alerts_enabled,
+        positive_reply_alert_email: cfg.positive_reply_alert_email?.trim() || null,
       })
       .eq("id", listId);
     if (error) {
