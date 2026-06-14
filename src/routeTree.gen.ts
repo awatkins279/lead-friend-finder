@@ -36,6 +36,7 @@ import { Route as ApiPublicTwilioRecordingRouteImport } from './routes/api/publi
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicInstantlyWebhookRouteImport } from './routes/api/public/instantly.webhook'
 import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
+import { Route as ApiPublicHooksSdrReplyTickRouteImport } from './routes/api/public/hooks/sdr-reply-tick'
 import { Route as ApiPublicHooksScoringTickRouteImport } from './routes/api/public/hooks/scoring-tick'
 
 const PricingRoute = PricingRouteImport.update({
@@ -179,6 +180,12 @@ const ApiPublicInboxIngestRoute = ApiPublicInboxIngestRouteImport.update({
   path: '/api/public/inbox/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksSdrReplyTickRoute =
+  ApiPublicHooksSdrReplyTickRouteImport.update({
+    id: '/api/public/hooks/sdr-reply-tick',
+    path: '/api/public/hooks/sdr-reply-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksScoringTickRoute =
   ApiPublicHooksScoringTickRouteImport.update({
     id: '/api/public/hooks/scoring-tick',
@@ -208,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
+  '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/instantly/webhook': typeof ApiPublicInstantlyWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -238,6 +246,7 @@ export interface FileRoutesByTo {
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
+  '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/instantly/webhook': typeof ApiPublicInstantlyWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -269,6 +278,7 @@ export interface FileRoutesById {
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
+  '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
   '/api/public/instantly/webhook': typeof ApiPublicInstantlyWebhookRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/hooks/scoring-tick'
+    | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
     | '/api/public/instantly/webhook'
     | '/api/public/payments/webhook'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '/app/lists/$listId'
     | '/app/lists'
     | '/api/public/hooks/scoring-tick'
+    | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
     | '/api/public/instantly/webhook'
     | '/api/public/payments/webhook'
@@ -361,6 +373,7 @@ export interface FileRouteTypes {
     | '/app/lists/$listId'
     | '/app/lists/'
     | '/api/public/hooks/scoring-tick'
+    | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
     | '/api/public/instantly/webhook'
     | '/api/public/payments/webhook'
@@ -379,6 +392,7 @@ export interface RootRouteChildren {
   ApiGoogleCalendarCallbackRoute: typeof ApiGoogleCalendarCallbackRoute
   ApiGoogleCalendarConnectRoute: typeof ApiGoogleCalendarConnectRoute
   ApiPublicHooksScoringTickRoute: typeof ApiPublicHooksScoringTickRoute
+  ApiPublicHooksSdrReplyTickRoute: typeof ApiPublicHooksSdrReplyTickRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
   ApiPublicInstantlyWebhookRoute: typeof ApiPublicInstantlyWebhookRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
@@ -579,6 +593,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInboxIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/sdr-reply-tick': {
+      id: '/api/public/hooks/sdr-reply-tick'
+      path: '/api/public/hooks/sdr-reply-tick'
+      fullPath: '/api/public/hooks/sdr-reply-tick'
+      preLoaderRoute: typeof ApiPublicHooksSdrReplyTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/scoring-tick': {
       id: '/api/public/hooks/scoring-tick'
       path: '/api/public/hooks/scoring-tick'
@@ -642,6 +663,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGoogleCalendarCallbackRoute: ApiGoogleCalendarCallbackRoute,
   ApiGoogleCalendarConnectRoute: ApiGoogleCalendarConnectRoute,
   ApiPublicHooksScoringTickRoute: ApiPublicHooksScoringTickRoute,
+  ApiPublicHooksSdrReplyTickRoute: ApiPublicHooksSdrReplyTickRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
   ApiPublicInstantlyWebhookRoute: ApiPublicInstantlyWebhookRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,

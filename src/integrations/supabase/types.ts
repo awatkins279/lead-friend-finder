@@ -1515,6 +1515,89 @@ export type Database = {
           },
         ]
       }
+      sdr_reply_jobs: {
+        Row: {
+          agent_id: string
+          attempts: number
+          completed_at: string | null
+          conversation_id: string
+          created_at: string
+          draft_message_id: string | null
+          error: string | null
+          id: string
+          inbound_message_id: string
+          locked_at: string | null
+          max_attempts: number
+          scheduled_for: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          attempts?: number
+          completed_at?: string | null
+          conversation_id: string
+          created_at?: string
+          draft_message_id?: string | null
+          error?: string | null
+          id?: string
+          inbound_message_id: string
+          locked_at?: string | null
+          max_attempts?: number
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string
+          attempts?: number
+          completed_at?: string | null
+          conversation_id?: string
+          created_at?: string
+          draft_message_id?: string | null
+          error?: string | null
+          id?: string
+          inbound_message_id?: string
+          locked_at?: string | null
+          max_attempts?: number
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sdr_reply_jobs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_reply_jobs_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_reply_jobs_draft_message_id_fkey"
+            columns: ["draft_message_id"]
+            isOneToOne: false
+            referencedRelation: "sdr_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sdr_reply_jobs_inbound_message_id_fkey"
+            columns: ["inbound_message_id"]
+            isOneToOne: true
+            referencedRelation: "sdr_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           billing_cycle: string | null
@@ -1767,6 +1850,32 @@ export type Database = {
           id: string
           lead_ids: string[]
         }[]
+      }
+      claim_sdr_reply_jobs_admin: {
+        Args: { p_limit?: number }
+        Returns: {
+          agent_id: string
+          attempts: number
+          completed_at: string | null
+          conversation_id: string
+          created_at: string
+          draft_message_id: string | null
+          error: string | null
+          id: string
+          inbound_message_id: string
+          locked_at: string | null
+          max_attempts: number
+          scheduled_for: string
+          status: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "sdr_reply_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       finalize_scoring_job: {
         Args: { p_job_id: string }
