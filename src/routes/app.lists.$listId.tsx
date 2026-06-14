@@ -444,6 +444,33 @@ function ListDetailPage() {
     else refetch();
   };
 
+  const handleLaunch = async () => {
+    setConfirmLaunch(false);
+    setLaunchBusy(true);
+    try {
+      const result = await launchCampaignFn({ data: { listId } });
+      toast.success(result.resumed ? "Campaign resumed" : `Campaign launched for ${result.prospects ?? 0} prospect${result.prospects === 1 ? "" : "s"}`);
+      await refetchList();
+    } catch (error) {
+      toast.error((error as Error).message || "Campaign could not be launched");
+    } finally {
+      setLaunchBusy(false);
+    }
+  };
+
+  const handlePause = async () => {
+    setLaunchBusy(true);
+    try {
+      await pauseCampaignFn({ data: { listId } });
+      toast.success("Campaign paused");
+      await refetchList();
+    } catch (error) {
+      toast.error((error as Error).message || "Campaign could not be paused");
+    } finally {
+      setLaunchBusy(false);
+    }
+  };
+
   const cfgInitial: CampaignConfig = list
     ? {
         name: list.name ?? "",
@@ -475,6 +502,7 @@ function ListDetailPage() {
       };
 
   const enrichedCount = (rows ?? []).filter((r) => r.status === "enriched").length;
+  const campaignStatus = list?.campaign_status ?? "draft";
 
   // Re-render every second while running so ETA ticks down
   const [, setTick] = useState(0);
