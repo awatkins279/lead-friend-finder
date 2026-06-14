@@ -728,6 +728,8 @@ export type Database = {
           sender_company: string | null
           sender_name: string | null
           sender_title: string | null
+          unsubscribe_footer_enabled: boolean
+          unsubscribe_footer_text: string | null
           updated_at: string
           user_id: string
           voicemail_audio_url: string | null
@@ -753,6 +755,8 @@ export type Database = {
           sender_company?: string | null
           sender_name?: string | null
           sender_title?: string | null
+          unsubscribe_footer_enabled?: boolean
+          unsubscribe_footer_text?: string | null
           updated_at?: string
           user_id: string
           voicemail_audio_url?: string | null
@@ -778,6 +782,8 @@ export type Database = {
           sender_company?: string | null
           sender_name?: string | null
           sender_title?: string | null
+          unsubscribe_footer_enabled?: boolean
+          unsubscribe_footer_text?: string | null
           updated_at?: string
           user_id?: string
           voicemail_audio_url?: string | null
@@ -1573,6 +1579,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      unsubscribes: {
+        Row: {
+          campaign_name: string | null
+          email_account: string | null
+          id: string
+          lead_email: string
+          source: string
+          unsubscribed_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_name?: string | null
+          email_account?: string | null
+          id?: string
+          lead_email: string
+          source?: string
+          unsubscribed_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_name?: string | null
+          email_account?: string | null
+          id?: string
+          lead_email?: string
+          source?: string
+          unsubscribed_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_phone_accounts: {
         Row: {
