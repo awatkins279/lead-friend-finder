@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { classifyIntent } from "@/lib/intent";
 
 // Instantly Unibox -> app inbox sync.
@@ -70,6 +69,7 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         // 1) Auth via shared secret.
         const expected = process.env.INSTANTLY_WEBHOOK_SECRET;
         const provided =
