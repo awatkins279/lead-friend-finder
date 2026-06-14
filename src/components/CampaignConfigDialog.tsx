@@ -56,6 +56,7 @@ export function CampaignConfigDialog({
   onSaved: () => void;
 }) {
   const [cfg, setCfg] = useState<CampaignConfig>(initial);
+  const [wordCountInput, setWordCountInput] = useState(String(initial.word_count));
   const [saving, setSaving] = useState(false);
 
   // Per-campaign mailbox pool.
@@ -70,6 +71,7 @@ export function CampaignConfigDialog({
   useEffect(() => {
     if (!open) return;
     setCfg(initial);
+    setWordCountInput(String(initial.word_count));
     setMailboxSearch("");
     (async () => {
       const sb = supabase as any;
@@ -252,8 +254,15 @@ export function CampaignConfigDialog({
             <Field label="Target word count per email">
               <Input
                 type="number"
-                value={cfg.word_count}
-                onChange={(e) => update("word_count", parseInt(e.target.value) || 150)}
+                value={wordCountInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setWordCountInput(value);
+                  if (value !== "") update("word_count", parseInt(value, 10));
+                }}
+                onBlur={() => {
+                  if (wordCountInput === "") setWordCountInput(String(cfg.word_count));
+                }}
               />
             </Field>
           </div>
