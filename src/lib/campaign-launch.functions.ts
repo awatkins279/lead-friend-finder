@@ -38,7 +38,7 @@ export const launchCampaign = createServerFn({ method: "POST" })
     const db = context.supabase as any;
     const { data: list, error: listError } = await db
       .from("lists")
-      .select("id, name, user_id, campaign_status, instantly_campaign_id, unsubscribe_footer_enabled, unsubscribe_footer_text")
+      .select("id, name, user_id, campaign_status, instantly_campaign_id, unsubscribe_footer_enabled, unsubscribe_footer_text, sending_days, sending_start_time, sending_end_time, sending_timezone, follow_up_delay_days, email_gap_minutes")
       .eq("id", data.listId)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -71,11 +71,10 @@ export const launchCampaign = createServerFn({ method: "POST" })
     if (prospects.length > 1000) throw new Error("Campaign launch currently supports up to 1,000 prospects at a time");
 
     const stepCount = Math.max(...prospects.map((row: any) => row.emails.length));
-    const firstSequence = prospects[0].emails as SequenceEmail[];
     const sequences = [{
       steps: Array.from({ length: stepCount }, (_, index) => ({
         type: "email",
-        delay: Math.max(0, Number(firstSequence[index]?.send_after_days ?? (index === 0 ? 2 : 3))),
+        delay: index === stepCount - 1 ? 0 : Math.max(1, Number(list.follow_up_delay_days ?? 3)),
         delay_unit: "days",
         variants: [{ subject: `{{nexus_subject_${index + 1}}}`, body: `{{nexus_body_${index + 1}}}` }],
       })),
@@ -107,14 +106,14 @@ export const launchCampaign = createServerFn({ method: "POST" })
         campaign_schedule: {
           schedules: [{
             name: "Weekdays",
-            timing: { from: "09:00", to: "17:00" },
-            days: { "0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": false },
-            timezone: "America/Detroit",
+            timing: { from: String(list.sending_start_time).slice(0, 5), to: String(list.sending_end_time).slice(0, 5) },
+            days: Object.fromEntries(Array.from({ length: 7 }, (_, day) => [String(day), (list.sending_days as number[]).includes(day)])),
+            timezone: list.sending_timezone,
           }],
         },
         sequences,
         email_list: mailboxes,
-        email_gap: 10,
+        email_gap: list.email_gap_minutes,
         daily_limit: 100,
         daily_max_leads: 100,
         stop_on_reply: true,
