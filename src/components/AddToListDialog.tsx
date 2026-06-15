@@ -53,7 +53,9 @@ export function AddToListDialog({
   const [busy, setBusy] = useState(false);
   const [minScore, setMinScore] = useState(70);
   const [overrides, setOverrides] = useState<Set<string>>(new Set());
-  const [allowedVerification, setAllowedVerification] = useState<"deliverable" | "deliverable_risky">("deliverable");
+  const [allowedVerification, setAllowedVerification] = useState<
+    "deliverable" | "deliverable_risky"
+  >("deliverable");
 
   const isCampaign = mode === "campaign";
   const noun = isCampaign ? "campaign" : "list";
@@ -96,12 +98,24 @@ export function AddToListDialog({
       ids = ids.filter((id) => {
         if (overrides.has(id)) return true;
         const status = leadVerifications!.get(id);
-        return status === "deliverable" || (allowedVerification === "deliverable_risky" && status === "risky");
+        return (
+          status === "deliverable" ||
+          (allowedVerification === "deliverable_risky" && status === "risky")
+        );
       });
     }
     return ids;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadIds, leadScores, minScore, overrides, showScoreFilter, leadVerifications, allowedVerification, showVerifyFilter]);
+  }, [
+    leadIds,
+    leadScores,
+    minScore,
+    overrides,
+    showScoreFilter,
+    leadVerifications,
+    allowedVerification,
+    showVerifyFilter,
+  ]);
 
   // Reset overrides when dialog opens
   useEffect(() => {
@@ -131,13 +145,21 @@ export function AddToListDialog({
   }, [lists, search]);
 
   const submit = async () => {
-    const idsToAdd = (showScoreFilter || showVerifyFilter) ? effectiveIds : leadIds;
+    const idsToAdd = showScoreFilter || showVerifyFilter ? effectiveIds : leadIds;
     if (idsToAdd.length === 0) {
-      toast.error(showVerifyFilter ? "No deliverable prospects in the current filter." : showScoreFilter ? "No prospects pass the threshold. Lower it or override individuals." : "No leads selected");
+      toast.error(
+        showVerifyFilter
+          ? "No deliverable prospects in the current filter."
+          : showScoreFilter
+            ? "No prospects pass the threshold. Lower it or override individuals."
+            : "No leads selected",
+      );
       return;
     }
     if (isCampaign && idsToAdd.length > CAMPAIGN_ADD_LIMIT) {
-      toast.error(`You can add up to ${CAMPAIGN_ADD_LIMIT.toLocaleString()} leads to a campaign at one time.`);
+      toast.error(
+        `You can add up to ${CAMPAIGN_ADD_LIMIT.toLocaleString()} leads to a campaign at one time.`,
+      );
       return;
     }
     setBusy(true);
@@ -173,9 +195,7 @@ export function AddToListDialog({
         if (insErr) throw insErr;
       }
 
-      toast.success(
-        `Added ${idsToAdd.length} lead${idsToAdd.length === 1 ? "" : "s"} to ${noun}`,
-      );
+      toast.success(`Added ${idsToAdd.length} lead${idsToAdd.length === 1 ? "" : "s"} to ${noun}`);
       onAdded?.();
       onOpenChange(false);
       setNewName("");
@@ -200,7 +220,6 @@ export function AddToListDialog({
               : "Group these prospects so you can research them and draft personalized emails."}
           </DialogDescription>
         </DialogHeader>
-
 
         <div className="space-y-2">
           <div className="relative">
@@ -231,7 +250,9 @@ export function AddToListDialog({
                 />
                 <span className="flex-1 truncate">{l.name}</span>
                 {isCampaign && l.sender_name && (
-                  <Badge variant="secondary" className="text-[10px]">configured</Badge>
+                  <Badge variant="secondary" className="text-[10px]">
+                    configured
+                  </Badge>
                 )}
               </label>
             ))}
@@ -252,7 +273,11 @@ export function AddToListDialog({
           <div className="space-y-3">
             <div>
               <Label className="text-xs">New list name</Label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. NYC SaaS founders" />
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="e.g. NYC SaaS founders"
+              />
             </div>
             <div>
               <Label className="text-xs">Description (used by AI for personalization)</Label>
@@ -304,11 +329,14 @@ export function AddToListDialog({
                 <Badge variant="outline">{verifiedCounts.unknown.toLocaleString()} unknown</Badge>
               )}
               {verifiedCounts.unverified > 0 && (
-                <Badge variant="outline">{verifiedCounts.unverified.toLocaleString()} not verified</Badge>
+                <Badge variant="outline">
+                  {verifiedCounts.unverified.toLocaleString()} not verified
+                </Badge>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be added.
+              {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be
+              added.
             </p>
           </div>
         )}
@@ -328,7 +356,8 @@ export function AddToListDialog({
                     value={minScore}
                     onChange={(e) => {
                       const n = Number(e.target.value);
-                      if (Number.isFinite(n)) setMinScore(Math.max(0, Math.min(100, Math.round(n))));
+                      if (Number.isFinite(n))
+                        setMinScore(Math.max(0, Math.min(100, Math.round(n))));
                     }}
                     className="h-7 w-16 text-xs"
                   />
@@ -344,8 +373,8 @@ export function AddToListDialog({
                 className="mt-3"
               />
               <p className="mt-2 text-[11px] text-muted-foreground">
-                {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be added.
-                Below-threshold prospects are flagged — tick to override.
+                {effectiveIds.length.toLocaleString()} of {leadIds.length.toLocaleString()} will be
+                added. Below-threshold prospects are flagged — tick to override.
               </p>
             </div>
 
@@ -369,7 +398,8 @@ export function AddToListDialog({
                             if (!passes) next.add(id);
                             else next.delete(id);
                           } else {
-                            if (passes) next.add(id); // suppress a passing one via override-off? skip
+                            if (passes)
+                              next.add(id); // suppress a passing one via override-off? skip
                             else next.delete(id);
                           }
                           // Simpler model: override toggles "force include" for non-passing leads only
@@ -382,7 +412,9 @@ export function AddToListDialog({
                       {id.slice(0, 10)}…
                     </span>
                     {s == null ? (
-                      <Badge variant="outline" className="text-[10px]">Not scored</Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        Not scored
+                      </Badge>
                     ) : (
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
@@ -403,10 +435,7 @@ export function AddToListDialog({
         )}
 
         <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <Checkbox
-            checked={allowDuplicates}
-            onCheckedChange={(v) => setAllowDuplicates(!!v)}
-          />
+          <Checkbox checked={allowDuplicates} onCheckedChange={(v) => setAllowDuplicates(!!v)} />
           Allow duplicates
         </label>
 
@@ -418,10 +447,9 @@ export function AddToListDialog({
             {busy
               ? "Saving…"
               : isCampaign
-                ? `Add ${((showScoreFilter || showVerifyFilter) ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
+                ? `Add ${(showScoreFilter || showVerifyFilter ? effectiveIds.length : leadIds.length).toLocaleString()} to Campaign`
                 : "Save Leads"}
           </Button>
-
         </DialogFooter>
       </DialogContent>
     </Dialog>
