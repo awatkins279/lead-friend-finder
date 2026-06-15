@@ -46,6 +46,25 @@ export const launchCampaign = createServerFn({ method: "POST" })
     if (listError || !list) throw new Error("Campaign not found");
 
     if (list.instantly_campaign_id) {
+      const { data: resumeRows, error: resumeError } = await db
+        .from("list_leads")
+        .select("verification_status, emails, lead:leads(email)")
+        .eq("list_id", list.id);
+      if (resumeError) throw new Error(resumeError.message);
+      const blocked = (resumeRows ?? []).filter(
+        (row: any) =>
+          row.lead?.email &&
+          Array.isArray(row.emails) &&
+          row.emails.length > 0 &&
+          !["deliverable", "risky"].includes(row.verification_status),
+      );
+      if (blocked.length > 0) {
+        throw new Error(
+          `${blocked.length} prospect${
+            blocked.length === 1 ? " is" : "s are"
+          } not approved for sending. Validate emails before resuming this campaign.`,
+        );
+      }
       await instantlyRequest(
         (await getConnection(db, context.userId)).api_key,
         `/campaigns/${list.instantly_campaign_id}/activate`,
