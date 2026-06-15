@@ -183,7 +183,7 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
   if (pendingError) throw new Error(pendingError.message);
   const slice = (pending ?? []).map((row: any) => ({ id: row.lead_id, score: row.score, research: row.research }));
   if (slice.length) {
-    const ids = slice.map((row) => row.id);
+    const ids = slice.map((row: { id: string }) => row.id);
     const { data: leads, error } = await db.from("leads").select("id,email").in("id", ids);
     if (error) throw new Error(error.message);
     const apiKey = process.env.MILLIONVERIFIER_API_KEY;
@@ -205,8 +205,7 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
     await db.from("lead_verifications").upsert(
       verified.map((row) => ({ user_id: event.user_id, lead_id: row.id, status: row.status, result: row.result, quality: row.quality, email: row.email, verified_at: new Date().toISOString() })),
     );
-    const byId = new Map(slice.map((row) => [row.id, row]));
-    await Promise.all(verified.map((row) => db.from("list_leads").update({ verification_status: row.status }).eq("list_id", details.campaign_id).eq("lead_id", row.id)));
+    await Promise.all(verified.map((row: { id: string; status: string }) => db.from("list_leads").update({ verification_status: row.status }).eq("list_id", details.campaign_id).eq("lead_id", row.id)));
     const total = details.progress_total ?? 0;
     const next = { ...details, validation_cursor: cursor + slice.length, progress_current: cursor + slice.length, progress_total: total, live_text: `Verifying email batch ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
     await updateEvent(db, event.id, `Validating emails · ${Math.min(cursor + slice.length, total)}/${total}`, next);
@@ -263,6 +262,17 @@ async function generateOutreach(campaign: any, lead: any) {
   const payload = await response.json();
   const parsed = JSON.parse(String(payload.choices?.[0]?.message?.content ?? "{}").replace(/```json|```/g, "").trim());
   return { leadId: lead.id, emails: Array.isArray(parsed.emails) ? parsed.emails.slice(0, count) : [], callScript: parsed.callScript ?? null };
+}
+
+function personalizeTemplate(template: { emails: any[]; callScript: any }, lead: any) {
+  const replacements: Array<[RegExp, string]> = [
+    [/\{\{first_name\}\}/gi, String(lead.first_name ?? "there")],
+    [/\{\{company\}\}/gi, String(lead.org_name ?? "your company")],
+    [/\{\{title\}\}/gi, String(lead.title ?? "your role")],
+  ];
+  const replace = (value: unknown) => replacements.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), String(value ?? ""));
+  const emails = (template.emails ?? []).map((email: any) => ({ ...email, subject: replace(email.subject), body: replace(email.body), cta: replace(email.cta) }));
+  return { leadId: lead.id, emails, callScript: template.callScript };
 }
 
 async function updateEvent(db: any, id: string, title: string, details: PipelineDetails) {
