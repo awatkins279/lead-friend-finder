@@ -258,11 +258,7 @@ export function AddToListDialog({
               </label>
             ))}
             <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent">
-              <input
-                type="radio"
-                checked={selectedId === ""}
-                onChange={() => setSelectedId("")}
-              />
+              <input type="radio" checked={selectedId === ""} onChange={() => setSelectedId("")} />
               <Plus className="h-3.5 w-3.5" /> Create new {noun}
             </label>
           </div>
