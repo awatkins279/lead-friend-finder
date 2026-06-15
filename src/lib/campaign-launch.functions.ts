@@ -12,13 +12,14 @@ type SequenceEmail = {
 };
 
 async function instantlyRequest(apiKey: string, path: string, init: RequestInit) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    ...(init.body ? { "Content-Type": "application/json" } : {}),
+    ...(init.headers as Record<string, string> | undefined),
+  };
   const response = await fetch(`${INSTANTLY_BASE}${path}`, {
     ...init,
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
+    headers,
   });
   const text = await response.text();
   const payload = text ? JSON.parse(text) : null;
