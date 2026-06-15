@@ -317,6 +317,7 @@ export const MessageBranchPage = ({
 };
 
 export type MessageResponseProps = ComponentProps<typeof ReactMarkdown> & {
+  className?: string;
   isAnimating?: boolean;
 };
 
