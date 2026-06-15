@@ -59,7 +59,7 @@ export function AddToListDialog({
   const noun = isCampaign ? "campaign" : "list";
   const hasScores = !!leadScores && leadScores.size > 0;
   const showScoreFilter = isCampaign && hasScores;
-  const hasVerifications = !!leadVerifications && leadVerifications.size > 0;
+  const hasVerifications = !!leadVerifications;
   const showVerifyFilter = isCampaign && hasVerifications;
 
   const scoreOf = (id: string): number | null => {
