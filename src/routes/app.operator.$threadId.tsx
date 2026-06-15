@@ -394,8 +394,8 @@ function OperatorWorkspace(props: any) {
             </PromptInputFooter>
           </PromptInput>
           <p className="mt-2 text-center text-[10px] text-muted-foreground">
-            Every search, database check, and campaign action is shown live. Important actions still
-            require approval.
+            Every search, database check, and campaign action is shown live. Full autonomy is enabled
+            for your Operator.
           </p>
         </div>
       </section>
@@ -660,8 +660,8 @@ function BlueprintPanel({
           </Button>
         )}
         <p className="mt-2 text-center text-[9px] leading-4 text-muted-foreground">
-          Approval authorizes work only inside the displayed limits. New audiences, channels or
-          higher volume require another approval.
+          Full autonomy lets the Operator execute its plan immediately while preserving validation,
+          deliverability, compliance, and stop-loss safeguards.
         </p>
       </div>
     </div>
