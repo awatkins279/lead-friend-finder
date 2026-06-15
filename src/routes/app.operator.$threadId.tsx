@@ -41,7 +41,9 @@ function OperatorPage() {
     api: "/api/operator/chat",
     prepareSendMessagesRequest: async ({ messages }) => {
       const { data } = await supabase.auth.getSession();
-      return { body: { threadId, messages }, headers: data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {} };
+      const headers: Record<string, string> = {};
+      if (data.session) headers.Authorization = `Bearer ${data.session.access_token}`;
+      return { body: { threadId, messages }, headers };
     },
   }), [threadId]);
 
