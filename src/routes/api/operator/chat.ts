@@ -10,7 +10,7 @@ const SYSTEM = `You are NexusAi Operator, an expert B2B demand-generation strate
 
 Operate like a disciplined professional, not a generic assistant. Start from minimal information, inspect live portfolio data, research credible current sources when useful, and ask only for missing constraints that materially change execution. Caller count, daily calling hours, geography, offer, exclusions, meeting definition, and sending capacity matter. State reasonable assumptions instead of creating unnecessary friction.
 
-Before any campaign mutation, produce a comprehensive campaign blueprint with distinct non-overlapping plays, ICP filters, scoring, validation rules, email/call sequences, daily volumes, timing, mailbox/caller capacity, CTA, reply handling, experiments, success metrics, stop-loss rules, risks, dependencies, costs, and citations. Use create_campaign_blueprint only when it is complete enough to approve. The user must explicitly approve the saved blueprint before execution. Never claim an action happened unless a tool result confirms it.
+Before any campaign mutation, produce a comprehensive campaign blueprint with distinct non-overlapping plays, ICP filters, scoring, validation rules, email/call sequences, daily volumes, timing, mailbox/caller capacity, CTA, reply handling, experiments, success metrics, stop-loss rules, risks, dependencies, costs, and citations. Use create_campaign_blueprint only when it is complete enough to execute. If the user's profile enables full autonomy, the saved blueprint is automatically authorized and built; otherwise it waits for explicit approval. Never claim an action happened unless a tool result confirms it.
 
 Use markdown. Be concise but thorough where decisions matter. Never fabricate research, intent, performance, or attribution. Prefer the customer's measured campaign data over generic internet advice once enough data exists.`;
 
@@ -99,7 +99,7 @@ export const Route = createFileRoute("/api/operator/chat")({
               },
             }),
             create_campaign_blueprint: tool({
-              description: "Save the complete campaign strategy for user review and approval. This does not create, validate, send, call, spend credits, or launch anything.",
+              description: "Save the complete campaign strategy. For users who enabled full autonomy, immediately authorize and build it within its guardrails; otherwise wait for approval.",
               inputSchema: z.object({
                 offerBrief: z.string().min(3).max(10000),
                 strategy: z.object({
@@ -113,8 +113,15 @@ export const Route = createFileRoute("/api/operator/chat")({
                 const { data: current } = await auth.db.from("operator_blueprints").select("version").eq("thread_id", threadId).eq("user_id", auth.userId).order("version", { ascending: false }).limit(1);
                 const version = Number(current?.[0]?.version ?? 0) + 1;
                 await auth.db.from("operator_blueprints").update({ status: "superseded" }).eq("thread_id", threadId).eq("user_id", auth.userId).eq("status", "draft");
-                const { data: blueprint, error } = await auth.db.from("operator_blueprints").insert({ thread_id: threadId, user_id: auth.userId, version, offer_brief: offerBrief, strategy, guardrails, status: "draft" }).select("id,version,status").single();
+                const { data: blueprint, error } = await auth.db.from("operator_blueprints").insert({ thread_id: threadId, user_id: auth.userId, version, offer_brief: offerBrief, strategy, guardrails, status: "draft" }).select("id,thread_id,version,status,offer_brief,strategy,guardrails").single();
                 if (error || !blueprint) return { error: error?.message ?? "Could not save plan" };
+                const { data: preferences } = await auth.db.from("profiles").select("operator_autonomy_enabled").eq("id", auth.userId).maybeSingle();
+                if (preferences?.operator_autonomy_enabled) {
+                  await auth.db.from("operator_events").insert({ thread_id: threadId, blueprint_id: blueprint.id, user_id: auth.userId, event_type: "blueprint_created", status: "completed", title: `Campaign plan v${version} created under full autonomy`, details: { plays: strategy.plays.length, estimated_credits: strategy.estimatedCredits } });
+                  const { buildApprovedBlueprint } = await import("@/lib/operator-build.server");
+                  const build = await buildApprovedBlueprint({ db: auth.db, userId: auth.userId, blueprint });
+                  return { blueprintId: blueprint.id, version, status: build.status, campaigns: build.createdCampaigns, message: "Full autonomy is enabled. The plan was authorized and campaign preparation started automatically." };
+                }
                 await auth.db.from("operator_events").insert({ thread_id: threadId, blueprint_id: blueprint.id, user_id: auth.userId, event_type: "blueprint_created", status: "approval_required", title: `Campaign plan v${version} ready for approval`, details: { plays: strategy.plays.length, estimated_credits: strategy.estimatedCredits } });
                 return { blueprintId: blueprint.id, version, status: "approval_required", message: "The plan is saved. No campaign actions have run. Ask the user to review the plan card and select Approve & build." };
               },
