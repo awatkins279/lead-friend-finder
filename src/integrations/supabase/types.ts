@@ -1388,7 +1388,9 @@ export type Database = {
           error: string | null
           failed_batches: number
           id: string
+          rubric: Json
           scored_leads: number
+          scoring_mode: string
           status: string
           total_batches: number
           total_leads: number
@@ -1402,7 +1404,9 @@ export type Database = {
           error?: string | null
           failed_batches?: number
           id?: string
+          rubric?: Json
           scored_leads?: number
+          scoring_mode?: string
           status?: string
           total_batches?: number
           total_leads?: number
@@ -1416,7 +1420,9 @@ export type Database = {
           error?: string | null
           failed_batches?: number
           id?: string
+          rubric?: Json
           scored_leads?: number
+          scoring_mode?: string
           status?: string
           total_batches?: number
           total_leads?: number
@@ -1424,6 +1430,63 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      scoring_results: {
+        Row: {
+          created_at: string
+          deep_status: string
+          gaps: Json
+          job_id: string
+          lead_id: string
+          reasoning: string
+          score: number
+          signals: Json
+          strengths: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deep_status?: string
+          gaps?: Json
+          job_id: string
+          lead_id: string
+          reasoning?: string
+          score?: number
+          signals?: Json
+          strengths?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deep_status?: string
+          gaps?: Json
+          job_id?: string
+          lead_id?: string
+          reasoning?: string
+          score?: number
+          signals?: Json
+          strengths?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scoring_results_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scoring_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scoring_results_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sdr_agents: {
         Row: {
@@ -2260,6 +2323,13 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      process_fast_scoring_batch_admin: {
+        Args: { p_job_id: string; p_limit?: number }
+        Returns: {
+          completed: boolean
+          processed: number
+        }[]
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

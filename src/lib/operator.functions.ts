@@ -87,9 +87,12 @@ export const resumeOperatorBlueprint = createServerFn({ method: "POST" })
       const { data: campaignEvents } = await db.from("operator_events").select("details").eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "campaign_draft_created").order("created_at");
       const plays = Array.isArray(blueprint.strategy?.plays) ? blueprint.strategy.plays : [];
       const { startOperatorPipeline } = await import("@/lib/operator-execution.server");
+      let remainingLeads = Math.min(100_000, Math.max(1, Math.floor(Number(blueprint.guardrails?.maxLeads ?? 100_000))));
       for (let index = 0; index < Math.min(plays.length, campaignEvents?.length ?? 0); index += 1) {
+        if (remainingLeads <= 0) break;
         const campaignId = campaignEvents[index]?.details?.campaign_id;
         if (typeof campaignId !== "string") continue;
+        const playLeads = Math.min(remainingLeads, Math.max(1, Math.floor(Number(plays[index]?.estimatedAudience ?? remainingLeads))));
         await startOperatorPipeline({
           db,
           userId: context.userId,
@@ -98,9 +101,10 @@ export const resumeOperatorBlueprint = createServerFn({ method: "POST" })
           campaignId,
           offerBrief: String(blueprint.offer_brief),
           play: plays[index],
-          maxLeads: Math.max(1, Math.floor(Number(blueprint.guardrails?.maxLeads ?? 1_000) / Math.max(plays.length, 1))),
+          maxLeads: playLeads,
           scoreThreshold: 60,
         });
+        remainingLeads -= playLeads;
       }
     }
     await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "operator_resumed", status: "completed", title: "Operator resumed by user" });

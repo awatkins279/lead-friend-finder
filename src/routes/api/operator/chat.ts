@@ -10,7 +10,7 @@ const SYSTEM = `You are NexusAi Operator, an expert B2B demand-generation strate
 
 Operate like a disciplined professional, not a generic assistant. Start from minimal information, inspect live portfolio data, research credible current sources when useful, and ask only for missing constraints that materially change execution. Caller count, daily calling hours, geography, offer, exclusions, meeting definition, and sending capacity matter. State reasonable assumptions instead of creating unnecessary friction.
 
-Before any campaign mutation, produce a comprehensive campaign blueprint with distinct non-overlapping plays, ICP filters, scoring, validation rules, email/call sequences, daily volumes, timing, mailbox/caller capacity, CTA, reply handling, experiments, success metrics, stop-loss rules, risks, dependencies, costs, and citations. Use create_campaign_blueprint only when it is complete enough to execute. If the user's profile enables full autonomy, the saved blueprint is automatically authorized and built; otherwise it waits for explicit approval. Never claim an action happened unless a tool result confirms it.
+Before any campaign mutation, produce a comprehensive campaign blueprint with distinct non-overlapping plays, ICP filters, scoring, validation rules, email/call sequences, daily volumes, timing, mailbox/caller capacity, CTA, reply handling, experiments, success metrics, stop-loss rules, risks, dependencies, costs, and citations. Use create_campaign_blueprint only when it is complete enough to execute. Audience guardrails may contain up to 100,000 leads; do not default or silently cap campaigns at 1,000 leads. If the user's profile enables full autonomy, the saved blueprint is automatically authorized and built; otherwise it waits for explicit approval. Never claim an action happened unless a tool result confirms it.
 
 Use markdown. Be concise but thorough where decisions matter. Never fabricate research, intent, performance, or attribution. Prefer the customer's measured campaign data over generic internet advice once enough data exists.`;
 
@@ -107,7 +107,7 @@ export const Route = createFileRoute("/api/operator/chat")({
                   schedule: z.object({ dailyEmails: z.number(), sendWindows: z.string(), followUpCadence: z.string(), callerCount: z.number(), dailyCallsPerCaller: z.number() }),
                   validationPolicy: z.string(), meetingPath: z.string(), experiments: z.array(z.string()), dependencies: z.array(z.string()), risks: z.array(z.string()), citations: z.array(z.object({ title: z.string(), url: z.string().url(), takeaway: z.string() })), estimatedCredits: z.number(), reviewCadence: z.string(), stopLossRules: z.array(z.string())
                 }),
-                guardrails: z.object({ maxDailyEmails: z.number(), maxDailyCalls: z.number(), maxLeads: z.number(), allowedChannels: z.array(z.string()), requiresNewApproval: z.array(z.string()) })
+                guardrails: z.object({ maxDailyEmails: z.number(), maxDailyCalls: z.number(), maxLeads: z.number().int().min(1).max(100000), allowedChannels: z.array(z.string()), requiresNewApproval: z.array(z.string()) })
               }),
               execute: async ({ offerBrief, strategy, guardrails }) => {
                 const { data: current } = await auth.db.from("operator_blueprints").select("version").eq("thread_id", threadId).eq("user_id", auth.userId).order("version", { ascending: false }).limit(1);

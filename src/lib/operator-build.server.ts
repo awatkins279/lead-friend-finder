@@ -22,7 +22,7 @@ export async function buildApprovedBlueprint(input: {
   });
 
   const strategy = blueprint.strategy as {
-    plays?: Array<{ name?: string; audience?: string; hypothesis?: string; messagingAngle?: string; emailPlan?: string; callingPlan?: string; filters?: { titles?: string[]; industries?: string[]; locations?: string[] } }>;
+    plays?: Array<{ name?: string; audience?: string; hypothesis?: string; messagingAngle?: string; emailPlan?: string; callingPlan?: string; estimatedAudience?: number; filters?: { titles?: string[]; industries?: string[]; locations?: string[] } }>;
   };
   const guardrails = blueprint.guardrails as { maxLeads?: number };
   const { data: profile } = await db.from("profiles").select("full_name,company_name").eq("id", userId).maybeSingle();
@@ -30,7 +30,9 @@ export async function buildApprovedBlueprint(input: {
   const createdCampaigns: Array<{ id: string; name: string }> = [];
   const { startOperatorPipeline } = await import("@/lib/operator-execution.server");
 
+  let remainingLeads = Math.min(100_000, Math.max(1, Math.floor(Number(guardrails?.maxLeads ?? 100_000))));
   for (const play of plays) {
+    if (remainingLeads <= 0) break;
     const name = String(play.name ?? "Operator campaign").trim().slice(0, 160);
     const description = [play.audience, play.hypothesis].filter(Boolean).join(" — ").slice(0, 2000) || null;
     const { data: campaign, error: campaignError } = await db.from("lists").insert({
@@ -50,6 +52,7 @@ export async function buildApprovedBlueprint(input: {
     }
     createdCampaigns.push(campaign);
     await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: userId, event_type: "campaign_draft_created", status: "completed", title: `Created draft campaign: ${campaign.name}`, details: { campaign_id: campaign.id, readiness: "Target leads, validate addresses, generate sequences, and connect sending accounts before launch." } });
+    const playLeads = Math.min(remainingLeads, Math.max(1, Math.floor(Number(play.estimatedAudience ?? remainingLeads))));
     await startOperatorPipeline({
       db,
       userId,
@@ -58,9 +61,10 @@ export async function buildApprovedBlueprint(input: {
       campaignId: campaign.id,
       offerBrief: String(blueprint.offer_brief),
       play,
-      maxLeads: Math.max(1, Math.floor(Number(guardrails?.maxLeads ?? 1_000) / Math.max(plays.length, 1))),
+      maxLeads: playLeads,
       scoreThreshold: 60,
     });
+    remainingLeads -= playLeads;
   }
   return { ok: true, status: "running" as const, createdCampaigns };
 }
