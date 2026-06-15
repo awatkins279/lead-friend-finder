@@ -895,6 +895,11 @@ function PeoplePage() {
   const verifySelectedEmails = () => verifyEmails(Array.from(picked));
 
   const keepVerificationResults = (allowed: VerificationStatus[]) => {
+    const verifiedSelected = Array.from(picked).filter((id) => verifications.has(id));
+    if (verifiedSelected.length === 0) {
+      toast.info("Validate the selected emails first.");
+      return;
+    }
     const allowedSet = new Set(allowed);
     setPicked(
       (previous) =>
@@ -941,6 +946,7 @@ function PeoplePage() {
   };
 
   const hasSelection = picked.size > 0;
+  const hasVerifiedSelection = Array.from(picked).some((id) => verifications.has(id));
 
   // Stable arrays/maps for child dialogs so they don't re-render every keystroke
   const pickedIds = useMemo(() => Array.from(picked), [picked]);
@@ -1034,7 +1040,7 @@ function PeoplePage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">People Search</h1>
             <p className="mt-1 text-sm text-muted-foreground font-mono-num">
-              {total.toLocaleString()} matching contacts · 25 shown per page
+              About {total.toLocaleString()} matching contacts · 25 shown per page
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1253,13 +1259,6 @@ function PeoplePage() {
             </PopoverTrigger>
             <PopoverContent align="end" className="w-80 space-y-4 p-4">
               <Field
-                icon={<Search className="h-3.5 w-3.5" />}
-                label="Name"
-                placeholder="Search by first or last name"
-                value={draft.name}
-                onChange={(v) => setDraft({ ...draft, name: v })}
-              />
-              <Field
                 icon={<Building2 className="h-3.5 w-3.5" />}
                 label="Company"
                 placeholder="e.g. Acme Corp"
@@ -1297,6 +1296,7 @@ function PeoplePage() {
             <Input
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              onBlur={apply}
               onKeyDown={(e) => {
                 if (e.key === "Enter") apply();
               }}
@@ -1331,6 +1331,7 @@ function PeoplePage() {
                 size="sm"
                 variant="outline"
                 onClick={() => keepVerificationResults(["deliverable"])}
+                disabled={!hasVerifiedSelection}
               >
                 Keep deliverable
               </Button>
@@ -1338,6 +1339,7 @@ function PeoplePage() {
                 size="sm"
                 variant="outline"
                 onClick={() => keepVerificationResults(["deliverable", "risky"])}
+                disabled={!hasVerifiedSelection}
               >
                 Keep deliverable + risky
               </Button>
@@ -1381,7 +1383,7 @@ function PeoplePage() {
                             <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
                               {bulkBusy
                                 ? "Selecting…"
-                                : `Select all leads${total ? ` (${total.toLocaleString()})` : ""}`}
+                                : `Select matching${total ? ` (up to ${Math.min(total, MAX_BULK).toLocaleString()})` : ""}`}
                             </MenuItem>
                             <MenuItem onClick={() => setAdvancedMode(true)}>
                               Advanced Selection
@@ -1637,7 +1639,7 @@ function PeoplePage() {
             size="sm"
             variant="outline"
             className="mt-2 w-full border-dashed border-white/15 bg-white/[0.03]"
-            disabled={importBusy || scoringBusy}
+            disabled={importBusy || scoringBusy || scoringContext.trim().length < 10}
             onClick={() => importInputRef.current?.click()}
           >
             {importBusy ? (
@@ -1648,8 +1650,9 @@ function PeoplePage() {
             Upload lead file and score
           </Button>
           <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-            CSV, TSV, or Excel. Supports name, email, title, company, industry, location, phone, and
-            LinkedIn columns. Up to 5,000 rows.
+            {scoringContext.trim().length < 10
+              ? "Describe your ideal customer above to enable file scoring."
+              : "CSV, TSV, or Excel. Supports name, email, title, company, industry, location, phone, and LinkedIn columns. Up to 5,000 rows."}
           </p>
 
           {/* Threshold */}
@@ -2017,6 +2020,13 @@ function PeoplePage() {
         leadIds={scoredEligibleIds}
         leadScores={scoredEligibleScores}
         leadVerifications={verifications}
+        onAdded={() => {
+          setScores((previous) => {
+            const next = new Map(previous);
+            scoredEligibleIds.forEach((id) => next.delete(id));
+            return next;
+          });
+        }}
       />
     </div>
   );
