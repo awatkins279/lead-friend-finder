@@ -132,9 +132,8 @@ export function AddToListDialog({
       .order("created_at", { ascending: false })
       .then(({ data }) => {
         const rows = (data ?? []) as ListRow[];
-        const filtered = isCampaign ? rows.filter((r) => !!r.sender_name) : rows;
-        setLists(filtered);
-        setSelectedId(filtered[0]?.id ?? "");
+        setLists(rows);
+        setSelectedId(rows[0]?.id ?? "");
       });
   }, [open, isCampaign]);
 
@@ -166,12 +165,8 @@ export function AddToListDialog({
     try {
       let listId = selectedId;
       if (!listId) {
-        if (isCampaign) {
-          toast.error("Pick a campaign");
-          return;
-        }
         if (!newName.trim()) {
-          toast.error("Pick a list or name a new one");
+          toast.error(`Pick a ${noun} or name a new one`);
           return;
         }
         const { data: u } = await supabase.auth.getUser();
@@ -222,7 +217,7 @@ export function AddToListDialog({
           </DialogTitle>
           <DialogDescription>
             {isCampaign
-              ? `Enroll these prospects into a configured campaign. Up to ${CAMPAIGN_ADD_LIMIT.toLocaleString()} can be added at once.`
+              ? `Add these prospects to an existing campaign or create a new draft campaign for them. Up to ${CAMPAIGN_ADD_LIMIT.toLocaleString()} can be added at once.`
               : "Group these prospects so you can research them and draft personalized emails."}
           </DialogDescription>
         </DialogHeader>
@@ -262,27 +257,25 @@ export function AddToListDialog({
                 )}
               </label>
             ))}
-            {!isCampaign && (
-              <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent">
-                <input
-                  type="radio"
-                  checked={selectedId === ""}
-                  onChange={() => setSelectedId("")}
-                />
-                <Plus className="h-3.5 w-3.5" /> Create new list
-              </label>
-            )}
+            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent">
+              <input
+                type="radio"
+                checked={selectedId === ""}
+                onChange={() => setSelectedId("")}
+              />
+              <Plus className="h-3.5 w-3.5" /> Create new {noun}
+            </label>
           </div>
         </div>
 
-        {!isCampaign && selectedId === "" && (
+        {selectedId === "" && (
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">New list name</Label>
+              <Label className="text-xs">New {noun} name</Label>
               <Input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. NYC SaaS founders"
+                placeholder={isCampaign ? "e.g. Validated SaaS founders" : "e.g. NYC SaaS founders"}
               />
             </div>
             <div>
@@ -293,6 +286,12 @@ export function AddToListDialog({
                 placeholder="What are you selling and to whom?"
               />
             </div>
+            {isCampaign && (
+              <p className="text-[11px] text-muted-foreground">
+                The campaign will be saved as a draft. You can configure its sender, sequence, and
+                schedule after adding these prospects.
+              </p>
+            )}
           </div>
         )}
 
