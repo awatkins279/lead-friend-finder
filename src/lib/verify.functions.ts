@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const Input = z.object({
   listId: z.string().uuid(),
@@ -41,6 +40,7 @@ export const verifyLeadEmail = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Input.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: row, error: rowErr } = await supabase
       .from("list_leads")
@@ -106,17 +106,15 @@ export const verifyLeadEmail = createServerFn({ method: "POST" })
       .eq("lead_id", data.leadId);
 
     // Also write to the per-user lead_verifications cache
-    await supabaseAdmin
-      .from("lead_verifications")
-      .upsert({
-        user_id: userId,
-        lead_id: data.leadId,
-        status,
-        result: mvResult,
-        quality: mvQuality,
-        email,
-        verified_at: new Date().toISOString(),
-      });
+    await supabaseAdmin.from("lead_verifications").upsert({
+      user_id: userId,
+      lead_id: data.leadId,
+      status,
+      result: mvResult,
+      quality: mvQuality,
+      email,
+      verified_at: new Date().toISOString(),
+    });
 
     return { ok: true as const, status, result: mvResult, quality: mvQuality, charged: true };
   });
@@ -138,6 +136,7 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => BulkInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const apiKey = process.env.MILLIONVERIFIER_API_KEY;
     if (!apiKey) throw new Error("Missing MILLIONVERIFIER_API_KEY");
 
@@ -151,12 +150,16 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
     // Skip leads that have already been verified by this user
     const { data: existing } = await supabaseAdmin
       .from("lead_verifications")
-      .select("lead_id,status,result")
+      .select("lead_id,status,result,email")
       .eq("user_id", userId)
       .in("lead_id", data.leadIds);
-    const cached = new Map<string, { status: string; result: string }>();
+    const cached = new Map<string, { status: string; result: string; email: string | null }>();
     for (const row of existing ?? []) {
-      cached.set(row.lead_id as string, { status: row.status as string, result: (row.result as string) ?? "" });
+      cached.set(row.lead_id as string, {
+        status: row.status as string,
+        result: (row.result as string) ?? "",
+        email: (row.email as string | null) ?? null,
+      });
     }
 
     const results: BulkVerifyResult[] = [];
@@ -165,24 +168,22 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
     for (const l of leads ?? []) {
       const id = l.id as string;
       const email = (l.email as string | null) ?? "";
-      if (cached.has(id)) {
-        const c = cached.get(id)!;
+      const c = cached.get(id);
+      if (c && c.email?.toLowerCase() === email.toLowerCase()) {
         results.push({ leadId: id, status: c.status as any, result: c.result });
         continue;
       }
       if (!email) {
         results.push({ leadId: id, status: "invalid", result: "no_email" });
-        await supabaseAdmin
-          .from("lead_verifications")
-          .upsert({
-            user_id: userId,
-            lead_id: id,
-            status: "invalid",
-            result: "no_email",
-            quality: "bad",
-            email: null,
-            verified_at: new Date().toISOString(),
-          });
+        await supabaseAdmin.from("lead_verifications").upsert({
+          user_id: userId,
+          lead_id: id,
+          status: "invalid",
+          result: "no_email",
+          quality: "bad",
+          email: null,
+          verified_at: new Date().toISOString(),
+        });
         continue;
       }
       toVerify.push({ id, email });
@@ -208,7 +209,14 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
           const r = await verifyOneEmail(apiKey, email);
           return { id, email, ...r, ok: true as const };
         } catch (err: any) {
-          return { id, email, result: "error", quality: "bad", ok: false as const, err: String(err?.message ?? "unknown") };
+          return {
+            id,
+            email,
+            result: "error",
+            quality: "bad",
+            ok: false as const,
+            err: String(err?.message ?? "unknown"),
+          };
         }
       }),
     );
@@ -244,7 +252,11 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
       });
     }
 
-    return { results, charged: toVerify.length - refunds, skipped: results.length - toVerify.length };
+    return {
+      results,
+      charged: toVerify.length - refunds,
+      skipped: results.length - toVerify.length,
+    };
   });
 
 // ---------- Load cached verifications for a set of lead ids ----------
@@ -258,11 +270,24 @@ export const loadLeadVerifications = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => LoadInput.parse(input))
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("lead_verifications")
-      .select("lead_id,status,result")
+      .select("lead_id,status,result,email")
       .eq("user_id", userId)
       .in("lead_id", data.leadIds);
     if (error) throw new Error(error.message);
-    return { verifications: rows ?? [] };
+    const { data: leads, error: leadsError } = await context.supabase
+      .from("leads")
+      .select("id,email")
+      .in("id", data.leadIds);
+    if (leadsError) throw new Error(leadsError.message);
+    const currentEmails = new Map(
+      (leads ?? []).map((lead) => [lead.id, lead.email?.toLowerCase() ?? null]),
+    );
+    return {
+      verifications: (rows ?? []).filter(
+        (row) => currentEmails.get(row.lead_id) === row.email?.toLowerCase(),
+      ),
+    };
   });
