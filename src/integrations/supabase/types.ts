@@ -1222,6 +1222,9 @@ export type Database = {
           full_name: string | null
           id: string
           ideal_customer: string | null
+          operator_autonomy_enabled: boolean
+          operator_notification_email: string | null
+          operator_notifications_enabled: boolean
           pricing_notes: string | null
           product_description: string | null
           product_name: string | null
@@ -1240,6 +1243,9 @@ export type Database = {
           full_name?: string | null
           id: string
           ideal_customer?: string | null
+          operator_autonomy_enabled?: boolean
+          operator_notification_email?: string | null
+          operator_notifications_enabled?: boolean
           pricing_notes?: string | null
           product_description?: string | null
           product_name?: string | null
@@ -1258,6 +1264,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           ideal_customer?: string | null
+          operator_autonomy_enabled?: boolean
+          operator_notification_email?: string | null
+          operator_notifications_enabled?: boolean
           pricing_notes?: string | null
           product_description?: string | null
           product_name?: string | null
