@@ -127,15 +127,29 @@ export async function processOperatorPipelines(db: any, limit = 4) {
     .order("created_at")
     .limit(limit);
   if (error) throw new Error(error.message);
-  const results = await Promise.all((events ?? []).map(async (event: any) => {
-    try {
-      return await advancePipeline(db, event);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Operator execution failed";
-      await db.from("operator_events").update({ status: "failed", error: message.slice(0, 1000) }).eq("id", event.id);
-      return { id: event.id, error: message };
-    }
-  }));
+  const results = await Promise.all(
+    (events ?? []).map(async (event: any) => {
+      const { data: claimed, error: claimError } = await db
+        .from("operator_events")
+        .update({ status: "processing" })
+        .eq("id", event.id)
+        .eq("status", "running")
+        .select("id")
+        .maybeSingle();
+      if (claimError) throw new Error(claimError.message);
+      if (!claimed) return { id: event.id, skipped: true };
+      try {
+        return await advancePipeline(db, event);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Operator execution failed";
+        await db
+          .from("operator_events")
+          .update({ status: "failed", error: message.slice(0, 1000) })
+          .eq("id", event.id);
+        return { id: event.id, error: message };
+      }
+    }),
+  );
   return results;
 }
 
@@ -292,7 +306,10 @@ function personalizeTemplate(template: { emails: any[]; callScript: any }, lead:
 }
 
 async function updateEvent(db: any, id: string, title: string, details: PipelineDetails) {
-  const { error } = await db.from("operator_events").update({ title, details }).eq("id", id);
+  const { error } = await db
+    .from("operator_events")
+    .update({ title, details, status: "running" })
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 
