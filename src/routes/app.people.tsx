@@ -894,8 +894,8 @@ function PeoplePage() {
         setVerifyProgress({ done, total: ids.length });
       }
       toast.success(`Verified ${ids.length.toLocaleString()} emails`);
-    } catch (e: any) {
-      toast.error(e.message ?? "Verification failed");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Verification failed");
     } finally {
       setVerifyBusy(false);
       setVerifyProgress(null);
@@ -940,8 +940,8 @@ function PeoplePage() {
       setPicked(new Set(result.ids));
       toast.success(`Imported ${result.imported.toLocaleString()} leads`);
       await startScoringJob(result.ids);
-    } catch (error: any) {
-      toast.error(error.message ?? "Lead import failed");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Lead import failed");
     } finally {
       setImportBusy(false);
       if (importInputRef.current) importInputRef.current.value = "";

@@ -200,8 +200,8 @@ export function AddToListDialog({
       onOpenChange(false);
       setNewName("");
       setNewDesc("");
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to add");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to add");
     } finally {
       setBusy(false);
     }
