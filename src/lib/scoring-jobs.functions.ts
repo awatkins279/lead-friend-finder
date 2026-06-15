@@ -116,7 +116,7 @@ export const processNextBatch = createServerFn({ method: "POST" })
     const { data: processed, error } = await supabaseAdmin.rpc("process_fast_scoring_batch_admin", { p_job_id: data.jobId, p_limit: 1000 });
     if (error) throw new Error(error.message);
     const count = Number(processed?.[0]?.processed ?? 0);
-    return { claimed: count > 0, results: [] as ScoreRow[], job: null, processed: count };
+    return { claimed: count > 0, results: [] as ScoreRow[], job: null, processed: count, error: undefined as string | undefined };
   });
 
 // Shared core: claim a single batch, score it, update bookkeeping.

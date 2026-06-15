@@ -1,6 +1,6 @@
-const SCORE_BATCH_SIZE = 15;
-const VERIFY_BATCH_SIZE = 25;
-const GENERATE_BATCH_SIZE = 4;
+const SCORE_BATCH_SIZE = 250;
+const VERIFY_BATCH_SIZE = 250;
+const GENERATE_BATCH_SIZE = 25;
 
 type Play = {
   name?: string;
@@ -40,7 +40,7 @@ export async function startOperatorPipeline(input: {
   scoreThreshold?: number;
 }) {
   const { db, userId, threadId, blueprintId, campaignId, offerBrief, play } = input;
-  const maxLeads = Math.min(Math.max(input.maxLeads, 1), 20_000);
+  const maxLeads = Math.min(Math.max(input.maxLeads, 1), 100_000);
   let query = db.from("leads").select("id").limit(maxLeads);
   const titles = cleanFilters(play.filters?.titles);
   const industries = cleanFilters(play.filters?.industries);
@@ -76,7 +76,7 @@ export async function startOperatorPipeline(input: {
     batches.push(leadIds.slice(index, index + SCORE_BATCH_SIZE));
   const { data: job, error: jobError } = await db
     .from("scoring_jobs")
-    .insert({ user_id: userId, context, total_batches: batches.length, total_leads: leadIds.length, status: "running" })
+    .insert({ user_id: userId, context, total_batches: batches.length, total_leads: leadIds.length, status: "running", scoring_mode: "hybrid_fast", rubric: buildFastRubric(context) })
     .select("id")
     .single();
   if (jobError || !job) throw new Error(jobError?.message ?? "Could not start lead scoring");
@@ -119,16 +119,15 @@ export async function processOperatorPipelines(db: any, limit = 4) {
     .order("created_at")
     .limit(limit);
   if (error) throw new Error(error.message);
-  const results = [];
-  for (const event of events ?? []) {
+  const results = await Promise.all((events ?? []).map(async (event: any) => {
     try {
-      results.push(await advancePipeline(db, event));
+      return await advancePipeline(db, event);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Operator execution failed";
       await db.from("operator_events").update({ status: "failed", error: message.slice(0, 1000) }).eq("id", event.id);
-      results.push({ id: event.id, error: message });
+      return { id: event.id, error: message };
     }
-  }
+  }));
   return results;
 }
 
@@ -276,4 +275,13 @@ async function updateEvent(db: any, id: string, title: string, details: Pipeline
 
 function cleanFilters(values?: string[]) {
   return (values ?? []).map((value) => String(value).replace(/[,%]/g, "").trim()).filter(Boolean).slice(0, 20);
+}
+
+function buildFastRubric(context: string) {
+  const normalized = context.toLowerCase();
+  const words = normalized.match(/[a-z][a-z0-9+.-]{2,}/g) ?? [];
+  const ignored = new Set(["the", "and", "for", "with", "that", "this", "from", "into", "sell", "selling", "want", "need", "company", "companies", "business", "leads"]);
+  const catalog = ["owner", "founder", "ceo", "president", "chief", "vp", "vice president", "director", "head", "manager"];
+  const industries = ["software", "saas", "healthcare", "financial", "insurance", "construction", "manufacturing", "real estate", "marketing", "technology", "retail", "logistics"];
+  return { titles: catalog.filter((value) => normalized.includes(value)), industries: industries.filter((value) => normalized.includes(value)), keywords: Array.from(new Set(words.filter((word) => !ignored.has(word)))).slice(0, 24), exclusions: ["student", "intern", "assistant"] };
 }

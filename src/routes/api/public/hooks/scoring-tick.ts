@@ -51,11 +51,23 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
 
           stats.jobs = jobs.length;
 
-          // Process jobs in parallel and score a small group of batches concurrently.
-          // The old serial loop only completed one or two batches per minute, which
-          // made a healthy 1,000-lead run look stuck for long periods.
+          // Hybrid jobs are scored in database-side blocks of up to 1,000 leads.
+          // This avoids model latency for the initial qualification pass.
           await Promise.all(
             jobs.map(async (job: { id: string }) => {
+              const { data: fastRows, error: fastError } = await supabaseAdmin.rpc(
+                "process_fast_scoring_batch_admin",
+                { p_job_id: job.id, p_limit: 5_000 },
+              );
+              if (fastError) {
+                stats.errors.push(`job ${job.id}: ${fastError.message}`);
+                return;
+              }
+              const fastCount = Number(fastRows?.[0]?.processed ?? 0);
+              if (fastCount > 0) {
+                stats.batchesProcessed += Math.ceil(fastCount / 250);
+                return;
+              }
               for (let i = 0; i < BATCHES_PER_JOB_PER_TICK; i += CONCURRENT_BATCHES_PER_JOB) {
                 if (Date.now() - startedAt > HARD_DEADLINE_MS) return;
                 const settled = await Promise.allSettled(
