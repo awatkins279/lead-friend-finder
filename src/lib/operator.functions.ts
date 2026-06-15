@@ -54,7 +54,7 @@ export const approveOperatorBlueprint = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ blueprintId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
-    const { data: blueprint, error: readError } = await db.from("operator_blueprints").select("id,thread_id,status").eq("id", data.blueprintId).eq("user_id", context.userId).maybeSingle();
+    const { data: blueprint, error: readError } = await db.from("operator_blueprints").select("id,thread_id,status,offer_brief,strategy,guardrails").eq("id", data.blueprintId).eq("user_id", context.userId).maybeSingle();
     if (readError || !blueprint) throw new Error("Campaign plan not found");
     if (blueprint.status !== "draft") throw new Error("Only a draft plan can be approved");
     const approvedAt = new Date().toISOString();
@@ -62,7 +62,36 @@ export const approveOperatorBlueprint = createServerFn({ method: "POST" })
     if (updateError) throw new Error(updateError.message);
     const { error: eventError } = await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "blueprint_approved", status: "completed", title: "Campaign plan approved", details: { approved_at: approvedAt, next: "Campaign build is authorized within the approved guardrails." } });
     if (eventError) throw new Error(eventError.message);
-    return { ok: true, status: "approved" as const };
+    const strategy = blueprint.strategy as {
+      plays?: Array<{ name?: string; audience?: string; hypothesis?: string; messagingAngle?: string; emailPlan?: string; callingPlan?: string }>;
+      schedule?: { followUpCadence?: string };
+    };
+    const plays = Array.isArray(strategy?.plays) ? strategy.plays.slice(0, 6) : [];
+    const createdCampaigns: Array<{ id: string; name: string }> = [];
+    for (const play of plays) {
+      const name = String(play.name ?? "Operator campaign").trim().slice(0, 160);
+      const description = [play.audience, play.hypothesis].filter(Boolean).join(" — ").slice(0, 2000) || null;
+      const { data: campaign, error: campaignError } = await db
+        .from("lists")
+        .insert({
+          user_id: context.userId,
+          name,
+          description,
+          what_selling: String(blueprint.offer_brief).slice(0, 4000),
+          key_selling_points: String(play.messagingAngle ?? "").slice(0, 4000) || null,
+          extra_instructions: [play.emailPlan, play.callingPlan].filter(Boolean).join("\n\n").slice(0, 4000) || null,
+          campaign_status: "draft",
+        })
+        .select("id,name")
+        .single();
+      if (campaignError || !campaign) {
+        await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "campaign_draft_failed", status: "failed", title: `Could not create ${name}`, error: campaignError?.message ?? "Unknown campaign error" });
+        continue;
+      }
+      createdCampaigns.push(campaign);
+      await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "campaign_draft_created", status: "completed", title: `Created draft campaign: ${campaign.name}`, details: { campaign_id: campaign.id, readiness: "Target leads, validate addresses, generate sequences, and connect sending accounts before launch." } });
+    }
+    return { ok: true, status: "approved" as const, createdCampaigns };
   });
 
 export const pauseOperatorBlueprint = createServerFn({ method: "POST" })
