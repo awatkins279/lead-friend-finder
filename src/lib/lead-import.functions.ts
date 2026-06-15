@@ -5,7 +5,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const importedLeadSchema = z.object({
   first_name: z.string().trim().max(200).optional().default(""),
   last_name: z.string().trim().max(200).optional().default(""),
-  email: z.string().trim().email().max(320).or(z.literal("")).optional().default(""),
+  // Keep malformed addresses so the lead can still be scored; the separate
+  // email-validation step is responsible for classifying them as invalid.
+  email: z.string().trim().max(320).optional().default(""),
   title: z.string().trim().max(300).optional().default(""),
   company: z.string().trim().max(300).optional().default(""),
   industry: z.string().trim().max(300).optional().default(""),
