@@ -53,7 +53,7 @@ export function AddToListDialog({
   const [busy, setBusy] = useState(false);
   const [minScore, setMinScore] = useState(70);
   const [overrides, setOverrides] = useState<Set<string>>(new Set());
-  const [deliverableOnly, setDeliverableOnly] = useState(true);
+  const [allowedVerification, setAllowedVerification] = useState<"deliverable" | "deliverable_risky">("deliverable");
 
   const isCampaign = mode === "campaign";
   const noun = isCampaign ? "campaign" : "list";
@@ -92,15 +92,16 @@ export function AddToListDialog({
         return s >= minScore;
       });
     }
-    if (showVerifyFilter && deliverableOnly) {
+    if (showVerifyFilter) {
       ids = ids.filter((id) => {
         if (overrides.has(id)) return true;
-        return leadVerifications!.get(id) === "deliverable";
+        const status = leadVerifications!.get(id);
+        return status === "deliverable" || (allowedVerification === "deliverable_risky" && status === "risky");
       });
     }
     return ids;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadIds, leadScores, minScore, overrides, showScoreFilter, leadVerifications, deliverableOnly, showVerifyFilter]);
+  }, [leadIds, leadScores, minScore, overrides, showScoreFilter, leadVerifications, allowedVerification, showVerifyFilter]);
 
   // Reset overrides when dialog opens
   useEffect(() => {
@@ -266,13 +267,25 @@ export function AddToListDialog({
 
         {showVerifyFilter && (
           <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-            <label className="flex cursor-pointer items-center gap-2">
-              <Checkbox
-                checked={deliverableOnly}
-                onCheckedChange={(v) => setDeliverableOnly(v === true)}
-              />
-              <span className="text-sm font-medium">Only add deliverable emails</span>
-            </label>
+            <div className="text-sm font-medium">Email quality to include</div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={allowedVerification === "deliverable" ? "default" : "outline"}
+                onClick={() => setAllowedVerification("deliverable")}
+              >
+                Deliverable only
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={allowedVerification === "deliverable_risky" ? "default" : "outline"}
+                onClick={() => setAllowedVerification("deliverable_risky")}
+              >
+                Deliverable + risky
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400">
                 {verifiedCounts.deliverable.toLocaleString()} deliverable
