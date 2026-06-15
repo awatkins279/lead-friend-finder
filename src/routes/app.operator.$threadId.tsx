@@ -4,10 +4,13 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Activity, ArrowUp, Bot, Check, CircleAlert, Clock3, FileCheck2, Loader2, Pause, Plus, Search, ShieldCheck, Target, Trash2 } from "lucide-react";
+import { Activity, Bot, Check, CircleAlert, Clock3, Database, FileCheck2, Globe2, Loader2, Pause, Plus, Search, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolPart } from "@/components/ai-elements/tool";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +36,7 @@ function OperatorPage() {
   const pausePlan = useServerFn(pauseOperatorBlueprint);
   const [input, setInput] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const workspaceQuery = useQuery({ queryKey: ["operator-workspace", threadId], queryFn: () => getWorkspace({ data: { threadId } }) });
   const threadsQuery = useQuery({ queryKey: ["operator-threads"], queryFn: () => getThreads() });
@@ -58,7 +61,6 @@ function OperatorWorkspace(props: any) {
   const [blueprint, setBlueprint] = useState<Blueprint | null>(workspace.blueprint);
   const [events, setEvents] = useState<any[]>(workspace.events);
   const [actionBusy, setActionBusy] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, sendMessage, status, error } = useChat({
     id: threadId,
     messages: workspace.messages as UIMessage[],
@@ -72,16 +74,21 @@ function OperatorWorkspace(props: any) {
     onError: (chatError) => toast.error(chatError.message.includes("402") ? "AI credits are exhausted. Add workspace credits to continue." : chatError.message),
   });
   const busy = status === "submitted" || status === "streaming";
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { inputRef.current?.focus(); }, [threadId, status, inputRef]);
+  useEffect(() => {
+    if (!busy && !actionBusy) return;
+    const refresh = window.setInterval(() => { void refreshWorkspace(); }, 1200);
+    return () => window.clearInterval(refresh);
+  }, [busy, actionBusy, threadId]);
 
   const refreshWorkspace = async () => {
     const data = await queryClient.fetchQuery({ queryKey: ["operator-workspace", threadId], queryFn: () => props.getWorkspace({ data: { threadId } }) });
     setBlueprint(data.blueprint); setEvents(data.events);
   };
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const text = input.trim();
+  const submit = async ({ text }: { text: string }) => {
+    const cleanText = text.trim();
+    const textToSend = cleanText || input.trim();
+    const text = textToSend;
     if (!text || busy) return;
     setInput("");
     await sendMessage({ text });
