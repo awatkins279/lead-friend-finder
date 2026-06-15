@@ -86,12 +86,10 @@ function OperatorWorkspace(props: any) {
     setBlueprint(data.blueprint); setEvents(data.events);
   };
   const submit = async ({ text }: { text: string }) => {
-    const cleanText = text.trim();
-    const textToSend = cleanText || input.trim();
-    const text = textToSend;
-    if (!text || busy) return;
+    const textToSend = text.trim() || input.trim();
+    if (!textToSend || busy) return;
     setInput("");
-    await sendMessage({ text });
+    await sendMessage({ text: textToSend });
   };
   const filteredThreads = threads.filter((thread: any) => thread.title.toLowerCase().includes(threadSearch.toLowerCase()));
 
@@ -108,13 +106,16 @@ function OperatorWorkspace(props: any) {
 
       <section className="flex min-h-0 flex-col border-r">
         <header className="flex h-16 items-center justify-between border-b px-5"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--gradient-aurora)] shadow-lg"><Bot className="h-4 w-4 text-primary-foreground" /></div><div><h1 className="text-sm font-semibold">NexusAi Campaign Operator</h1><p className="text-[11px] text-muted-foreground">Strategy, execution and optimization toward meetings</p></div></div><Badge variant="outline" className="gap-1.5 text-[10px]"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Online</Badge></header>
-        <div ref={scrollRef} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-6">
-          {messages.length === 0 && <div className="mx-auto mt-16 max-w-xl text-center"><div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--gradient-aurora)] shadow-[var(--shadow-glow)]"><Target className="h-6 w-6 text-primary-foreground" /></div><h2 className="text-2xl font-semibold tracking-tight">What do you want to sell?</h2><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">Give me the offer in plain English. I’ll inspect your setup, research the market, map audiences and channels, estimate capacity, then present the full campaign for approval.</p><div className="mt-6 flex flex-wrap justify-center gap-2">{["I sell contact-center solutions", "Build a campaign for my product info", "Review my campaigns and find the next opportunity"].map((prompt) => <Button key={prompt} variant="outline" size="sm" onClick={() => setInput(prompt)}>{prompt}</Button>)}</div></div>}
-          {messages.map((message: UIMessage) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={message.role === "user" ? "max-w-[82%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-sm text-primary-foreground" : "max-w-[92%] text-sm leading-6 text-foreground"}>{message.role === "assistant" && <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary"><Bot className="h-3.5 w-3.5" /> Operator</div>}{message.parts.map((part: any, index: number) => part.type === "text" ? <div key={index} className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-a:text-accent dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown></div> : part.type.startsWith("tool-") || part.type === "dynamic-tool" ? <div key={index} className="my-2 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"><Activity className="h-3.5 w-3.5 text-accent" /><span>{String(part.type).replace("tool-", "").replaceAll("_", " ")}</span><Badge variant="outline" className="ml-auto text-[9px]">{part.state?.replaceAll("-", " ") ?? "working"}</Badge></div> : null)}</div></div>)}
-          {status === "submitted" && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> Operator is assessing the next move…</div>}
-          {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error.message}</div>}
-        </div>
-        <form onSubmit={submit} className="border-t p-4"><div className="flex items-end gap-2 rounded-2xl border bg-background/60 p-2 shadow-lg focus-within:ring-1 focus-within:ring-primary"><Input ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Describe your offer, market, or what you want the Operator to do…" className="min-h-11 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0" disabled={busy} /><Button type="submit" size="icon" disabled={!input.trim() || busy} className="h-10 w-10 shrink-0 rounded-xl">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}</Button></div><p className="mt-2 text-center text-[10px] text-muted-foreground">Plans use live account data and cited research. Review all assumptions before approval.</p></form>
+        <Conversation className="min-h-0">
+          <ConversationContent className="gap-6 px-5 py-6">
+            {messages.length === 0 && <div className="mx-auto mt-16 max-w-xl text-center"><div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--gradient-aurora)] shadow-[var(--shadow-glow)]"><Target className="h-6 w-6 text-primary-foreground" /></div><h2 className="text-2xl font-semibold tracking-tight">What do you want to sell?</h2><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">Give me the offer in plain English. Watch the live activity feed while I inspect your setup, research the market, search your leads, and build the campaign map.</p><div className="mt-6 flex flex-wrap justify-center gap-2">{["I sell contact-center solutions", "Build a campaign for my product info", "Review my campaigns and find the next opportunity"].map((prompt) => <Button key={prompt} variant="outline" size="sm" onClick={() => setInput(prompt)}>{prompt}</Button>)}</div></div>}
+            {messages.map((message: UIMessage) => <Message from={message.role} key={message.id}><MessageContent className={message.role === "user" ? "bg-primary text-primary-foreground" : undefined}>{message.role === "assistant" && <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary"><Bot className="h-3.5 w-3.5" /> Operator</div>}{message.parts.map((part: any, index: number) => part.type === "text" ? <MessageResponse key={index} isAnimating={busy}>{part.text}</MessageResponse> : part.type.startsWith("tool-") || part.type === "dynamic-tool" ? <OperatorToolActivity key={index} part={part} /> : null)}</MessageContent></Message>)}
+            {status === "submitted" && <div className="flex items-center gap-2 text-xs"><Zap className="h-3.5 w-3.5 animate-pulse text-primary" /><Shimmer>Operator is deciding the next action…</Shimmer></div>}
+            {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error.message}</div>}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+        <div className="border-t p-4"><PromptInput onSubmit={submit} className="rounded-2xl bg-background/60 shadow-lg"><PromptInputTextarea ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Tell the Operator what to sell or what to investigate…" disabled={busy} className="min-h-16" /><PromptInputFooter className="justify-end"><PromptInputSubmit status={status} disabled={!input.trim() && !busy} /></PromptInputFooter></PromptInput><p className="mt-2 text-center text-[10px] text-muted-foreground">Every search, database check, and campaign action is shown live. Important actions still require approval.</p></div>
       </section>
 
       <aside className="min-h-0 overflow-y-auto bg-background/15 p-4">
