@@ -669,16 +669,6 @@ function PeoplePage() {
           }
 
           emptyClaims += 1;
-          if (emptyClaims > 30) {
-            try {
-              await finalizeScoringJobCall({ data: { jobId } });
-            } catch (error) {
-              console.error("Failed to force-finalize idle scoring job", error);
-            }
-            const afterFinalize = await syncJobSnapshot(jobId, runId, token);
-            if (afterFinalize.job.status !== "running") break;
-            emptyClaims = 0;
-          }
 
           await new Promise((r) => setTimeout(r, 1500));
         } catch (error: any) {

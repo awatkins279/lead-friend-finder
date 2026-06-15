@@ -17,7 +17,7 @@ export type ScoreRow = {
   gaps: string[];
 };
 
-const BATCH_SIZE = 25;
+const BATCH_SIZE = 15;
 const MAX_LEADS_PER_JOB = 20000;
 const PROCESSING_STALE_MS = 75_000;
 // How many batches to claim+score in parallel inside one processNextBatch call.
@@ -494,6 +494,14 @@ ${JSON.stringify(compact)}`;
         : [],
     }))
     .filter((s) => leadIds.includes(s.leadId));
+
+  const scoredIds = new Set(scores.map((score) => score.leadId));
+  const missingCount = leads.filter((lead: { id: string }) => !scoredIds.has(lead.id)).length;
+  if (missingCount > 0) {
+    throw new Error(
+      `AI returned an incomplete batch (${scores.length} of ${leads.length}); retrying`,
+    );
+  }
 
   return scores;
 }
