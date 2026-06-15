@@ -223,18 +223,17 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
         }
       }),
     );
-    const verifiedAt = new Date().toISOString();
-    const [{ error: verificationError }, { error: listError }] = await Promise.all([
-      db.from("lead_verifications").upsert(
-        verified.map((row) => ({ user_id: event.user_id, lead_id: row.id, status: row.status, result: row.result, quality: row.quality, email: row.email, verified_at: verifiedAt })),
-      ),
-      db.from("list_leads").upsert(
-        verified.map((row) => ({ list_id: details.campaign_id, lead_id: row.id, verification_status: row.status })),
-        { onConflict: "list_id,lead_id" },
-      ),
-    ]);
+    const { error: verificationError } = await db.from("lead_verifications").upsert(
+      verified.map((row) => ({ user_id: event.user_id, lead_id: row.id, status: row.status, result: row.result, quality: row.quality, email: row.email, verified_at: new Date().toISOString() })),
+    );
     if (verificationError) throw new Error(verificationError.message);
-    if (listError) throw new Error(listError.message);
+    const updates = await Promise.all(
+      verified.map((row: { id: string; status: string }) =>
+        db.from("list_leads").update({ verification_status: row.status }).eq("list_id", details.campaign_id).eq("lead_id", row.id),
+      ),
+    );
+    const failedUpdate = updates.find((result: any) => result.error);
+    if (failedUpdate?.error) throw new Error(failedUpdate.error.message);
     const total = details.progress_total ?? 0;
     const next = { ...details, validation_cursor: cursor + slice.length, progress_current: cursor + slice.length, progress_total: total, live_text: `Verifying email batch ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
     await updateEvent(db, event.id, `Validating emails · ${Math.min(cursor + slice.length, total)}/${total}`, next);
@@ -257,11 +256,9 @@ async function advanceGeneration(db: any, event: any, details: PipelineDetails) 
     ]);
     const template = details.outreach_template ?? await generateOutreach(campaign, {});
     const generated = (leads ?? []).map((lead: any) => personalizeTemplate(template, lead));
-    const { error: updateError } = await db.from("list_leads").upsert(
-      generated.map((item: any) => ({ list_id: details.campaign_id, lead_id: item.leadId, emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" })),
-      { onConflict: "list_id,lead_id" },
-    );
-    if (updateError) throw new Error(updateError.message);
+    const updates = await Promise.all(generated.map((item: any) => db.from("list_leads").update({ emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" }).eq("list_id", details.campaign_id).eq("lead_id", item.leadId)));
+    const failedUpdate = updates.find((result: any) => result.error);
+    if (failedUpdate?.error) throw new Error(failedUpdate.error.message);
     const total = details.progress_total ?? 0;
     const next = { ...details, outreach_template: template, generation_cursor: cursor + slice.length, generated: (details.generated ?? 0) + generated.length, phone_ready: (details.phone_ready ?? 0) + (leads ?? []).filter((lead: any) => Boolean(lead.phone)).length, progress_current: cursor + slice.length, progress_total: total, live_text: `Personalizing outreach for contacts ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
     await updateEvent(db, event.id, `Building emails and call plans · ${Math.min(cursor + slice.length, total)}/${total}`, next);
