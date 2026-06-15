@@ -1279,17 +1279,24 @@ function PeoplePage() {
 
         {/* Selection bar */}
         {hasSelection && (
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[oklch(0.70_0.18_290/0.08)] px-4 py-2.5 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[oklch(0.70_0.18_290/0.08)] px-4 py-2.5 text-sm">
             <div className="flex items-center gap-2">
               <span className="font-medium">{picked.size.toLocaleString()} leads selected</span>
               <span className="text-muted-foreground">· selection persists across pages</span>
             </div>
-            <button
-              onClick={clearSelection}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear selection
-            </button>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button size="sm" variant="outline" onClick={verifySelectedEmails} disabled={verifyBusy}>
+                {verifyBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-1 h-3 w-3" />}
+                Validate selected
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => keepVerificationResults(["deliverable"])}>
+                Keep deliverable
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => keepVerificationResults(["deliverable", "risky"])}>
+                Keep deliverable + risky
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSelection}>Clear</Button>
+            </div>
           </div>
         )}
 
@@ -1379,6 +1386,9 @@ function PeoplePage() {
                     Location
                   </TableHead>
                   <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Email status
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
                     AI Score
                   </TableHead>
                 </TableRow>
@@ -1387,7 +1397,7 @@ function PeoplePage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="py-12 text-center text-sm text-muted-foreground"
                     >
                       Loading…
@@ -1396,7 +1406,7 @@ function PeoplePage() {
                 ) : rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="py-12 text-center text-sm text-muted-foreground"
                     >
                       No leads match your filters.
@@ -1459,6 +1469,9 @@ function PeoplePage() {
                           <MapPin className="h-3 w-3" />
                           {[r.city, r.state].filter(Boolean).join(", ") || r.country || "—"}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <VerificationBadge status={verifications.get(r.id)} hasEmail={!!r.email} />
                       </TableCell>
                       <TableCell>
                         <ScoreBadge info={scores.get(r.id)} />
@@ -1561,6 +1574,30 @@ function PeoplePage() {
             placeholder="Describe your ideal customer profile…"
             className="border-white/10 bg-white/[0.03] text-xs"
           />
+
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void importAndScore(file);
+            }}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2 w-full border-dashed border-white/15 bg-white/[0.03]"
+            disabled={importBusy || scoringBusy}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importBusy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Upload className="mr-1 h-3 w-3" />}
+            Upload CSV and score leads
+          </Button>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+            Supports name, email, title, company, industry, location, phone, and LinkedIn columns. Up to 5,000 rows.
+          </p>
 
           {/* Threshold */}
           <div className="mt-4">
@@ -1917,6 +1954,7 @@ function PeoplePage() {
         onOpenChange={setCampaignOpen}
         leadIds={pickedIds}
         leadScores={campaignLeadScores}
+        leadVerifications={verifications}
         onAdded={() => setPicked(new Set())}
       />
       <AddToListDialog
