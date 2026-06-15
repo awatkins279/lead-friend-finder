@@ -63,7 +63,9 @@ export const launchCampaign = createServerFn({ method: "POST" })
       db.from("list_email_accounts").select("email_accounts(email_address, provider, status)").eq("list_id", list.id),
       db
         .from("list_leads")
-        .select("lead_id, emails, verification_status, lead:leads(email, first_name, last_name, org_name, title, phone)")
+        .select(
+          "lead_id, emails, verification_status, lead:leads(email, first_name, last_name, org_name, title, phone)",
+        )
         .eq("list_id", list.id),
     ]);
     if (!connection?.api_key || connection.status !== "active") throw new Error("Connect Instantly under Sending accounts first");
@@ -82,7 +84,9 @@ export const launchCampaign = createServerFn({ method: "POST" })
     );
     if (blockedByValidation.length > 0) {
       throw new Error(
-        `${blockedByValidation.length} prospect${blockedByValidation.length === 1 ? " is" : "s are"} not approved for sending. Validate emails and keep only Deliverable, or Deliverable + Risky, before launching.`,
+        `${blockedByValidation.length} prospect${
+          blockedByValidation.length === 1 ? " is" : "s are"
+        } not approved for sending. Validate emails and keep only Deliverable, or Deliverable + Risky, before launching.`,
       );
     }
     const prospects = emailReady;
