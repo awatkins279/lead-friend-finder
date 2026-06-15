@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { processOneBatch } from "@/lib/scoring-jobs.functions";
 
 // Background worker invoked by pg_cron every ~10s. Picks up to a small batch
@@ -12,7 +11,8 @@ import { processOneBatch } from "@/lib/scoring-jobs.functions";
 
 const MAX_JOBS_PER_TICK = 5;
 const BATCHES_PER_JOB_PER_TICK = 6;
-const HARD_DEADLINE_MS = 25_000;
+const CONCURRENT_BATCHES_PER_JOB = 3;
+const HARD_DEADLINE_MS = 45_000;
 
 export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
   server: {
@@ -25,6 +25,7 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
         }
 
         const startedAt = Date.now();
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const stats = {
           jobs: 0,
           batchesProcessed: 0,
@@ -50,25 +51,33 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
 
           stats.jobs = jobs.length;
 
-          // Process jobs in parallel; for each job, run BATCHES_PER_JOB_PER_TICK
-          // claim+score cycles serially to respect AI gateway rate limits.
+          // Process jobs in parallel and score a small group of batches concurrently.
+          // The old serial loop only completed one or two batches per minute, which
+          // made a healthy 1,000-lead run look stuck for long periods.
           await Promise.all(
             jobs.map(async (job: { id: string }) => {
-              for (let i = 0; i < BATCHES_PER_JOB_PER_TICK; i++) {
+              for (let i = 0; i < BATCHES_PER_JOB_PER_TICK; i += CONCURRENT_BATCHES_PER_JOB) {
                 if (Date.now() - startedAt > HARD_DEADLINE_MS) return;
-                try {
-                  const r = await processOneBatch(supabaseAdmin, job.id, true);
-                  if (r.claimed) {
-                    stats.batchesProcessed += 1;
+                const settled = await Promise.allSettled(
+                  Array.from({ length: CONCURRENT_BATCHES_PER_JOB }, () =>
+                    processOneBatch(supabaseAdmin, job.id, true),
+                  ),
+                );
+                let claimedInGroup = 0;
+                for (const result of settled) {
+                  if (result.status === "fulfilled") {
+                    if (result.value.claimed) {
+                      claimedInGroup += 1;
+                      stats.batchesProcessed += 1;
+                    } else {
+                      stats.batchesIdle += 1;
+                    }
                   } else {
-                    stats.batchesIdle += 1;
-                    break; // nothing left to claim for this job
+                    const msg = String(result.reason?.message ?? result.reason).slice(0, 200);
+                    stats.errors.push(`job ${job.id}: ${msg}`);
                   }
-                } catch (err: any) {
-                  const msg = String(err?.message ?? err).slice(0, 200);
-                  stats.errors.push(`job ${job.id}: ${msg}`);
-                  // Don't break — try next batch (could be a transient AI error)
                 }
+                if (claimedInGroup === 0) break;
               }
 
               // Finalize only after every batch is terminal. The previous

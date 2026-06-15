@@ -188,16 +188,19 @@ function OperatorWorkspace(props: any) {
       ),
   });
   const busy = status === "submitted" || status === "streaming";
+  const activeEvent = events.find((event: any) => event.status === "running") ?? null;
+  const hasActiveWork = busy || actionBusy || Boolean(activeEvent) || blueprint?.status === "running";
   useEffect(() => {
     inputRef.current?.focus();
   }, [threadId, status, inputRef]);
   useEffect(() => {
-    if (!busy && !actionBusy) return;
+    if (!hasActiveWork) return;
+    void refreshWorkspace();
     const refresh = window.setInterval(() => {
       void refreshWorkspace();
-    }, 1200);
+    }, 1500);
     return () => window.clearInterval(refresh);
-  }, [busy, actionBusy, threadId]);
+  }, [hasActiveWork, threadId]);
 
   const refreshWorkspace = async () => {
     const data = await queryClient.fetchQuery({
@@ -462,13 +465,14 @@ function OperatorWorkspace(props: any) {
             }}
           />
         )}
+        <LiveOperatorScreen event={activeEvent} chatBusy={busy} />
         <div className="mt-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock3 className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold">Live activity</h3>
             </div>
-            {busy && (
+            {hasActiveWork && (
               <Badge variant="outline" className="gap-1 text-[9px]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Watching
               </Badge>

@@ -23,6 +23,9 @@ type PipelineDetails = {
   generation_cursor?: number;
   generated?: number;
   phone_ready?: number;
+  progress_current?: number;
+  progress_total?: number;
+  live_text?: string;
 };
 
 export async function startOperatorPipeline(input: {
@@ -89,6 +92,9 @@ export async function startOperatorPipeline(input: {
     stage: "scoring",
     score_threshold: input.scoreThreshold ?? 60,
     target_count: leadIds.length,
+    progress_current: 0,
+    progress_total: leadIds.length,
+    live_text: `Loading the first ${Math.min(SCORE_BATCH_SIZE, leadIds.length)} contacts for ICP scoring`,
   };
   const { error: eventError } = await db.from("operator_events").insert({
     thread_id: threadId,
@@ -141,7 +147,13 @@ async function advanceScoring(db: any, event: any, details: PipelineDetails) {
     .single();
   if (error || !job) throw new Error(error?.message ?? "Scoring job disappeared");
   if (job.status === "running") {
-    await updateEvent(db, event.id, `Scoring contacts · ${job.scored_leads}/${job.total_leads}`, details);
+    const next = {
+      ...details,
+      progress_current: job.scored_leads,
+      progress_total: job.total_leads,
+      live_text: `Comparing contact ${Math.min(job.scored_leads + 1, job.total_leads)}-${Math.min(job.scored_leads + SCORE_BATCH_SIZE, job.total_leads)} against the campaign ICP`,
+    };
+    await updateEvent(db, event.id, `Scoring contacts · ${job.scored_leads}/${job.total_leads}`, next);
     return { id: event.id, stage: "scoring" };
   }
   const { data: batches, error: batchError } = await db
@@ -158,7 +170,7 @@ async function advanceScoring(db: any, event: any, details: PipelineDetails) {
       score: Number(row.score),
       research: { reasoning: row.reasoning ?? "", ipp_breakdown: row.signals ?? [], strengths: row.strengths ?? [], gaps: row.gaps ?? [] },
     }));
-  const next: PipelineDetails = { ...details, stage: "validating", qualified, validation_cursor: 0, deliverable: [] };
+  const next: PipelineDetails = { ...details, stage: "validating", qualified, validation_cursor: 0, deliverable: [], progress_current: 0, progress_total: qualified.length, live_text: "Checking qualified email addresses for deliverability" };
   await updateEvent(db, event.id, `Validating ${qualified.length.toLocaleString()} qualified email addresses`, next);
   return { id: event.id, stage: "validating", qualified: qualified.length };
 }
@@ -195,7 +207,7 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
       ...(details.deliverable ?? []),
       ...verified.filter((row) => row.status === "deliverable").map((row) => byId.get(row.id)).filter(Boolean),
     ] as PipelineDetails["deliverable"];
-    const next = { ...details, validation_cursor: cursor + slice.length, deliverable };
+    const next = { ...details, validation_cursor: cursor + slice.length, deliverable, progress_current: cursor + slice.length, progress_total: qualified.length, live_text: `Verifying email batch ${cursor + 1}-${Math.min(cursor + slice.length, qualified.length)}` };
     await updateEvent(db, event.id, `Validating emails · ${Math.min(cursor + slice.length, qualified.length)}/${qualified.length}`, next);
     return { id: event.id, stage: "validating", processed: slice.length };
   }
@@ -207,7 +219,7 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
     );
     if (error) throw new Error(error.message);
   }
-  const next: PipelineDetails = { ...details, qualified: undefined, stage: "generating", generation_cursor: 0, generated: 0, phone_ready: 0 };
+  const next: PipelineDetails = { ...details, qualified: undefined, stage: "generating", generation_cursor: 0, generated: 0, phone_ready: 0, progress_current: 0, progress_total: deliverable.length, live_text: "Writing personalized email sequences and call plans" };
   await updateEvent(db, event.id, `Generating personalized outreach for ${deliverable.length.toLocaleString()} validated contacts`, next);
   return { id: event.id, stage: "generating", deliverable: deliverable.length };
 }
@@ -226,7 +238,7 @@ async function advanceGeneration(db: any, event: any, details: PipelineDetails) 
       const { error } = await db.from("list_leads").update({ emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" }).eq("list_id", details.campaign_id).eq("lead_id", item.leadId);
       if (error) throw new Error(error.message);
     }
-    const next = { ...details, generation_cursor: cursor + slice.length, generated: (details.generated ?? 0) + generated.length, phone_ready: (details.phone_ready ?? 0) + (leads ?? []).filter((lead: any) => Boolean(lead.phone)).length };
+    const next = { ...details, generation_cursor: cursor + slice.length, generated: (details.generated ?? 0) + generated.length, phone_ready: (details.phone_ready ?? 0) + (leads ?? []).filter((lead: any) => Boolean(lead.phone)).length, progress_current: cursor + slice.length, progress_total: deliverable.length, live_text: `Personalizing outreach for contacts ${cursor + 1}-${Math.min(cursor + slice.length, deliverable.length)}` };
     await updateEvent(db, event.id, `Building emails and call plans · ${Math.min(cursor + slice.length, deliverable.length)}/${deliverable.length}`, next);
     return { id: event.id, stage: "generating", processed: slice.length };
   }
