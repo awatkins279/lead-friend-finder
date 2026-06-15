@@ -46,6 +46,7 @@ import {
   Sparkles,
   ListPlus,
   Send,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -68,6 +69,7 @@ import {
   loadLeadVerifications as loadLeadVerificationsFn,
 } from "@/lib/verify.functions";
 import { ShieldCheck } from "lucide-react";
+import { importLeadsForScoring as importLeadsForScoringFn } from "@/lib/lead-import.functions";
 
 type VerificationStatus = "deliverable" | "risky" | "invalid" | "disposable" | "unknown";
 
@@ -173,6 +175,44 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
 
+const IMPORT_HEADER_ALIASES: Record<string, string> = {
+  firstname: "first_name", first: "first_name", lastname: "last_name", last: "last_name",
+  emailaddress: "email", jobtitle: "title", companyname: "company", organization: "company",
+  companyindustry: "industry", companysize: "company_size", employeecount: "company_size",
+  phonenumber: "phone", linkedin: "linkedin_url", linkedinurl: "linkedin_url",
+  website: "company_website", companywebsite: "company_website", description: "company_description",
+};
+
+function parseCsvLeads(text: string): Array<Record<string, string>> {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '"') {
+      if (quoted && text[i + 1] === '"') { cell += '"'; i += 1; }
+      else quoted = !quoted;
+    } else if (char === "," && !quoted) { row.push(cell); cell = ""; }
+    else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[i + 1] === "\n") i += 1;
+      row.push(cell); cell = "";
+      if (row.some((value) => value.trim())) records.push(row);
+      row = [];
+    } else cell += char;
+  }
+  row.push(cell);
+  if (row.some((value) => value.trim())) records.push(row);
+  if (records.length < 2) return [];
+  const headers = records[0].map((header) => {
+    const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    return IMPORT_HEADER_ALIASES[normalized] ?? header.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  });
+  return records.slice(1).map((values) =>
+    Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? "").trim()])),
+  );
+}
+
 function escapeForOr(v: string) {
   // PostgREST .or() uses commas as separators; escape them in user input.
   return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -263,6 +303,8 @@ function PeoplePage() {
   const [verifications, setVerifications] = useState<Map<string, VerificationStatus>>(new Map());
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyProgress, setVerifyProgress] = useState<{ done: number; total: number } | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
@@ -271,6 +313,7 @@ function PeoplePage() {
   const finalizeScoringJobCall = useServerFn(finalizeScoringJobFn);
   const verifyLeadEmailsBatchCall = useServerFn(verifyLeadEmailsBatchFn);
   const loadLeadVerificationsCall = useServerFn(loadLeadVerificationsFn);
+  const importLeadsForScoringCall = useServerFn(importLeadsForScoringFn);
 
   useEffect(() => setPage(0), [filters]);
 
