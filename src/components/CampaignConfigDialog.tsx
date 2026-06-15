@@ -224,7 +224,7 @@ export function CampaignConfigDialog({
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> Email generator config
+            <Sparkles className="h-4 w-4 text-primary" /> Campaign & sending setup
           </DialogTitle>
           <DialogDescription>
             Set up your campaign once — every prospect's sequence is generated against this context.
@@ -232,6 +232,53 @@ export function CampaignConfigDialog({
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          <div className="space-y-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div>
+              <p className="text-sm font-semibold">Sending schedule</p>
+              <p className="text-xs text-muted-foreground">Choose exactly when this campaign is allowed to send.</p>
+            </div>
+            <Field label="Sending days">
+              <div className="flex flex-wrap gap-2">
+                {SEND_DAYS.map((day) => {
+                  const selected = cfg.sending_days.includes(day.value);
+                  return (
+                    <Button
+                      key={day.value}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      onClick={() => update("sending_days", selected ? cfg.sending_days.filter((value) => value !== day.value) : [...cfg.sending_days, day.value])}
+                    >
+                      {day.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </Field>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Start time"><Input type="time" value={cfg.sending_start_time} onChange={(e) => update("sending_start_time", e.target.value)} /></Field>
+              <Field label="End time"><Input type="time" value={cfg.sending_end_time} onChange={(e) => update("sending_end_time", e.target.value)} /></Field>
+              <Field label="Time zone">
+                <Select value={cfg.sending_timezone} onValueChange={(value) => update("sending_timezone", value)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="America/Detroit">Eastern</SelectItem>
+                    <SelectItem value="America/Chicago">Central</SelectItem>
+                    <SelectItem value="America/Denver">Mountain</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific</SelectItem>
+                    <SelectItem value="America/Phoenix">Arizona</SelectItem>
+                    <SelectItem value="America/Anchorage">Alaska</SelectItem>
+                    <SelectItem value="Pacific/Honolulu">Hawaii</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Days between follow-ups"><Input type="number" min={1} max={30} value={cfg.follow_up_delay_days} onChange={(e) => update("follow_up_delay_days", Math.max(1, Math.min(30, Number(e.target.value) || 1)))} /></Field>
+              <Field label="Minutes between each send"><Input type="number" min={1} max={1440} value={cfg.email_gap_minutes} onChange={(e) => update("email_gap_minutes", Math.max(1, Math.min(1440, Number(e.target.value) || 1)))} /></Field>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <Field label="Campaign name">
               <Input value={cfg.name} onChange={(e) => update("name", e.target.value)} />
@@ -351,53 +398,6 @@ export function CampaignConfigDialog({
               placeholder="Friendly, conversational tone. First email CTA should be like: 'if you could save 50% on your call center costs…'"
             />
           </Field>
-
-          <div className="space-y-4 rounded-lg border p-4">
-            <div>
-              <p className="text-sm font-medium">Sending schedule</p>
-              <p className="text-xs text-muted-foreground">Emails only send during this window. Follow-ups wait the number of days you choose.</p>
-            </div>
-            <Field label="Sending days">
-              <div className="flex flex-wrap gap-2">
-                {SEND_DAYS.map((day) => {
-                  const selected = cfg.sending_days.includes(day.value);
-                  return (
-                    <Button
-                      key={day.value}
-                      type="button"
-                      size="sm"
-                      variant={selected ? "default" : "outline"}
-                      onClick={() => update("sending_days", selected ? cfg.sending_days.filter((value) => value !== day.value) : [...cfg.sending_days, day.value])}
-                    >
-                      {day.label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </Field>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Start time"><Input type="time" value={cfg.sending_start_time} onChange={(e) => update("sending_start_time", e.target.value)} /></Field>
-              <Field label="End time"><Input type="time" value={cfg.sending_end_time} onChange={(e) => update("sending_end_time", e.target.value)} /></Field>
-              <Field label="Time zone">
-                <Select value={cfg.sending_timezone} onValueChange={(value) => update("sending_timezone", value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="America/New_York">Eastern</SelectItem>
-                    <SelectItem value="America/Chicago">Central</SelectItem>
-                    <SelectItem value="America/Denver">Mountain</SelectItem>
-                    <SelectItem value="America/Los_Angeles">Pacific</SelectItem>
-                    <SelectItem value="America/Phoenix">Arizona</SelectItem>
-                    <SelectItem value="America/Anchorage">Alaska</SelectItem>
-                    <SelectItem value="Pacific/Honolulu">Hawaii</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Days between sequence emails"><Input type="number" min={1} max={30} value={cfg.follow_up_delay_days} onChange={(e) => update("follow_up_delay_days", Math.max(1, Math.min(30, Number(e.target.value) || 1)))} /></Field>
-              <Field label="Minutes between sends"><Input type="number" min={1} max={1440} value={cfg.email_gap_minutes} onChange={(e) => update("email_gap_minutes", Math.max(1, Math.min(1440, Number(e.target.value) || 1)))} /></Field>
-            </div>
-          </div>
 
           <Field label="Positive reply alerts" hint="When a prospect is interested or books a meeting, send an alert containing their reply and the AI SDR's response. Add this email to your phone's mail app for phone alerts.">
             <div className="flex items-center gap-2">
