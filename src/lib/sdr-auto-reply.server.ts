@@ -158,6 +158,13 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
       supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
       supabase.from("sdr_reply_jobs").update({ status: "needs_approval", draft_message_id: draft.id, completed_at: new Date().toISOString() }).eq("id", job.id),
     ]);
+    await sendPositiveReplyAlert(supabase, {
+      job,
+      conversation,
+      inboundText: String(inbound.body_text ?? ""),
+      aiReply: reply,
+      from,
+    });
     return { status: "needs_approval" as const };
   }
 

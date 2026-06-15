@@ -18,7 +18,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2, Rocket, PauseCircle } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Mail, Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2, Rocket, PauseCircle, CalendarClock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
@@ -552,6 +552,9 @@ function ListDetailPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
+              <CalendarClock className="mr-2 h-3.5 w-3.5" /> Sending schedule
+            </Button>
             {campaignStatus === "active" ? (
               <Button size="sm" variant="outline" onClick={handlePause} disabled={launchBusy}>
                 {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <PauseCircle className="mr-2 h-3.5 w-3.5" />}
@@ -564,7 +567,7 @@ function ListDetailPage() {
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => setConfigOpen(true)}>
-              <Settings2 className="mr-2 h-3.5 w-3.5" /> Campaign config
+              <Settings2 className="mr-2 h-3.5 w-3.5" /> Campaign setup
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCallConfigOpen(true)}>
               <Headphones className="mr-2 h-3.5 w-3.5" /> Calling config
@@ -715,7 +718,7 @@ function ListDetailPage() {
             <AlertDialogDescription>
               {campaignStatus === "paused"
                 ? "Sending will continue through your assigned mailboxes using the existing schedule."
-                : `This will start the generated email sequence for ${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length} ready prospect${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length === 1 ? "" : "s"}. Emails send on weekdays from 9 AM–5 PM Eastern, stop when a prospect replies, and use the mailboxes selected in Campaign config.`}
+                : `This will start the generated email sequence for ${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length} ready prospect${(rows ?? []).filter((row) => row.lead?.email && effectiveEmails(row).length > 0).length === 1 ? "" : "s"}. Emails send only on your selected days from ${String(list?.sending_start_time ?? "09:00").slice(0, 5)} to ${String(list?.sending_end_time ?? "17:00").slice(0, 5)} (${list?.sending_timezone ?? "Eastern"}), stop when a prospect replies, and use the mailboxes selected in Campaign setup.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
