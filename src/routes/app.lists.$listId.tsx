@@ -173,6 +173,7 @@ function ListDetailPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "email" | "calling">("email");
   const [pendingCallLeadId, setPendingCallLeadId] = useState<string | null>(null);
   const [confirmScripts, setConfirmScripts] = useState(false);
+  const [confirmEmails, setConfirmEmails] = useState(false);
   const [confirmLaunch, setConfirmLaunch] = useState(false);
   const [launchBusy, setLaunchBusy] = useState(false);
   const [callCfg, setCallCfg] = useState<CallingConfig>(DEFAULT_CALLING_CONFIG);
@@ -268,16 +269,18 @@ function ListDetailPage() {
     }
   };
 
-  const runAll = async () => {
+  const runAll = async (force = false) => {
     if (!isConfigured) {
       toast.error("Set up the campaign first");
       setConfigOpen(true);
       return;
     }
     const target = list?.num_emails ?? 4;
-    const pending = (rows ?? []).filter(
-      (r) => r.status !== "enriched" || (r.emails?.length ?? 0) < target,
-    );
+    const pending = force
+      ? (rows ?? [])
+      : (rows ?? []).filter(
+          (r) => r.status !== "enriched" || effectiveEmails(r).length < target,
+        );
     if (pending.length === 0) return toast.info("All prospects already have full sequences");
 
     const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
@@ -312,11 +315,20 @@ function ListDetailPage() {
 
     setProgress((p) => (p?.cancel ? null : p));
     if (!state.cancel) {
-      toast.success(`Generated sequences for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      toast.success(`${force ? "Regenerated" : "Generated"} sequences for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
       setTimeout(() => setProgress(null), 1500);
     } else {
       toast.info(`Stopped after ${state.done} of ${state.total}`);
     }
+  };
+
+  const requestRunAllEmails = () => {
+    const hasExistingSequences = (rows ?? []).some((row) => effectiveEmails(row).length > 0);
+    if (hasExistingSequences) {
+      setConfirmEmails(true);
+      return;
+    }
+    void runAll(false);
   };
 
   const runVerifyAll = async () => {
@@ -585,7 +597,7 @@ function ListDetailPage() {
             )}
             <Button
               size="sm"
-              onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
+              onClick={activeTab === "calling" ? requestRunAllScripts : requestRunAllEmails}
               disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
             >
               {isRunning ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
@@ -593,7 +605,9 @@ function ListDetailPage() {
                 ? "Generating…"
                 : activeTab === "calling"
                   ? "Generate all scripts"
-                  : "Generate all sequences"}
+                  : (rows ?? []).some((row) => effectiveEmails(row).length > 0)
+                    ? "Regenerate all sequences"
+                    : "Generate all sequences"}
             </Button>
           </div>
         </div>
@@ -707,6 +721,23 @@ function ListDetailPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={runAllScripts}>Rewrite all scripts</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmEmails} onOpenChange={setConfirmEmails}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate all email sequences?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will rewrite the existing emails for all {rows?.length ?? 0} prospects using your current Campaign setup. Any edits made to individual email drafts will be replaced.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmEmails(false); void runAll(true); }}>
+              Rewrite all emails
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
