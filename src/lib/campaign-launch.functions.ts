@@ -46,7 +46,10 @@ export const launchCampaign = createServerFn({ method: "POST" })
     if (listError || !list) throw new Error("Campaign not found");
 
     if (list.instantly_campaign_id) {
-      await instantlyRequest((await getConnection(db, context.userId)).api_key, `/campaigns/${list.instantly_campaign_id}/activate`, { method: "POST" });
+      await instantlyRequest((await getConnection(db, context.userId)).api_key, `/campaigns/${list.instantly_campaign_id}/activate`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
       await db.from("lists").update({ campaign_status: "active", launched_at: new Date().toISOString() }).eq("id", list.id);
       return { status: "active" as const, resumed: true };
     }
@@ -133,7 +136,10 @@ export const launchCampaign = createServerFn({ method: "POST" })
         method: "POST",
         body: JSON.stringify({ campaign_id: instantlyCampaignId, leads, skip_if_in_workspace: false, skip_if_in_campaign: false }),
       });
-      await instantlyRequest(connection.api_key, `/campaigns/${instantlyCampaignId}/activate`, { method: "POST" });
+      await instantlyRequest(connection.api_key, `/campaigns/${instantlyCampaignId}/activate`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
     } catch (error) {
       await instantlyRequest(connection.api_key, `/campaigns/${instantlyCampaignId}`, { method: "DELETE" }).catch(() => null);
       throw error;
@@ -161,7 +167,10 @@ export const pauseCampaign = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!list?.instantly_campaign_id) throw new Error("This campaign has not been launched yet");
     const connection = await getConnection(db, context.userId);
-    await instantlyRequest(connection.api_key, `/campaigns/${list.instantly_campaign_id}/pause`, { method: "POST" });
+    await instantlyRequest(connection.api_key, `/campaigns/${list.instantly_campaign_id}/pause`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
     const { error } = await db.from("lists").update({ campaign_status: "paused" }).eq("id", list.id);
     if (error) throw new Error(error.message);
     return { status: "paused" as const };
