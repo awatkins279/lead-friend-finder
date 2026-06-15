@@ -833,11 +833,11 @@ function PeoplePage() {
     [scoredEligibleIds, verifications],
   );
 
-  const verifyScoredEmails = async () => {
+  const verifyEmails = async (requestedIds: string[]) => {
     if (verifyBusy) return;
-    const ids = unverifiedScoredIds;
+    const ids = requestedIds.filter((id) => !verifications.has(id));
     if (ids.length === 0) {
-      toast.info("All scored leads have already been verified.");
+      toast.info("Those leads have already been verified.");
       return;
     }
     setVerifyBusy(true);
@@ -872,6 +872,49 @@ function PeoplePage() {
     }
   };
 
+  const verifyScoredEmails = () => verifyEmails(scoredEligibleIds);
+  const verifySelectedEmails = () => verifyEmails(Array.from(picked));
+
+  const keepVerificationResults = (allowed: VerificationStatus[]) => {
+    const allowedSet = new Set(allowed);
+    setPicked((previous) => new Set(Array.from(previous).filter((id) => allowedSet.has(verifications.get(id) ?? "unknown"))));
+    toast.success(
+      allowed.length === 1
+        ? "Kept deliverable emails only"
+        : "Kept deliverable and risky emails",
+    );
+  };
+
+  const importAndScore = async (file: File) => {
+    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
+      toast.error("Describe your ideal customer profile before importing");
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Upload a CSV file");
+      return;
+    }
+    if (file.size > 5_000_000) {
+      toast.error("CSV files must be 5 MB or smaller");
+      return;
+    }
+    setImportBusy(true);
+    try {
+      const leads = parseCsvLeads(await file.text());
+      if (leads.length === 0) throw new Error("No lead rows were found in the CSV");
+      if (leads.length > 5000) throw new Error("Import up to 5,000 leads at a time");
+      const result = await importLeadsForScoringCall({ data: { leads } });
+      setPicked(new Set(result.ids));
+      toast.success(`Imported ${result.imported.toLocaleString()} leads`);
+      await startScoringJob(result.ids);
+    } catch (error: any) {
+      toast.error(error.message ?? "Lead import failed");
+    } finally {
+      setImportBusy(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
   const hasSelection = picked.size > 0;
 
   // Stable arrays/maps for child dialogs so they don't re-render every keystroke
@@ -880,6 +923,31 @@ function PeoplePage() {
     () => new Map(pickedIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
     [pickedIds, scores],
   );
+
+  useEffect(() => {
+    const missing = pickedIds.filter((id) => !verifications.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        for (let i = 0; i < missing.length; i += 5000) {
+          const result = await loadLeadVerificationsCall({ data: { leadIds: missing.slice(i, i + 5000) } });
+          if (cancelled) return;
+          setVerifications((previous) => {
+            const next = new Map(previous);
+            for (const row of result.verifications as Array<{ lead_id: string; status: string }>) {
+              next.set(row.lead_id, row.status as VerificationStatus);
+            }
+            return next;
+          });
+        }
+      } catch (error) {
+        console.warn("Failed to load selected email validations", error);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickedIds.join(",")]);
 
   // Lazily fetch heavy detail fields only when the side sheet opens
   const { data: selectedDetail } = useQuery({
