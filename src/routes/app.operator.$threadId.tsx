@@ -4,10 +4,13 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Activity, ArrowUp, Bot, Check, CircleAlert, Clock3, FileCheck2, Loader2, Pause, Plus, Search, ShieldCheck, Target, Trash2 } from "lucide-react";
+import { Activity, Bot, Check, CircleAlert, Clock3, Database, FileCheck2, Globe2, Loader2, Pause, Plus, Search, ShieldCheck, Target, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolPart } from "@/components/ai-elements/tool";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +36,7 @@ function OperatorPage() {
   const pausePlan = useServerFn(pauseOperatorBlueprint);
   const [input, setInput] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const workspaceQuery = useQuery({ queryKey: ["operator-workspace", threadId], queryFn: () => getWorkspace({ data: { threadId } }) });
   const threadsQuery = useQuery({ queryKey: ["operator-threads"], queryFn: () => getThreads() });
@@ -58,7 +61,6 @@ function OperatorWorkspace(props: any) {
   const [blueprint, setBlueprint] = useState<Blueprint | null>(workspace.blueprint);
   const [events, setEvents] = useState<any[]>(workspace.events);
   const [actionBusy, setActionBusy] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, sendMessage, status, error } = useChat({
     id: threadId,
     messages: workspace.messages as UIMessage[],
@@ -72,19 +74,22 @@ function OperatorWorkspace(props: any) {
     onError: (chatError) => toast.error(chatError.message.includes("402") ? "AI credits are exhausted. Add workspace credits to continue." : chatError.message),
   });
   const busy = status === "submitted" || status === "streaming";
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, status]);
   useEffect(() => { inputRef.current?.focus(); }, [threadId, status, inputRef]);
+  useEffect(() => {
+    if (!busy && !actionBusy) return;
+    const refresh = window.setInterval(() => { void refreshWorkspace(); }, 1200);
+    return () => window.clearInterval(refresh);
+  }, [busy, actionBusy, threadId]);
 
   const refreshWorkspace = async () => {
     const data = await queryClient.fetchQuery({ queryKey: ["operator-workspace", threadId], queryFn: () => props.getWorkspace({ data: { threadId } }) });
     setBlueprint(data.blueprint); setEvents(data.events);
   };
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const text = input.trim();
-    if (!text || busy) return;
+  const submit = async ({ text }: { text: string }) => {
+    const textToSend = text.trim() || input.trim();
+    if (!textToSend || busy) return;
     setInput("");
-    await sendMessage({ text });
+    await sendMessage({ text: textToSend });
   };
   const filteredThreads = threads.filter((thread: any) => thread.title.toLowerCase().includes(threadSearch.toLowerCase()));
 
@@ -101,22 +106,40 @@ function OperatorWorkspace(props: any) {
 
       <section className="flex min-h-0 flex-col border-r">
         <header className="flex h-16 items-center justify-between border-b px-5"><div className="flex items-center gap-3"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--gradient-aurora)] shadow-lg"><Bot className="h-4 w-4 text-primary-foreground" /></div><div><h1 className="text-sm font-semibold">NexusAi Campaign Operator</h1><p className="text-[11px] text-muted-foreground">Strategy, execution and optimization toward meetings</p></div></div><Badge variant="outline" className="gap-1.5 text-[10px]"><span className="h-1.5 w-1.5 rounded-full bg-accent" /> Online</Badge></header>
-        <div ref={scrollRef} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-6">
-          {messages.length === 0 && <div className="mx-auto mt-16 max-w-xl text-center"><div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--gradient-aurora)] shadow-[var(--shadow-glow)]"><Target className="h-6 w-6 text-primary-foreground" /></div><h2 className="text-2xl font-semibold tracking-tight">What do you want to sell?</h2><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">Give me the offer in plain English. I’ll inspect your setup, research the market, map audiences and channels, estimate capacity, then present the full campaign for approval.</p><div className="mt-6 flex flex-wrap justify-center gap-2">{["I sell contact-center solutions", "Build a campaign for my product info", "Review my campaigns and find the next opportunity"].map((prompt) => <Button key={prompt} variant="outline" size="sm" onClick={() => setInput(prompt)}>{prompt}</Button>)}</div></div>}
-          {messages.map((message: UIMessage) => <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}><div className={message.role === "user" ? "max-w-[82%] rounded-2xl rounded-br-md bg-primary px-4 py-3 text-sm text-primary-foreground" : "max-w-[92%] text-sm leading-6 text-foreground"}>{message.role === "assistant" && <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary"><Bot className="h-3.5 w-3.5" /> Operator</div>}{message.parts.map((part: any, index: number) => part.type === "text" ? <div key={index} className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-a:text-accent dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown></div> : part.type.startsWith("tool-") || part.type === "dynamic-tool" ? <div key={index} className="my-2 flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"><Activity className="h-3.5 w-3.5 text-accent" /><span>{String(part.type).replace("tool-", "").replaceAll("_", " ")}</span><Badge variant="outline" className="ml-auto text-[9px]">{part.state?.replaceAll("-", " ") ?? "working"}</Badge></div> : null)}</div></div>)}
-          {status === "submitted" && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> Operator is assessing the next move…</div>}
-          {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error.message}</div>}
-        </div>
-        <form onSubmit={submit} className="border-t p-4"><div className="flex items-end gap-2 rounded-2xl border bg-background/60 p-2 shadow-lg focus-within:ring-1 focus-within:ring-primary"><Input ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Describe your offer, market, or what you want the Operator to do…" className="min-h-11 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0" disabled={busy} /><Button type="submit" size="icon" disabled={!input.trim() || busy} className="h-10 w-10 shrink-0 rounded-xl">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}</Button></div><p className="mt-2 text-center text-[10px] text-muted-foreground">Plans use live account data and cited research. Review all assumptions before approval.</p></form>
+        <Conversation className="min-h-0">
+          <ConversationContent className="gap-6 px-5 py-6">
+            {messages.length === 0 && <div className="mx-auto mt-16 max-w-xl text-center"><div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[var(--gradient-aurora)] shadow-[var(--shadow-glow)]"><Target className="h-6 w-6 text-primary-foreground" /></div><h2 className="text-2xl font-semibold tracking-tight">What do you want to sell?</h2><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">Give me the offer in plain English. Watch the live activity feed while I inspect your setup, research the market, search your leads, and build the campaign map.</p><div className="mt-6 flex flex-wrap justify-center gap-2">{["I sell contact-center solutions", "Build a campaign for my product info", "Review my campaigns and find the next opportunity"].map((prompt) => <Button key={prompt} variant="outline" size="sm" onClick={() => setInput(prompt)}>{prompt}</Button>)}</div></div>}
+            {messages.map((message: UIMessage) => <Message from={message.role} key={message.id}><MessageContent className={message.role === "user" ? "bg-primary text-primary-foreground" : undefined}>{message.role === "assistant" && <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-primary"><Bot className="h-3.5 w-3.5" /> Operator</div>}{message.parts.map((part: any, index: number) => part.type === "text" ? <MessageResponse key={index} isAnimating={busy}>{part.text}</MessageResponse> : part.type.startsWith("tool-") || part.type === "dynamic-tool" ? <OperatorToolActivity key={index} part={part} /> : null)}</MessageContent></Message>)}
+            {status === "submitted" && <div className="flex items-center gap-2 text-xs"><Zap className="h-3.5 w-3.5 animate-pulse text-primary" /><Shimmer>Operator is deciding the next action…</Shimmer></div>}
+            {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error.message}</div>}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+        <div className="border-t p-4"><PromptInput onSubmit={submit} className="rounded-2xl bg-background/60 shadow-lg"><PromptInputTextarea ref={inputRef} value={input} onChange={(event) => setInput(event.target.value)} placeholder="Tell the Operator what to sell or what to investigate…" disabled={busy} className="min-h-16" /><PromptInputFooter className="justify-end"><PromptInputSubmit status={status} disabled={!input.trim() && !busy} /></PromptInputFooter></PromptInput><p className="mt-2 text-center text-[10px] text-muted-foreground">Every search, database check, and campaign action is shown live. Important actions still require approval.</p></div>
       </section>
 
       <aside className="min-h-0 overflow-y-auto bg-background/15 p-4">
         <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Command center</p><h2 className="mt-1 text-base font-semibold">Campaign blueprint</h2></div>{blueprint && <Badge variant={blueprint.status === "draft" ? "secondary" : "default"}>{blueprint.status}</Badge>}</div>
         {!blueprint ? <div className="rounded-xl border border-dashed p-6 text-center"><FileCheck2 className="mx-auto h-7 w-7 text-muted-foreground" /><p className="mt-3 text-sm font-medium">No blueprint yet</p><p className="mt-1 text-xs leading-5 text-muted-foreground">The Operator will build it after learning enough about your offer and capacity.</p></div> : <BlueprintPanel blueprint={blueprint} actionBusy={actionBusy} approve={async () => { setActionBusy(true); try { await approvePlan({ data: { blueprintId: blueprint.id } }); toast.success("Campaign plan approved"); await refreshWorkspace(); } catch (err) { toast.error(err instanceof Error ? err.message : "Approval failed"); } finally { setActionBusy(false); } }} pause={async () => { setActionBusy(true); try { await pausePlan({ data: { blueprintId: blueprint.id } }); toast.success("Operator paused"); await refreshWorkspace(); } finally { setActionBusy(false); } }} />}
-        <div className="mt-5"><div className="mb-3 flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold">Execution timeline</h3></div><div className="space-y-2">{events.length === 0 ? <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">Research, approvals and actions will appear here.</p> : events.map((event: any) => <div key={event.id} className="rounded-lg border bg-muted/20 p-3"><div className="flex items-start gap-2">{event.status === "completed" ? <Check className="mt-0.5 h-3.5 w-3.5 text-accent" /> : event.status === "approval_required" ? <CircleAlert className="mt-0.5 h-3.5 w-3.5 text-primary" /> : <Activity className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />}<div className="min-w-0"><p className="text-xs font-medium">{event.title}</p><p className="mt-1 text-[10px] text-muted-foreground">{new Date(event.created_at).toLocaleString()}</p></div></div></div>)}</div></div>
+        <div className="mt-5"><div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold">Live activity</h3></div>{busy && <Badge variant="outline" className="gap-1 text-[9px]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Watching</Badge>}</div><div className="space-y-2">{events.length === 0 ? <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">Research, lead searches, approvals, and campaign changes will appear here as they happen.</p> : events.map((event: any) => <div key={event.id} className="rounded-lg border bg-muted/20 p-3"><div className="flex items-start gap-2">{event.status === "completed" ? <Check className="mt-0.5 h-3.5 w-3.5 text-accent" /> : event.status === "approval_required" ? <CircleAlert className="mt-0.5 h-3.5 w-3.5 text-primary" /> : event.status === "running" ? <Loader2 className="mt-0.5 h-3.5 w-3.5 animate-spin text-primary" /> : <Activity className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />}<div className="min-w-0"><p className="text-xs font-medium">{event.title}</p>{event.details?.summary && <p className="mt-1 text-[10px] leading-4 text-muted-foreground">{event.details.summary}</p>}<p className="mt-1 text-[10px] text-muted-foreground">{new Date(event.created_at).toLocaleString()}</p></div></div></div>)}</div></div>
       </aside>
     </div>
   );
+}
+
+const toolPresentation: Record<string, { title: string; icon: typeof Activity }> = {
+  inspect_portfolio: { title: "Inspecting your sales workspace", icon: Database },
+  research_market: { title: "Researching the market online", icon: Globe2 },
+  estimate_audience: { title: "Searching your lead database", icon: Search },
+  create_campaign_blueprint: { title: "Building the campaign blueprint", icon: FileCheck2 },
+};
+
+function OperatorToolActivity({ part }: { part: ToolPart }) {
+  const toolName = part.type === "dynamic-tool" ? part.toolName : part.type.replace("tool-", "");
+  const presentation = toolPresentation[toolName] ?? { title: toolName.replaceAll("_", " "), icon: Activity };
+  const Icon = presentation.icon;
+  const toolPart = part as any;
+  return <Tool defaultOpen={false} className="my-2 overflow-hidden bg-muted/20"><ToolHeader type={part.type as any} state={part.state} toolName={part.type === "dynamic-tool" ? part.toolName : undefined as never} title={presentation.title} /><ToolContent><div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4 text-accent" /> This is a live, verified Operator action.</div>{toolPart.input && <ToolInput input={toolPart.input} />}{(toolPart.output || toolPart.errorText) && <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />}</ToolContent></Tool>;
 }
 
 function BlueprintPanel({ blueprint, actionBusy, approve, pause }: { blueprint: Blueprint; actionBusy: boolean; approve: () => void; pause: () => void }) {
