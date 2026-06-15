@@ -226,7 +226,7 @@ async function advanceGeneration(db: any, event: any, details: PipelineDetails) 
       db.from("lists").select("name,what_selling,key_selling_points,extra_instructions,num_emails,sender_name,sender_company").eq("id", details.campaign_id).single(),
       db.from("leads").select("id,first_name,last_name,title,email,phone,org_name,org_industry,org_description,org_employee_count").in("id", slice.map((row: any) => row.lead_id)),
     ]);
-    const template = details.outreach_template ?? await generateOutreach(campaign, (leads ?? [])[0] ?? {});
+    const template = details.outreach_template ?? await generateOutreach(campaign, {});
     const generated = (leads ?? []).map((lead: any) => personalizeTemplate(template, lead));
     for (const item of generated) {
       const { error } = await db.from("list_leads").update({ emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" }).eq("list_id", details.campaign_id).eq("lead_id", item.leadId);
@@ -253,7 +253,7 @@ async function generateOutreach(campaign: any, lead: any) {
       model: "google/gemini-2.5-flash-lite",
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "Create concise, personalized B2B outreach. Return valid JSON only. Never invent contact details." },
+        { role: "system", content: "Create a concise reusable B2B outreach template. Use {{first_name}}, {{company}}, and {{title}} placeholders where relevant. Return valid JSON only. Never invent contact details." },
         { role: "user", content: `Campaign: ${campaign.what_selling}\nAngle: ${campaign.key_selling_points ?? ""}\nInstructions: ${campaign.extra_instructions ?? ""}\nSender: ${campaign.sender_name ?? "Sales team"} at ${campaign.sender_company ?? "our company"}\nProspect: ${lead.first_name ?? ""} ${lead.last_name ?? ""}, ${lead.title ?? ""} at ${lead.org_name ?? ""}; ${lead.org_industry ?? ""}; ${lead.org_description ?? ""}.\nReturn {"emails":[{"subject":"","body":"","cta":"","send_after_days":0} exactly ${count} items],"callScript":{"opener":"","talk_track":[{"heading":"","body":""}],"problem_questions":[],"solution_questions":[],"consequence_questions":[],"qualifying_questions":[],"close":"","objection_map":[]}}.` },
       ],
     }),

@@ -531,10 +531,8 @@ function PeoplePage() {
   };
 
   // ---- Background scoring jobs ----
-  // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
-  // re-opening the page resumes via the localStorage handle.
-  // Keep AI requests below the shared gateway burst limit. Each worker call
-  // fans out server-side, so four workers still process eight batches at once.
+  // Tab-safe: progress is persisted in the database and the scheduled worker
+  // continues after the tab closes. Browser workers accelerate active sessions.
   const WORKER_COUNT = 4;
   const STORAGE_KEY = "active-scoring-job-id";
   // Shared cooldown for all workers — set when the AI gateway returns 429 so
@@ -729,7 +727,7 @@ function PeoplePage() {
         totalLeads,
         status: "running",
       });
-      toast.success(`Queued ${totalLeads.toLocaleString()} leads — scoring in background`);
+      toast.success(`Queued ${totalLeads.toLocaleString()} leads — fast scoring in background`);
       // fire-and-forget: workers update state as they go
       void runWorkers(jobId, totalBatches);
     } catch (e: any) {
