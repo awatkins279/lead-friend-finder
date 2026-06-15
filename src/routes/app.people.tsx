@@ -930,7 +930,9 @@ function PeoplePage() {
     setImportBusy(true);
     try {
       const leads = await parseLeadFile(file);
-      if (leads.length === 0) throw new Error("No lead rows were found. Make sure row 1 contains column headers.");
+      if (leads.length === 0) {
+        throw new Error("No lead rows were found. Make sure row 1 contains column headers.");
+      }
       if (leads.length > 5000) throw new Error("Import up to 5,000 leads at a time");
       const result = await importLeadsForScoringCall({ data: { leads } });
       setPicked(new Set(result.ids));
@@ -1652,8 +1654,8 @@ function PeoplePage() {
             Upload lead file and score
           </Button>
           <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-            CSV, TSV, or Excel. Supports name, email, title, company, industry, location, phone,
-            and LinkedIn columns. Up to 5,000 rows.
+            CSV, TSV, or Excel. Supports name, email, title, company, industry, location, phone, and
+            LinkedIn columns. Up to 5,000 rows.
           </p>
 
           {/* Threshold */}
