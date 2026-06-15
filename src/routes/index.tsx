@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Mail, Linkedin, ArrowRight } from "lucide-react";
+import { Users, Mail, Link2 as Linkedin, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: Landing,
