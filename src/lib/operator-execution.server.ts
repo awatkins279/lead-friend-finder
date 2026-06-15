@@ -1,6 +1,6 @@
 const SCORE_BATCH_SIZE = 250;
 const VERIFY_BATCH_SIZE = 250;
-const GENERATE_BATCH_SIZE = 25;
+const GENERATE_BATCH_SIZE = 250;
 
 type Play = {
   name?: string;
@@ -42,21 +42,22 @@ export async function startOperatorPipeline(input: {
 }) {
   const { db, userId, threadId, blueprintId, campaignId, offerBrief, play } = input;
   const maxLeads = Math.min(Math.max(input.maxLeads, 1), 100_000);
-  let query = db.from("leads").select("id").limit(maxLeads);
   const titles = cleanFilters(play.filters?.titles);
   const industries = cleanFilters(play.filters?.industries);
   const locations = cleanFilters(play.filters?.locations);
-  if (titles.length) query = query.or(titles.map((value) => `title.ilike.%${value}%`).join(","));
-  if (industries.length)
-    query = query.or(industries.map((value) => `org_industry.ilike.%${value}%`).join(","));
-  if (locations.length)
-    query = query.or(locations.map((value) => `country.ilike.%${value}%`).join(","));
-  query = query.not("email", "is", null);
-  const { data: leads, error: leadError } = await query;
-  if (leadError) throw new Error(leadError.message);
-  const leadIds: string[] = Array.from(
-    new Set<string>((leads ?? []).map((lead: { id: string }) => String(lead.id))),
-  );
+  const leadIds: string[] = [];
+  for (let offset = 0; leadIds.length < maxLeads; offset += 1000) {
+    let query = db.from("leads").select("id");
+    if (titles.length) query = query.or(titles.map((value) => `title.ilike.%${value}%`).join(","));
+    if (industries.length) query = query.or(industries.map((value) => `org_industry.ilike.%${value}%`).join(","));
+    if (locations.length) query = query.or(locations.map((value) => `country.ilike.%${value}%`).join(","));
+    query = query.not("email", "is", null).range(offset, offset + Math.min(999, maxLeads - leadIds.length - 1));
+    const { data: leads, error: leadError } = await query;
+    if (leadError) throw new Error(leadError.message);
+    const page = (leads ?? []).map((lead: { id: string }) => String(lead.id));
+    leadIds.push(...page);
+    if (page.length < 1000) break;
+  }
   if (!leadIds.length) {
     await db.from("operator_events").insert({
       thread_id: threadId,
@@ -228,10 +229,9 @@ async function advanceGeneration(db: any, event: any, details: PipelineDetails) 
     ]);
     const template = details.outreach_template ?? await generateOutreach(campaign, {});
     const generated = (leads ?? []).map((lead: any) => personalizeTemplate(template, lead));
-    for (const item of generated) {
-      const { error } = await db.from("list_leads").update({ emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" }).eq("list_id", details.campaign_id).eq("lead_id", item.leadId);
-      if (error) throw new Error(error.message);
-    }
+    const updates = await Promise.all(generated.map((item: any) => db.from("list_leads").update({ emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" }).eq("list_id", details.campaign_id).eq("lead_id", item.leadId)));
+    const failedUpdate = updates.find((result: any) => result.error);
+    if (failedUpdate?.error) throw new Error(failedUpdate.error.message);
     const total = details.progress_total ?? 0;
     const next = { ...details, outreach_template: template, generation_cursor: cursor + slice.length, generated: (details.generated ?? 0) + generated.length, phone_ready: (details.phone_ready ?? 0) + (leads ?? []).filter((lead: any) => Boolean(lead.phone)).length, progress_current: cursor + slice.length, progress_total: total, live_text: `Personalizing outreach for contacts ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
     await updateEvent(db, event.id, `Building emails and call plans · ${Math.min(cursor + slice.length, total)}/${total}`, next);
