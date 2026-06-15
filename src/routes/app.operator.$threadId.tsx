@@ -139,7 +139,7 @@ function OperatorToolActivity({ part }: { part: ToolPart }) {
   const presentation = toolPresentation[toolName] ?? { title: toolName.replaceAll("_", " "), icon: Activity };
   const Icon = presentation.icon;
   const toolPart = part as any;
-  return <Tool defaultOpen={false} className="my-2 overflow-hidden bg-muted/20"><ToolHeader type={part.type as any} state={part.state} toolName={part.type === "dynamic-tool" ? part.toolName : undefined as never} title={presentation.title} className="[&_svg:first-child]:hidden before:hidden"><span className="sr-only"><Icon /></span></ToolHeader><ToolContent><div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4 text-accent" /> This is a live, verified Operator action.</div>{toolPart.input && <ToolInput input={toolPart.input} />}{(toolPart.output || toolPart.errorText) && <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />}</ToolContent></Tool>;
+  return <Tool defaultOpen={false} className="my-2 overflow-hidden bg-muted/20"><ToolHeader type={part.type as any} state={part.state} toolName={part.type === "dynamic-tool" ? part.toolName : undefined as never} title={presentation.title} /><ToolContent><div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4 text-accent" /> This is a live, verified Operator action.</div>{toolPart.input && <ToolInput input={toolPart.input} />}{(toolPart.output || toolPart.errorText) && <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />}</ToolContent></Tool>;
 }
 
 function BlueprintPanel({ blueprint, actionBusy, approve, pause }: { blueprint: Blueprint; actionBusy: boolean; approve: () => void; pause: () => void }) {
