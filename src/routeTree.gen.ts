@@ -25,8 +25,11 @@ import { Route as AppCoachingStylesRouteImport } from './routes/app.coaching-sty
 import { Route as AppCalendarRouteImport } from './routes/app.calendar'
 import { Route as AppAdminRouteImport } from './routes/app.admin'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
+import { Route as AppOperatorIndexRouteImport } from './routes/app.operator.index'
 import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
+import { Route as AppOperatorThreadIdRouteImport } from './routes/app.operator.$threadId'
 import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
+import { Route as ApiOperatorChatRouteImport } from './routes/api/operator/chat'
 import { Route as ApiGoogleCalendarConnectRouteImport } from './routes/api.google-calendar.connect'
 import { Route as ApiGoogleCalendarCallbackRouteImport } from './routes/api.google-calendar.callback'
 import { Route as ApiRingcentralOauthCallbackRouteImport } from './routes/api/ringcentral.oauth.callback'
@@ -119,15 +122,30 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOperatorIndexRoute = AppOperatorIndexRouteImport.update({
+  id: '/operator/',
+  path: '/operator/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppListsIndexRoute = AppListsIndexRouteImport.update({
   id: '/lists/',
   path: '/lists/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOperatorThreadIdRoute = AppOperatorThreadIdRouteImport.update({
+  id: '/operator/$threadId',
+  path: '/operator/$threadId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppListsListIdRoute = AppListsListIdRouteImport.update({
   id: '/lists/$listId',
   path: '/lists/$listId',
   getParentRoute: () => AppRoute,
+} as any)
+const ApiOperatorChatRoute = ApiOperatorChatRouteImport.update({
+  id: '/api/operator/chat',
+  path: '/api/operator/chat',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGoogleCalendarConnectRoute =
   ApiGoogleCalendarConnectRouteImport.update({
@@ -212,8 +230,11 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/api/google-calendar/callback': typeof ApiGoogleCalendarCallbackRoute
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
+  '/api/operator/chat': typeof ApiOperatorChatRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/operator/$threadId': typeof AppOperatorThreadIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/app/operator/': typeof AppOperatorIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -243,8 +264,11 @@ export interface FileRoutesByTo {
   '/checkout/return': typeof CheckoutReturnRoute
   '/api/google-calendar/callback': typeof ApiGoogleCalendarCallbackRoute
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
+  '/api/operator/chat': typeof ApiOperatorChatRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/operator/$threadId': typeof AppOperatorThreadIdRoute
   '/app/lists': typeof AppListsIndexRoute
+  '/app/operator': typeof AppOperatorIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -275,8 +299,11 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/api/google-calendar/callback': typeof ApiGoogleCalendarCallbackRoute
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
+  '/api/operator/chat': typeof ApiOperatorChatRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/operator/$threadId': typeof AppOperatorThreadIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/app/operator/': typeof AppOperatorIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -308,8 +335,11 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/api/google-calendar/callback'
     | '/api/google-calendar/connect'
+    | '/api/operator/chat'
     | '/app/lists/$listId'
+    | '/app/operator/$threadId'
     | '/app/lists/'
+    | '/app/operator/'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
@@ -339,8 +369,11 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/api/google-calendar/callback'
     | '/api/google-calendar/connect'
+    | '/api/operator/chat'
     | '/app/lists/$listId'
+    | '/app/operator/$threadId'
     | '/app/lists'
+    | '/app/operator'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
@@ -370,8 +403,11 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/api/google-calendar/callback'
     | '/api/google-calendar/connect'
+    | '/api/operator/chat'
     | '/app/lists/$listId'
+    | '/app/operator/$threadId'
     | '/app/lists/'
+    | '/app/operator/'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
@@ -391,6 +427,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ApiGoogleCalendarCallbackRoute: typeof ApiGoogleCalendarCallbackRoute
   ApiGoogleCalendarConnectRoute: typeof ApiGoogleCalendarConnectRoute
+  ApiOperatorChatRoute: typeof ApiOperatorChatRoute
   ApiPublicHooksScoringTickRoute: typeof ApiPublicHooksScoringTickRoute
   ApiPublicHooksSdrReplyTickRoute: typeof ApiPublicHooksSdrReplyTickRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
@@ -516,11 +553,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/operator/': {
+      id: '/app/operator/'
+      path: '/operator'
+      fullPath: '/app/operator/'
+      preLoaderRoute: typeof AppOperatorIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/lists/': {
       id: '/app/lists/'
       path: '/lists'
       fullPath: '/app/lists/'
       preLoaderRoute: typeof AppListsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/operator/$threadId': {
+      id: '/app/operator/$threadId'
+      path: '/operator/$threadId'
+      fullPath: '/app/operator/$threadId'
+      preLoaderRoute: typeof AppOperatorThreadIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/lists/$listId': {
@@ -529,6 +580,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/lists/$listId'
       preLoaderRoute: typeof AppListsListIdRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/operator/chat': {
+      id: '/api/operator/chat'
+      path: '/api/operator/chat'
+      fullPath: '/api/operator/chat'
+      preLoaderRoute: typeof ApiOperatorChatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/google-calendar/connect': {
       id: '/api/google-calendar/connect'
@@ -622,7 +680,9 @@ interface AppRouteChildren {
   AppSdrAgentsRoute: typeof AppSdrAgentsRoute
   AppVoicemailAgentRoute: typeof AppVoicemailAgentRoute
   AppListsListIdRoute: typeof AppListsListIdRoute
+  AppOperatorThreadIdRoute: typeof AppOperatorThreadIdRoute
   AppListsIndexRoute: typeof AppListsIndexRoute
+  AppOperatorIndexRoute: typeof AppOperatorIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -637,7 +697,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppSdrAgentsRoute: AppSdrAgentsRoute,
   AppVoicemailAgentRoute: AppVoicemailAgentRoute,
   AppListsListIdRoute: AppListsListIdRoute,
+  AppOperatorThreadIdRoute: AppOperatorThreadIdRoute,
   AppListsIndexRoute: AppListsIndexRoute,
+  AppOperatorIndexRoute: AppOperatorIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -662,6 +724,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ApiGoogleCalendarCallbackRoute: ApiGoogleCalendarCallbackRoute,
   ApiGoogleCalendarConnectRoute: ApiGoogleCalendarConnectRoute,
+  ApiOperatorChatRoute: ApiOperatorChatRoute,
   ApiPublicHooksScoringTickRoute: ApiPublicHooksScoringTickRoute,
   ApiPublicHooksSdrReplyTickRoute: ApiPublicHooksSdrReplyTickRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,

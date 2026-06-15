@@ -36,7 +36,7 @@ import {
   Building2,
   Briefcase,
   X,
-  Linkedin,
+  Link2 as Linkedin,
   Mail,
   Phone,
   Globe,
