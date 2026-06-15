@@ -63,9 +63,11 @@ export const approveOperatorBlueprint = createServerFn({ method: "POST" })
     const { error: eventError } = await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "blueprint_approved", status: "completed", title: "Campaign plan approved", details: { approved_at: approvedAt, next: "Campaign build is authorized within the approved guardrails." } });
     if (eventError) throw new Error(eventError.message);
     const strategy = blueprint.strategy as {
-      plays?: Array<{ name?: string; audience?: string; hypothesis?: string; messagingAngle?: string; emailPlan?: string; callingPlan?: string }>;
+      plays?: Array<{ name?: string; audience?: string; hypothesis?: string; messagingAngle?: string; emailPlan?: string; callingPlan?: string; filters?: { titles?: string[]; industries?: string[]; locations?: string[] } }>;
       schedule?: { followUpCadence?: string };
     };
+    const guardrails = blueprint.guardrails as { maxLeads?: number };
+    const { data: profile } = await db.from("profiles").select("full_name,company_name").eq("id", context.userId).maybeSingle();
     const plays = Array.isArray(strategy?.plays) ? strategy.plays.slice(0, 6) : [];
     const createdCampaigns: Array<{ id: string; name: string }> = [];
     for (const play of plays) {
@@ -78,6 +80,8 @@ export const approveOperatorBlueprint = createServerFn({ method: "POST" })
           name,
           description,
           what_selling: String(blueprint.offer_brief).slice(0, 4000),
+          sender_name: String(profile?.full_name ?? "Sales team").slice(0, 160),
+          sender_company: String(profile?.company_name ?? "").slice(0, 160) || null,
           key_selling_points: String(play.messagingAngle ?? "").slice(0, 4000) || null,
           extra_instructions: [play.emailPlan, play.callingPlan].filter(Boolean).join("\n\n").slice(0, 4000) || null,
           campaign_status: "draft",
@@ -90,8 +94,20 @@ export const approveOperatorBlueprint = createServerFn({ method: "POST" })
       }
       createdCampaigns.push(campaign);
       await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "campaign_draft_created", status: "completed", title: `Created draft campaign: ${campaign.name}`, details: { campaign_id: campaign.id, readiness: "Target leads, validate addresses, generate sequences, and connect sending accounts before launch." } });
+      const { startOperatorPipeline } = await import("@/lib/operator-execution.server");
+      await startOperatorPipeline({
+        db,
+        userId: context.userId,
+        threadId: blueprint.thread_id,
+        blueprintId: blueprint.id,
+        campaignId: campaign.id,
+        offerBrief: String(blueprint.offer_brief),
+        play,
+        maxLeads: Math.max(1, Math.floor(Number(guardrails?.maxLeads ?? play.filters ? 20_000 : 1_000) / Math.max(plays.length, 1))),
+        scoreThreshold: 60,
+      });
     }
-    return { ok: true, status: "approved" as const, createdCampaigns };
+    return { ok: true, status: "running" as const, createdCampaigns };
   });
 
 export const pauseOperatorBlueprint = createServerFn({ method: "POST" })
@@ -102,5 +118,17 @@ export const pauseOperatorBlueprint = createServerFn({ method: "POST" })
     const { data: blueprint, error } = await db.from("operator_blueprints").update({ status: "paused" }).eq("id", data.blueprintId).eq("user_id", context.userId).in("status", ["approved", "running"]).select("id,thread_id").maybeSingle();
     if (error || !blueprint) throw new Error("This plan cannot be paused");
     await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "operator_paused", status: "paused", title: "Operator paused by user" });
+    return { ok: true };
+  });
+
+export const resumeOperatorBlueprint = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ blueprintId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const db = context.supabase as any;
+    const { data: blueprint, error } = await db.from("operator_blueprints").update({ status: "running" }).eq("id", data.blueprintId).eq("user_id", context.userId).eq("status", "paused").select("id,thread_id").maybeSingle();
+    if (error || !blueprint) throw new Error("This plan is not paused or cannot be resumed");
+    await db.from("operator_events").update({ status: "running" }).eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "operator_pipeline").eq("status", "paused");
+    await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "operator_resumed", status: "completed", title: "Operator resumed by user" });
     return { ok: true };
   });

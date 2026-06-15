@@ -50,7 +50,9 @@ export async function startOperatorPipeline(input: {
   query = query.not("email", "is", null);
   const { data: leads, error: leadError } = await query;
   if (leadError) throw new Error(leadError.message);
-  const leadIds = Array.from(new Set((leads ?? []).map((lead: { id: string }) => lead.id)));
+  const leadIds: string[] = Array.from(
+    new Set<string>((leads ?? []).map((lead: { id: string }) => String(lead.id))),
+  );
   if (!leadIds.length) {
     await db.from("operator_events").insert({
       thread_id: threadId,

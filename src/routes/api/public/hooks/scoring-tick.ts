@@ -90,6 +90,9 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
             }),
           );
 
+          const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
+          await processOperatorPipelines(supabaseAdmin);
+
           return Response.json({
             ok: true,
             elapsed_ms: Date.now() - startedAt,
