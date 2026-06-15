@@ -2288,6 +2288,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      create_operator_scoring_job_admin: {
+        Args: {
+          p_context: string
+          p_industries?: string[]
+          p_locations?: string[]
+          p_max_leads: number
+          p_rubric: Json
+          p_titles?: string[]
+          p_user_id: string
+        }
+        Returns: {
+          job_id: string
+          total_batches: number
+          total_leads: number
+        }[]
+      }
       finalize_scoring_job: {
         Args: { p_job_id: string }
         Returns: {
