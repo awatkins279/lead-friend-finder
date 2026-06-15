@@ -47,21 +47,24 @@ export async function startOperatorPipeline(input: {
   const locations = cleanFilters(play.filters?.locations);
   const leadIds: string[] = [];
   const PAGE_SIZE = 1000;
-  const PAGE_CONCURRENCY = 8;
-  const loadPage = async (offset: number) => {
+  let lastId = "";
+  const loadPage = async () => {
     let query = db.from("leads").select("id");
     if (titles.length) query = query.or(titles.map((value) => `title.ilike.%${value}%`).join(","));
     if (industries.length) query = query.or(industries.map((value) => `org_industry.ilike.%${value}%`).join(","));
     if (locations.length) query = query.or(locations.map((value) => `country.ilike.%${value}%`).join(","));
-    const { data, error } = await query.not("email", "is", null).order("id").range(offset, offset + PAGE_SIZE - 1);
+    query = query.not("email", "is", null);
+    if (lastId) query = query.gt("id", lastId);
+    const { data, error } = await query.order("id").limit(Math.min(PAGE_SIZE, maxLeads - leadIds.length));
     if (error) throw new Error(error.message);
     return (data ?? []).map((lead: { id: string }) => String(lead.id));
   };
-  for (let offset = 0; leadIds.length < maxLeads; offset += PAGE_SIZE * PAGE_CONCURRENCY) {
-    const pageCount = Math.min(PAGE_CONCURRENCY, Math.ceil((maxLeads - leadIds.length) / PAGE_SIZE));
-    const pages = await Promise.all(Array.from({ length: pageCount }, (_, index) => loadPage(offset + index * PAGE_SIZE)));
-    for (const page of pages) leadIds.push(...page);
-    if (pages.some((page) => page.length < PAGE_SIZE)) break;
+  while (leadIds.length < maxLeads) {
+    const page = await loadPage();
+    if (!page.length) break;
+    leadIds.push(...page);
+    lastId = page[page.length - 1] ?? lastId;
+    if (page.length < Math.min(PAGE_SIZE, maxLeads - leadIds.length + page.length)) break;
   }
   leadIds.splice(maxLeads);
   if (!leadIds.length) {
