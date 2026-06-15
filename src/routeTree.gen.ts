@@ -27,6 +27,7 @@ import { Route as AppAdminRouteImport } from './routes/app.admin'
 import { Route as AppAccountsRouteImport } from './routes/app.accounts'
 import { Route as AppOperatorIndexRouteImport } from './routes/app.operator.index'
 import { Route as AppListsIndexRouteImport } from './routes/app.lists.index'
+import { Route as AppOperatorThreadIdRouteImport } from './routes/app.operator.$threadId'
 import { Route as AppListsListIdRouteImport } from './routes/app.lists.$listId'
 import { Route as ApiOperatorChatRouteImport } from './routes/api/operator/chat'
 import { Route as ApiGoogleCalendarConnectRouteImport } from './routes/api.google-calendar.connect'
@@ -131,6 +132,11 @@ const AppListsIndexRoute = AppListsIndexRouteImport.update({
   path: '/lists/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOperatorThreadIdRoute = AppOperatorThreadIdRouteImport.update({
+  id: '/operator/$threadId',
+  path: '/operator/$threadId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppListsListIdRoute = AppListsListIdRouteImport.update({
   id: '/lists/$listId',
   path: '/lists/$listId',
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/api/operator/chat': typeof ApiOperatorChatRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/operator/$threadId': typeof AppOperatorThreadIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/app/operator/': typeof AppOperatorIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/api/operator/chat': typeof ApiOperatorChatRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/operator/$threadId': typeof AppOperatorThreadIdRoute
   '/app/lists': typeof AppListsIndexRoute
   '/app/operator': typeof AppOperatorIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
@@ -293,6 +301,7 @@ export interface FileRoutesById {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/api/operator/chat': typeof ApiOperatorChatRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
+  '/app/operator/$threadId': typeof AppOperatorThreadIdRoute
   '/app/lists/': typeof AppListsIndexRoute
   '/app/operator/': typeof AppOperatorIndexRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/api/operator/chat'
     | '/app/lists/$listId'
+    | '/app/operator/$threadId'
     | '/app/lists/'
     | '/app/operator/'
     | '/api/public/hooks/scoring-tick'
@@ -361,6 +371,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/api/operator/chat'
     | '/app/lists/$listId'
+    | '/app/operator/$threadId'
     | '/app/lists'
     | '/app/operator'
     | '/api/public/hooks/scoring-tick'
@@ -394,6 +405,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/api/operator/chat'
     | '/app/lists/$listId'
+    | '/app/operator/$threadId'
     | '/app/lists/'
     | '/app/operator/'
     | '/api/public/hooks/scoring-tick'
@@ -555,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppListsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/operator/$threadId': {
+      id: '/app/operator/$threadId'
+      path: '/operator/$threadId'
+      fullPath: '/app/operator/$threadId'
+      preLoaderRoute: typeof AppOperatorThreadIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/lists/$listId': {
       id: '/app/lists/$listId'
       path: '/lists/$listId'
@@ -661,6 +680,7 @@ interface AppRouteChildren {
   AppSdrAgentsRoute: typeof AppSdrAgentsRoute
   AppVoicemailAgentRoute: typeof AppVoicemailAgentRoute
   AppListsListIdRoute: typeof AppListsListIdRoute
+  AppOperatorThreadIdRoute: typeof AppOperatorThreadIdRoute
   AppListsIndexRoute: typeof AppListsIndexRoute
   AppOperatorIndexRoute: typeof AppOperatorIndexRoute
 }
@@ -677,6 +697,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSdrAgentsRoute: AppSdrAgentsRoute,
   AppVoicemailAgentRoute: AppVoicemailAgentRoute,
   AppListsListIdRoute: AppListsListIdRoute,
+  AppOperatorThreadIdRoute: AppOperatorThreadIdRoute,
   AppListsIndexRoute: AppListsIndexRoute,
   AppOperatorIndexRoute: AppOperatorIndexRoute,
 }
