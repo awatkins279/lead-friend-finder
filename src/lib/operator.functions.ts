@@ -117,6 +117,7 @@ export const pauseOperatorBlueprint = createServerFn({ method: "POST" })
     const db = context.supabase as any;
     const { data: blueprint, error } = await db.from("operator_blueprints").update({ status: "paused" }).eq("id", data.blueprintId).eq("user_id", context.userId).in("status", ["approved", "running"]).select("id,thread_id").maybeSingle();
     if (error || !blueprint) throw new Error("This plan cannot be paused");
+    await db.from("operator_events").update({ status: "paused" }).eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "operator_pipeline").eq("status", "running");
     await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "operator_paused", status: "paused", title: "Operator paused by user" });
     return { ok: true };
   });
