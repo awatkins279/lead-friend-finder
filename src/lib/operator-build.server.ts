@@ -24,7 +24,7 @@ export async function buildApprovedBlueprint(input: {
   return { ok: true, status: "running" as const, createdCampaigns: [] };
 }
 
-export async function processOperatorBuilds(db: any, limit = 2) {
+export async function processOperatorBuilds(db: any, limit = 1) {
   const { data: events, error } = await db.from("operator_events")
     .select("id,thread_id,blueprint_id,user_id")
     .eq("event_type", "operator_build").eq("status", "running")

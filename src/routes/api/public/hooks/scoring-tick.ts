@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
           const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
           const { processOperatorBuilds } = await import("@/lib/operator-build.server");
           do {
-            await processOperatorBuilds(supabaseAdmin, 2);
+            await processOperatorBuilds(supabaseAdmin, 1);
             const { data: jobs, error } = await supabaseAdmin
               .from("scoring_jobs")
               .select("id,total_batches,completed_batches,failed_batches")
