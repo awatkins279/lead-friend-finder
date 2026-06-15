@@ -188,7 +188,8 @@ function OperatorWorkspace(props: any) {
       ),
   });
   const busy = status === "submitted" || status === "streaming";
-  const activeEvent = events.find((event: any) => event.status === "running") ?? null;
+  const activeEvent =
+    events.find((event: any) => ["running", "processing"].includes(event.status)) ?? null;
   const hasActiveWork = busy || actionBusy || Boolean(activeEvent) || blueprint?.status === "running";
   useEffect(() => {
     inputRef.current?.focus();

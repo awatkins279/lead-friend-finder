@@ -46,18 +46,24 @@ export async function startOperatorPipeline(input: {
   const industries = cleanFilters(play.filters?.industries);
   const locations = cleanFilters(play.filters?.locations);
   const leadIds: string[] = [];
-  for (let offset = 0; leadIds.length < maxLeads; offset += 1000) {
+  const PAGE_SIZE = 1000;
+  const PAGE_CONCURRENCY = 8;
+  const loadPage = async (offset: number) => {
     let query = db.from("leads").select("id");
     if (titles.length) query = query.or(titles.map((value) => `title.ilike.%${value}%`).join(","));
     if (industries.length) query = query.or(industries.map((value) => `org_industry.ilike.%${value}%`).join(","));
     if (locations.length) query = query.or(locations.map((value) => `country.ilike.%${value}%`).join(","));
-    query = query.not("email", "is", null).range(offset, offset + Math.min(999, maxLeads - leadIds.length - 1));
-    const { data: leads, error: leadError } = await query;
-    if (leadError) throw new Error(leadError.message);
-    const page = (leads ?? []).map((lead: { id: string }) => String(lead.id));
-    leadIds.push(...page);
-    if (page.length < 1000) break;
+    const { data, error } = await query.not("email", "is", null).order("id").range(offset, offset + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((lead: { id: string }) => String(lead.id));
+  };
+  for (let offset = 0; leadIds.length < maxLeads; offset += PAGE_SIZE * PAGE_CONCURRENCY) {
+    const pageCount = Math.min(PAGE_CONCURRENCY, Math.ceil((maxLeads - leadIds.length) / PAGE_SIZE));
+    const pages = await Promise.all(Array.from({ length: pageCount }, (_, index) => loadPage(offset + index * PAGE_SIZE)));
+    for (const page of pages) leadIds.push(...page);
+    if (pages.some((page) => page.length < PAGE_SIZE)) break;
   }
+  leadIds.splice(maxLeads);
   if (!leadIds.length) {
     await db.from("operator_events").insert({
       thread_id: threadId,
@@ -121,15 +127,29 @@ export async function processOperatorPipelines(db: any, limit = 4) {
     .order("created_at")
     .limit(limit);
   if (error) throw new Error(error.message);
-  const results = await Promise.all((events ?? []).map(async (event: any) => {
-    try {
-      return await advancePipeline(db, event);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Operator execution failed";
-      await db.from("operator_events").update({ status: "failed", error: message.slice(0, 1000) }).eq("id", event.id);
-      return { id: event.id, error: message };
-    }
-  }));
+  const results = await Promise.all(
+    (events ?? []).map(async (event: any) => {
+      const { data: claimed, error: claimError } = await db
+        .from("operator_events")
+        .update({ status: "processing" })
+        .eq("id", event.id)
+        .eq("status", "running")
+        .select("id")
+        .maybeSingle();
+      if (claimError) throw new Error(claimError.message);
+      if (!claimed) return { id: event.id, skipped: true };
+      try {
+        return await advancePipeline(db, event);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Operator execution failed";
+        await db
+          .from("operator_events")
+          .update({ status: "failed", error: message.slice(0, 1000) })
+          .eq("id", event.id);
+        return { id: event.id, error: message };
+      }
+    }),
+  );
   return results;
 }
 
@@ -203,10 +223,17 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
         }
       }),
     );
-    await db.from("lead_verifications").upsert(
+    const { error: verificationError } = await db.from("lead_verifications").upsert(
       verified.map((row) => ({ user_id: event.user_id, lead_id: row.id, status: row.status, result: row.result, quality: row.quality, email: row.email, verified_at: new Date().toISOString() })),
     );
-    await Promise.all(verified.map((row: { id: string; status: string }) => db.from("list_leads").update({ verification_status: row.status }).eq("list_id", details.campaign_id).eq("lead_id", row.id)));
+    if (verificationError) throw new Error(verificationError.message);
+    const updates = await Promise.all(
+      verified.map((row: { id: string; status: string }) =>
+        db.from("list_leads").update({ verification_status: row.status }).eq("list_id", details.campaign_id).eq("lead_id", row.id),
+      ),
+    );
+    const failedUpdate = updates.find((result: any) => result.error);
+    if (failedUpdate?.error) throw new Error(failedUpdate.error.message);
     const total = details.progress_total ?? 0;
     const next = { ...details, validation_cursor: cursor + slice.length, progress_current: cursor + slice.length, progress_total: total, live_text: `Verifying email batch ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
     await updateEvent(db, event.id, `Validating emails · ${Math.min(cursor + slice.length, total)}/${total}`, next);
@@ -276,7 +303,10 @@ function personalizeTemplate(template: { emails: any[]; callScript: any }, lead:
 }
 
 async function updateEvent(db: any, id: string, title: string, details: PipelineDetails) {
-  const { error } = await db.from("operator_events").update({ title, details }).eq("id", id);
+  const { error } = await db
+    .from("operator_events")
+    .update({ title, details, status: "running" })
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 
