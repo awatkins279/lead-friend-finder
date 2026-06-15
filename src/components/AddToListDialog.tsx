@@ -49,7 +49,6 @@ export function AddToListDialog({
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [search, setSearch] = useState("");
-  const [allowDuplicates, setAllowDuplicates] = useState(true);
   const [busy, setBusy] = useState(false);
   const [minScore, setMinScore] = useState(70);
   const [overrides, setOverrides] = useState<Set<string>>(new Set());
@@ -125,7 +124,6 @@ export function AddToListDialog({
   useEffect(() => {
     if (!open) return;
     setSearch("");
-    setAllowDuplicates(true);
     supabase
       .from("lists")
       .select("id, name, sender_name")
@@ -192,7 +190,7 @@ export function AddToListDialog({
         const slice = rows.slice(i, i + CHUNK);
         const { error: insErr } = await supabase
           .from("list_leads")
-          .upsert(slice, { onConflict: "list_id,lead_id", ignoreDuplicates: !allowDuplicates });
+          .upsert(slice, { onConflict: "list_id,lead_id", ignoreDuplicates: true });
         if (insErr) throw insErr;
       }
 
@@ -434,11 +432,6 @@ export function AddToListDialog({
             </div>
           </div>
         )}
-
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <Checkbox checked={allowDuplicates} onCheckedChange={(v) => setAllowDuplicates(!!v)} />
-          Allow duplicates
-        </label>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>

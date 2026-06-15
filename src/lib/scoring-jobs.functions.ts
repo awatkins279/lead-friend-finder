@@ -17,12 +17,12 @@ export type ScoreRow = {
   gaps: string[];
 };
 
-const BATCH_SIZE = 25;
+const BATCH_SIZE = 15;
 const MAX_LEADS_PER_JOB = 20000;
 const PROCESSING_STALE_MS = 75_000;
 // How many batches to claim+score in parallel inside one processNextBatch call.
 // Cuts HTTP round-trips between the browser worker and the server fn.
-const FANOUT_PER_CALL = 3;
+const FANOUT_PER_CALL = 2;
 
 // ---------- createScoringJob ----------
 
@@ -439,6 +439,7 @@ ${JSON.stringify(compact)}`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(50_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -494,6 +495,14 @@ ${JSON.stringify(compact)}`;
         : [],
     }))
     .filter((s) => leadIds.includes(s.leadId));
+
+  const scoredIds = new Set(scores.map((score) => score.leadId));
+  const missingCount = leads.filter((lead: { id: string }) => !scoredIds.has(lead.id)).length;
+  if (missingCount > 0) {
+    throw new Error(
+      `AI returned an incomplete batch (${scores.length} of ${leads.length}); retrying`,
+    );
+  }
 
   return scores;
 }
