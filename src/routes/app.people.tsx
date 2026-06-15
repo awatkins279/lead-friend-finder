@@ -2660,6 +2660,25 @@ const verdictDot: Record<Signal["verdict"], string> = {
   unknown: "bg-muted-foreground/40",
 };
 
+function VerificationBadge({
+  status,
+  hasEmail,
+}: {
+  status: VerificationStatus | undefined;
+  hasEmail: boolean;
+}) {
+  if (!hasEmail) return <Badge variant="outline" className="text-[10px]">No email</Badge>;
+  if (!status) return <Badge variant="outline" className="text-[10px]">Not validated</Badge>;
+  const style = status === "deliverable"
+    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+    : status === "risky"
+      ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+      : status === "invalid" || status === "disposable"
+        ? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+        : "text-muted-foreground";
+  return <Badge variant="outline" className={`text-[10px] capitalize ${style}`}>{status}</Badge>;
+}
+
 function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
   if (!info) return <span className="text-xs text-muted-foreground">—</span>;
   const { score } = info;
