@@ -597,7 +597,7 @@ function ListDetailPage() {
             )}
             <Button
               size="sm"
-              onClick={activeTab === "calling" ? requestRunAllScripts : runAll}
+              onClick={activeTab === "calling" ? requestRunAllScripts : requestRunAllEmails}
               disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
             >
               {isRunning ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
@@ -605,7 +605,9 @@ function ListDetailPage() {
                 ? "Generating…"
                 : activeTab === "calling"
                   ? "Generate all scripts"
-                  : "Generate all sequences"}
+                  : (rows ?? []).some((row) => effectiveEmails(row).length > 0)
+                    ? "Regenerate all sequences"
+                    : "Generate all sequences"}
             </Button>
           </div>
         </div>
@@ -719,6 +721,23 @@ function ListDetailPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={runAllScripts}>Rewrite all scripts</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmEmails} onOpenChange={setConfirmEmails}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate all email sequences?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will rewrite the existing emails for all {rows?.length ?? 0} prospects using your current Campaign setup. Any edits made to individual email drafts will be replaced.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmEmails(false); void runAll(true); }}>
+              Rewrite all emails
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
