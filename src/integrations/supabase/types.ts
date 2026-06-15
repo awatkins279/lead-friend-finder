@@ -984,6 +984,202 @@ export type Database = {
         }
         Relationships: []
       }
+      operator_blueprints: {
+        Row: {
+          approved_at: string | null
+          created_at: string
+          guardrails: Json
+          id: string
+          offer_brief: string
+          status: string
+          strategy: Json
+          thread_id: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          created_at?: string
+          guardrails?: Json
+          id?: string
+          offer_brief: string
+          status?: string
+          strategy: Json
+          thread_id: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          created_at?: string
+          guardrails?: Json
+          id?: string
+          offer_brief?: string
+          status?: string
+          strategy?: Json
+          thread_id?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_blueprints_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "operator_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operator_briefs: {
+        Row: {
+          brief_date: string
+          created_at: string
+          id: string
+          summary: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brief_date: string
+          created_at?: string
+          id?: string
+          summary: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brief_date?: string
+          created_at?: string
+          id?: string
+          summary?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      operator_events: {
+        Row: {
+          blueprint_id: string | null
+          created_at: string
+          details: Json
+          error: string | null
+          event_type: string
+          id: string
+          status: string
+          thread_id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blueprint_id?: string | null
+          created_at?: string
+          details?: Json
+          error?: string | null
+          event_type: string
+          id?: string
+          status?: string
+          thread_id: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blueprint_id?: string | null
+          created_at?: string
+          details?: Json
+          error?: string | null
+          event_type?: string
+          id?: string
+          status?: string
+          thread_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_events_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "operator_blueprints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_events_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "operator_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operator_messages: {
+        Row: {
+          ai_message_id: string
+          created_at: string
+          id: string
+          message: Json
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          ai_message_id: string
+          created_at?: string
+          id?: string
+          message: Json
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          ai_message_id?: string
+          created_at?: string
+          id?: string
+          message?: Json
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "operator_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operator_threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           annual_price_cents: number
