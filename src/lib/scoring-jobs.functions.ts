@@ -116,7 +116,12 @@ export const processNextBatch = createServerFn({ method: "POST" })
     const { data: processed, error } = await supabaseAdmin.rpc("process_fast_scoring_batch_admin", { p_job_id: data.jobId, p_limit: 1000 });
     if (error) throw new Error(error.message);
     const count = Number(processed?.[0]?.processed ?? 0);
-    return { claimed: count > 0, results: [] as ScoreRow[], job: null, processed: count, error: undefined as string | undefined };
+    const { data: recentRows, error: recentError } = count > 0
+      ? await supabase.from("scoring_results").select("lead_id,score,reasoning,signals,strengths,gaps").eq("job_id", data.jobId).order("updated_at", { ascending: false }).limit(count)
+      : { data: [], error: null };
+    if (recentError) throw new Error(recentError.message);
+    const results = (recentRows ?? []).map((row: any) => ({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: row.signals ?? [], strengths: row.strengths ?? [], gaps: row.gaps ?? [] })) as ScoreRow[];
+    return { claimed: count > 0, results, job: null, processed: count, error: undefined as string | undefined };
   });
 
 // Shared core: claim a single batch, score it, update bookkeeping.
@@ -272,13 +277,16 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
 
     const results: ScoreRow[] = [];
     if (data.includeResults) {
-      const { data: scoreRows, error: batchErr } = await supabase
-        .from("scoring_results")
-        .select("lead_id,score,reasoning,signals,strengths,gaps")
-        .eq("job_id", data.jobId)
-        .limit(100000);
-      if (batchErr) throw new Error(batchErr.message);
-      for (const row of scoreRows ?? []) results.push({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: Array.isArray(row.signals) ? row.signals as Signal[] : [], strengths: Array.isArray(row.strengths) ? row.strengths as string[] : [], gaps: Array.isArray(row.gaps) ? row.gaps as string[] : [] });
+      for (let offset = 0; offset < job.total_leads; offset += 1000) {
+        const { data: scoreRows, error: batchErr } = await supabase
+          .from("scoring_results")
+          .select("lead_id,score,reasoning,signals,strengths,gaps")
+          .eq("job_id", data.jobId)
+          .range(offset, offset + 999);
+        if (batchErr) throw new Error(batchErr.message);
+        for (const row of scoreRows ?? []) results.push({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: Array.isArray(row.signals) ? row.signals as Signal[] : [], strengths: Array.isArray(row.strengths) ? row.strengths as string[] : [], gaps: Array.isArray(row.gaps) ? row.gaps as string[] : [] });
+        if ((scoreRows?.length ?? 0) < 1000) break;
+      }
     }
     return { job, results };
   });
