@@ -188,16 +188,19 @@ function OperatorWorkspace(props: any) {
       ),
   });
   const busy = status === "submitted" || status === "streaming";
+  const activeEvent = events.find((event: any) => event.status === "running") ?? null;
+  const hasActiveWork = busy || actionBusy || Boolean(activeEvent) || blueprint?.status === "running";
   useEffect(() => {
     inputRef.current?.focus();
   }, [threadId, status, inputRef]);
   useEffect(() => {
-    if (!busy && !actionBusy) return;
+    if (!hasActiveWork) return;
+    void refreshWorkspace();
     const refresh = window.setInterval(() => {
       void refreshWorkspace();
-    }, 1200);
+    }, 1500);
     return () => window.clearInterval(refresh);
-  }, [busy, actionBusy, threadId]);
+  }, [hasActiveWork, threadId]);
 
   const refreshWorkspace = async () => {
     const data = await queryClient.fetchQuery({
@@ -462,13 +465,14 @@ function OperatorWorkspace(props: any) {
             }}
           />
         )}
+        <LiveOperatorScreen event={activeEvent} chatBusy={busy} />
         <div className="mt-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock3 className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold">Live activity</h3>
             </div>
-            {busy && (
+            {hasActiveWork && (
               <Badge variant="outline" className="gap-1 text-[9px]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" /> Watching
               </Badge>
@@ -521,6 +525,62 @@ const toolPresentation: Record<string, { title: string; icon: typeof Activity }>
   estimate_audience: { title: "Searching your lead database", icon: Search },
   create_campaign_blueprint: { title: "Building the campaign blueprint", icon: FileCheck2 },
 };
+
+function LiveOperatorScreen({ event, chatBusy }: { event: any; chatBusy: boolean }) {
+  const details = event?.details ?? {};
+  const current = Number(details.progress_current ?? 0);
+  const total = Number(details.progress_total ?? details.target_count ?? 0);
+  const percent = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
+  const liveText = String(
+    details.live_text ??
+      (chatBusy ? "Reading your request and choosing the next action" : "Waiting for work"),
+  );
+  const active = Boolean(event) || chatBusy;
+
+  return (
+    <div className="mt-5 overflow-hidden rounded-xl border bg-background/70 shadow-lg">
+      <div className="flex items-center justify-between border-b bg-muted/25 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            <span className="h-2 w-2 rounded-full bg-destructive/70" />
+            <span className="h-2 w-2 rounded-full bg-primary/70" />
+            <span className="h-2 w-2 rounded-full bg-accent/70" />
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Live operator screen
+          </span>
+        </div>
+        <Badge variant="outline" className="gap-1 text-[9px]">
+          <span className={`h-1.5 w-1.5 rounded-full ${active ? "animate-pulse bg-accent" : "bg-muted-foreground"}`} />
+          {active ? "Live" : "Idle"}
+        </Badge>
+      </div>
+      <div className="p-3 font-mono text-[11px]">
+        <div className="mb-3 flex items-center gap-2 text-muted-foreground">
+          <span className="text-accent">operator@nexus</span>
+          <span>~</span>
+          <span className="text-foreground">{event?.details?.stage ?? (chatBusy ? "planning" : "ready")}</span>
+        </div>
+        <div className="min-h-14 rounded-lg bg-muted/25 p-3 leading-5 text-foreground">
+          <span className="mr-2 text-primary">›</span>
+          {liveText}
+          {active && <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-primary align-middle" />}
+        </div>
+        {total > 0 && (
+          <div className="mt-3">
+            <div className="mb-1.5 flex justify-between text-[10px] text-muted-foreground">
+              <span>{event?.title ?? "Working"}</span>
+              <span>{current.toLocaleString()} / {total.toLocaleString()}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${percent}%` }} />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function OperatorToolActivity({ part }: { part: ToolPart }) {
   const toolName = part.type === "dynamic-tool" ? part.toolName : part.type.replace("tool-", "");
