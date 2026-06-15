@@ -533,7 +533,9 @@ function PeoplePage() {
   // ---- Background scoring jobs ----
   // Tab-safe: progress is persisted in the DB. Closing the tab pauses;
   // re-opening the page resumes via the localStorage handle.
-  const WORKER_COUNT = 24;
+  // Keep AI requests below the shared gateway burst limit. Each worker call
+  // fans out server-side, so four workers still process eight batches at once.
+  const WORKER_COUNT = 4;
   const STORAGE_KEY = "active-scoring-job-id";
   // Shared cooldown for all workers — set when the AI gateway returns 429 so
   // workers slow down together instead of hammering the rate limit.
@@ -601,7 +603,9 @@ function PeoplePage() {
               `Scored ${snap.job.scored_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed`,
             );
           } else if (snap.job.status === "failed") {
-            toast.error("Lead scoring stopped before the whole list finished.");
+            toast.error(
+              `Scoring stopped after ${snap.job.scored_leads.toLocaleString()} of ${snap.job.total_leads.toLocaleString()} leads. Your completed scores were kept; select the remaining leads and try again.`,
+            );
           }
         }
       }
@@ -1040,7 +1044,7 @@ function PeoplePage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">People Search</h1>
             <p className="mt-1 text-sm text-muted-foreground font-mono-num">
-              {total.toLocaleString()} results found
+              {total.toLocaleString()} matching contacts · 25 shown per page
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1306,7 +1310,7 @@ function PeoplePage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") apply();
               }}
-              placeholder="Search by name or keyword…"
+              placeholder="Search by first or last name…"
               className="h-11 rounded-xl border-white/10 bg-white/[0.03] pl-10 placeholder:text-muted-foreground/60"
             />
           </div>

@@ -22,7 +22,7 @@ const MAX_LEADS_PER_JOB = 20000;
 const PROCESSING_STALE_MS = 75_000;
 // How many batches to claim+score in parallel inside one processNextBatch call.
 // Cuts HTTP round-trips between the browser worker and the server fn.
-const FANOUT_PER_CALL = 3;
+const FANOUT_PER_CALL = 2;
 
 // ---------- createScoringJob ----------
 

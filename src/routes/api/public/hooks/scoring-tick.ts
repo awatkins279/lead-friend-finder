@@ -69,9 +69,21 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
                 }
               }
 
-              // Best-effort finalize if everything is accounted for.
+              // Finalize only after every batch is terminal. The previous
+              // unconditional call marked pending/processing batches as failed
+              // while the browser worker was still actively scoring them.
               try {
-                await supabaseAdmin.rpc("finalize_scoring_job_admin", { p_job_id: job.id });
+                const { data: current } = await supabaseAdmin
+                  .from("scoring_jobs")
+                  .select("total_batches,completed_batches,failed_batches")
+                  .eq("id", job.id)
+                  .single();
+                if (
+                  current &&
+                  current.completed_batches + current.failed_batches >= current.total_batches
+                ) {
+                  await supabaseAdmin.rpc("finalize_scoring_job_admin", { p_job_id: job.id });
+                }
               } catch {
                 // ignore — next tick will retry
               }
