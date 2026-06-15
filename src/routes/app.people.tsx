@@ -195,31 +195,7 @@ const IMPORT_HEADER_ALIASES: Record<string, string> = {
   description: "company_description",
 };
 
-function parseCsvLeads(text: string): Array<Record<string, string>> {
-  const records: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (char === '"') {
-      if (quoted && text[i + 1] === '"') {
-        cell += '"';
-        i += 1;
-      } else quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      row.push(cell);
-      cell = "";
-    } else if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && text[i + 1] === "\n") i += 1;
-      row.push(cell);
-      cell = "";
-      if (row.some((value) => value.trim())) records.push(row);
-      row = [];
-    } else cell += char;
-  }
-  row.push(cell);
-  if (row.some((value) => value.trim())) records.push(row);
+function mapImportedRows(records: string[][]): Array<Record<string, string>> {
   if (records.length < 2) return [];
   const headers = records[0].map((header) => {
     const normalized = header
@@ -239,6 +215,25 @@ function parseCsvLeads(text: string): Array<Record<string, string>> {
     .map((values) =>
       Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? "").trim()])),
     );
+}
+
+async function parseLeadFile(file: File): Promise<Array<Record<string, string>>> {
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(await file.arrayBuffer(), {
+    type: "array",
+    cellDates: true,
+  });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
+  const sheet = workbook.Sheets[firstSheetName];
+  if (!sheet) return [];
+  const records = XLSX.utils.sheet_to_json<Array<string | number | boolean>>(sheet, {
+    header: 1,
+    raw: false,
+    defval: "",
+    blankrows: false,
+  });
+  return mapImportedRows(records.map((row) => row.map((value) => String(value ?? ""))));
 }
 
 function escapeForOr(v: string) {
@@ -923,18 +918,19 @@ function PeoplePage() {
       toast.error("Describe your ideal customer profile before importing");
       return;
     }
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast.error("Upload a CSV file");
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (!extension || !["csv", "tsv", "xlsx", "xls"].includes(extension)) {
+      toast.error("Upload a CSV, TSV, or Excel file");
       return;
     }
-    if (file.size > 5_000_000) {
-      toast.error("CSV files must be 5 MB or smaller");
+    if (file.size > 20_000_000) {
+      toast.error("Lead files must be 20 MB or smaller");
       return;
     }
     setImportBusy(true);
     try {
-      const leads = parseCsvLeads(await file.text());
-      if (leads.length === 0) throw new Error("No lead rows were found in the CSV");
+      const leads = await parseLeadFile(file);
+      if (leads.length === 0) throw new Error("No lead rows were found. Make sure row 1 contains column headers.");
       if (leads.length > 5000) throw new Error("Import up to 5,000 leads at a time");
       const result = await importLeadsForScoringCall({ data: { leads } });
       setPicked(new Set(result.ids));
@@ -1634,7 +1630,7 @@ function PeoplePage() {
           <input
             ref={importInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -1653,11 +1649,11 @@ function PeoplePage() {
             ) : (
               <Upload className="mr-1 h-3 w-3" />
             )}
-            Upload CSV and score leads
+            Upload lead file and score
           </Button>
           <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
-            Supports name, email, title, company, industry, location, phone, and LinkedIn columns.
-            Up to 5,000 rows.
+            CSV, TSV, or Excel. Supports name, email, title, company, industry, location, phone,
+            and LinkedIn columns. Up to 5,000 rows.
           </p>
 
           {/* Threshold */}
