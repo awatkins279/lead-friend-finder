@@ -11,15 +11,54 @@ export async function buildApprovedBlueprint(input: {
     .eq("id", blueprint.id)
     .eq("user_id", userId);
   if (updateError) throw new Error(updateError.message);
-  await db.from("operator_events").insert({
+  const { error: queueError } = await db.from("operator_events").insert({
     thread_id: blueprint.thread_id,
     blueprint_id: blueprint.id,
     user_id: userId,
-    event_type: "blueprint_approved",
-    status: "completed",
-    title: "Campaign plan approved",
-    details: { approved_at: approvedAt, next: "Campaign build is authorized within the approved guardrails." },
+    event_type: "operator_build",
+    status: "running",
+    title: "Campaign plan approved · preparing campaigns",
+    details: { approved_at: approvedAt, next: "Campaign preparation is queued and will continue in the background." },
   });
+  if (queueError) throw new Error(queueError.message);
+  return { ok: true, status: "running" as const, createdCampaigns: [] };
+}
+
+export async function processOperatorBuilds(db: any, limit = 1) {
+  const { data: events, error } = await db.from("operator_events")
+    .select("id,thread_id,blueprint_id,user_id")
+    .eq("event_type", "operator_build").eq("status", "running")
+    .order("created_at").limit(limit);
+  if (error) throw new Error(error.message);
+  return Promise.all((events ?? []).map(async (event: any) => {
+    const { data: claimed, error: claimError } = await db.from("operator_events")
+      .update({ status: "processing", title: "Creating campaigns and selecting matched contacts" })
+      .eq("id", event.id).eq("status", "running").select("id").maybeSingle();
+    if (claimError) throw new Error(claimError.message);
+    if (!claimed) return { id: event.id, skipped: true };
+    try {
+      const { data: blueprint, error: blueprintError } = await db.from("operator_blueprints")
+        .select("id,thread_id,offer_brief,strategy,guardrails")
+        .eq("id", event.blueprint_id).eq("user_id", event.user_id).single();
+      if (blueprintError || !blueprint) throw new Error(blueprintError?.message ?? "Campaign plan not found");
+      const createdCampaigns = await executeApprovedBlueprint({ db, userId: event.user_id, blueprint });
+      await db.from("operator_events").update({
+        status: "completed",
+        title: `Campaign preparation started · ${createdCampaigns.length} campaign${createdCampaigns.length === 1 ? "" : "s"}`,
+        details: { campaign_ids: createdCampaigns.map((campaign) => campaign.id) },
+      }).eq("id", event.id);
+      return { id: event.id, created: createdCampaigns.length };
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Campaign preparation failed";
+      await db.from("operator_events").update({ status: "failed", error: message.slice(0, 1000) }).eq("id", event.id);
+      await db.from("operator_blueprints").update({ status: "failed" }).eq("id", event.blueprint_id);
+      return { id: event.id, error: message };
+    }
+  }));
+}
+
+async function executeApprovedBlueprint(input: { db: any; userId: string; blueprint: any }) {
+  const { db, userId, blueprint } = input;
 
   const strategy = blueprint.strategy as {
     plays?: Array<{ name?: string; audience?: string; hypothesis?: string; messagingAngle?: string; emailPlan?: string; callingPlan?: string; estimatedAudience?: number; filters?: { titles?: string[]; industries?: string[]; locations?: string[] } }>;
@@ -66,5 +105,5 @@ export async function buildApprovedBlueprint(input: {
     });
     remainingLeads -= playLeads;
   }
-  return { ok: true, status: "running" as const, createdCampaigns };
+  return createdCampaigns;
 }

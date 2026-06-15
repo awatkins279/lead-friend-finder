@@ -120,7 +120,7 @@ export const Route = createFileRoute("/api/operator/chat")({
                   await auth.db.from("operator_events").insert({ thread_id: threadId, blueprint_id: blueprint.id, user_id: auth.userId, event_type: "blueprint_created", status: "completed", title: `Campaign plan v${version} created under full autonomy`, details: { plays: strategy.plays.length, estimated_credits: strategy.estimatedCredits } });
                   const { buildApprovedBlueprint } = await import("@/lib/operator-build.server");
                   const build = await buildApprovedBlueprint({ db: auth.db, userId: auth.userId, blueprint });
-                  return { blueprintId: blueprint.id, version, status: build.status, campaigns: build.createdCampaigns, message: "Full autonomy is enabled. The plan was authorized and campaign preparation started automatically." };
+                   return { blueprintId: blueprint.id, version, status: build.status, campaigns: build.createdCampaigns, message: "Full autonomy is enabled. The plan was authorized and campaign preparation was queued immediately in the background." };
                 }
                 await auth.db.from("operator_events").insert({ thread_id: threadId, blueprint_id: blueprint.id, user_id: auth.userId, event_type: "blueprint_created", status: "approval_required", title: `Campaign plan v${version} ready for approval`, details: { plays: strategy.plays.length, estimated_credits: strategy.estimatedCredits } });
                 return { blueprintId: blueprint.id, version, status: "approval_required", message: "The plan is saved. No campaign actions have run. Ask the user to review the plan card and select Approve & build." };

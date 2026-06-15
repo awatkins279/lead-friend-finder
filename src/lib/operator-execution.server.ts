@@ -45,26 +45,21 @@ export async function startOperatorPipeline(input: {
   const titles = cleanFilters(play.filters?.titles);
   const industries = cleanFilters(play.filters?.industries);
   const locations = cleanFilters(play.filters?.locations);
-  const leadIds: string[] = [];
-  const PAGE_SIZE = 1000;
-  const PAGE_CONCURRENCY = 8;
-  const loadPage = async (offset: number) => {
-    let query = db.from("leads").select("id");
-    if (titles.length) query = query.or(titles.map((value) => `title.ilike.%${value}%`).join(","));
-    if (industries.length) query = query.or(industries.map((value) => `org_industry.ilike.%${value}%`).join(","));
-    if (locations.length) query = query.or(locations.map((value) => `country.ilike.%${value}%`).join(","));
-    const { data, error } = await query.not("email", "is", null).order("id").range(offset, offset + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((lead: { id: string }) => String(lead.id));
-  };
-  for (let offset = 0; leadIds.length < maxLeads; offset += PAGE_SIZE * PAGE_CONCURRENCY) {
-    const pageCount = Math.min(PAGE_CONCURRENCY, Math.ceil((maxLeads - leadIds.length) / PAGE_SIZE));
-    const pages = await Promise.all(Array.from({ length: pageCount }, (_, index) => loadPage(offset + index * PAGE_SIZE)));
-    for (const page of pages) leadIds.push(...page);
-    if (pages.some((page) => page.length < PAGE_SIZE)) break;
-  }
-  leadIds.splice(maxLeads);
-  if (!leadIds.length) {
+  const context = [offerBrief, play.audience, play.messagingAngle].filter(Boolean).join("\n\n").slice(0, 4000);
+  const { data: queuedRows, error: queueError } = await db.rpc("create_operator_scoring_job_admin", {
+    p_user_id: userId,
+    p_context: context,
+    p_max_leads: maxLeads,
+    p_rubric: buildFastRubric(context),
+    p_titles: titles,
+    p_industries: industries,
+    p_locations: locations,
+  });
+  if (queueError) throw new Error(queueError.message);
+  const queued = queuedRows?.[0];
+  const leadCount = Number(queued?.total_leads ?? 0);
+  const jobId = String(queued?.job_id ?? "");
+  if (!leadCount || !jobId) {
     await db.from("operator_events").insert({
       thread_id: threadId,
       blueprint_id: blueprintId,
@@ -78,31 +73,15 @@ export async function startOperatorPipeline(input: {
     return null;
   }
 
-  const context = [offerBrief, play.audience, play.messagingAngle].filter(Boolean).join("\n\n").slice(0, 4000);
-  const batches: string[][] = [];
-  for (let index = 0; index < leadIds.length; index += SCORE_BATCH_SIZE)
-    batches.push(leadIds.slice(index, index + SCORE_BATCH_SIZE));
-  const { data: job, error: jobError } = await db
-    .from("scoring_jobs")
-    .insert({ user_id: userId, context, total_batches: batches.length, total_leads: leadIds.length, status: "running", scoring_mode: "hybrid_fast", rubric: buildFastRubric(context) })
-    .select("id")
-    .single();
-  if (jobError || !job) throw new Error(jobError?.message ?? "Could not start lead scoring");
-  for (let index = 0; index < batches.length; index += 500) {
-    const { error } = await db.from("scoring_job_batches").insert(
-      batches.slice(index, index + 500).map((batch) => ({ job_id: job.id, lead_ids: batch, status: "pending" })),
-    );
-    if (error) throw new Error(error.message);
-  }
   const details: PipelineDetails = {
     campaign_id: campaignId,
-    scoring_job_id: job.id,
+    scoring_job_id: jobId,
     stage: "scoring",
     score_threshold: input.scoreThreshold ?? 60,
-    target_count: leadIds.length,
+    target_count: leadCount,
     progress_current: 0,
-    progress_total: leadIds.length,
-    live_text: `Loading the first ${Math.min(SCORE_BATCH_SIZE, leadIds.length)} contacts for ICP scoring`,
+    progress_total: leadCount,
+    live_text: `Loading the first ${Math.min(SCORE_BATCH_SIZE, leadCount)} contacts for ICP scoring`,
   };
   const { error: eventError } = await db.from("operator_events").insert({
     thread_id: threadId,
@@ -110,12 +89,12 @@ export async function startOperatorPipeline(input: {
     user_id: userId,
     event_type: "operator_pipeline",
     status: "running",
-    title: `Scoring ${leadIds.length.toLocaleString()} matched contacts`,
+    title: `Scoring ${leadCount.toLocaleString()} matched contacts`,
     details,
   });
   if (eventError) throw new Error(eventError.message);
   await db.from("operator_blueprints").update({ status: "running" }).eq("id", blueprintId).eq("user_id", userId);
-  return { jobId: job.id, leadCount: leadIds.length };
+  return { jobId, leadCount };
 }
 
 export async function processOperatorPipelines(db: any, limit = 4) {
