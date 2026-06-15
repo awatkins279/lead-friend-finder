@@ -46,10 +46,14 @@ export const launchCampaign = createServerFn({ method: "POST" })
     if (listError || !list) throw new Error("Campaign not found");
 
     if (list.instantly_campaign_id) {
-      await instantlyRequest((await getConnection(db, context.userId)).api_key, `/campaigns/${list.instantly_campaign_id}/activate`, {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
+      await instantlyRequest(
+        (await getConnection(db, context.userId)).api_key,
+        `/campaigns/${list.instantly_campaign_id}/activate`,
+        {
+          method: "POST",
+          body: JSON.stringify({}),
+        },
+      );
       await db.from("lists").update({ campaign_status: "active", launched_at: new Date().toISOString() }).eq("id", list.id);
       return { status: "active" as const, resumed: true };
     }
