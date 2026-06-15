@@ -63,7 +63,7 @@ export const launchCampaign = createServerFn({ method: "POST" })
       db.from("list_email_accounts").select("email_accounts(email_address, provider, status)").eq("list_id", list.id),
       db
         .from("list_leads")
-        .select("lead_id, emails, lead:leads(email, first_name, last_name, org_name, title, phone)")
+        .select("lead_id, emails, verification_status, lead:leads(email, first_name, last_name, org_name, title, phone)")
         .eq("list_id", list.id),
     ]);
     if (!connection?.api_key || connection.status !== "active") throw new Error("Connect Instantly under Sending accounts first");
@@ -74,7 +74,18 @@ export const launchCampaign = createServerFn({ method: "POST" })
       .map((account: any) => account.email_address);
     if (!mailboxes.length) throw new Error("Choose at least one active Instantly mailbox in Campaign config");
 
-    const prospects = (leadRows ?? []).filter((row: any) => row.lead?.email && Array.isArray(row.emails) && row.emails.length > 0);
+    const emailReady = (leadRows ?? []).filter(
+      (row: any) => row.lead?.email && Array.isArray(row.emails) && row.emails.length > 0,
+    );
+    const blockedByValidation = emailReady.filter(
+      (row: any) => !["deliverable", "risky"].includes(row.verification_status),
+    );
+    if (blockedByValidation.length > 0) {
+      throw new Error(
+        `${blockedByValidation.length} prospect${blockedByValidation.length === 1 ? " is" : "s are"} not approved for sending. Validate emails and keep only Deliverable, or Deliverable + Risky, before launching.`,
+      );
+    }
+    const prospects = emailReady;
     if (!prospects.length) throw new Error("Generate an email sequence for at least one prospect before launching");
     if (prospects.length > 1000) throw new Error("Campaign launch currently supports up to 1,000 prospects at a time");
 

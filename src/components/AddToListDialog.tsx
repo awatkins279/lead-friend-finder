@@ -185,7 +185,13 @@ export function AddToListDialog({
         listId = created.id;
       }
 
-      const rows = idsToAdd.map((id) => ({ list_id: listId, lead_id: id }));
+      const rows = idsToAdd.map((id) => ({
+        list_id: listId,
+        lead_id: id,
+        ...(isCampaign && leadVerifications
+          ? { verification_status: leadVerifications.get(id) ?? null }
+          : {}),
+      }));
       const CHUNK = 500;
       for (let i = 0; i < rows.length; i += CHUNK) {
         const slice = rows.slice(i, i + CHUNK);
