@@ -173,7 +173,7 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const PAGE_SIZE = 25;
-const MAX_BULK = 50000;
+const MAX_BULK = 100000;
 
 const IMPORT_HEADER_ALIASES: Record<string, string> = {
   firstname: "first_name",

@@ -29,7 +29,7 @@ const SIZE_BUCKETS: Record<string, string[]> = {
 
 const Input = z.object({
   filters: FiltersSchema,
-  limit: z.number().int().min(1).max(50000),
+  limit: z.number().int().min(1).max(100000),
 });
 
 
