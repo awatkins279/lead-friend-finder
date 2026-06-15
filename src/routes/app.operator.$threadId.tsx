@@ -15,6 +15,7 @@ import {
   Globe2,
   Loader2,
   Pause,
+  Play,
   Plus,
   Search,
   ShieldCheck,
@@ -55,6 +56,7 @@ import {
   getOperatorWorkspace,
   listOperatorThreads,
   pauseOperatorBlueprint,
+  resumeOperatorBlueprint,
 } from "@/lib/operator.functions";
 
 export const Route = createFileRoute("/app/operator/$threadId")({
@@ -82,6 +84,7 @@ function OperatorPage() {
   const deleteThread = useServerFn(deleteOperatorThread);
   const approvePlan = useServerFn(approveOperatorBlueprint);
   const pausePlan = useServerFn(pauseOperatorBlueprint);
+  const resumePlan = useServerFn(resumeOperatorBlueprint);
   const [input, setInput] = useState("");
   const [threadSearch, setThreadSearch] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -137,6 +140,7 @@ function OperatorPage() {
       deleteThread={deleteThread}
       approvePlan={approvePlan}
       pausePlan={pausePlan}
+      resumePlan={resumePlan}
     />
   );
 }
@@ -158,6 +162,7 @@ function OperatorWorkspace(props: any) {
     deleteThread,
     approvePlan,
     pausePlan,
+    resumePlan,
   } = props;
   const [blueprint, setBlueprint] = useState<Blueprint | null>(workspace.blueprint);
   const [events, setEvents] = useState<any[]>(workspace.events);
@@ -443,6 +448,18 @@ function OperatorWorkspace(props: any) {
                 setActionBusy(false);
               }
             }}
+            resume={async () => {
+              setActionBusy(true);
+              try {
+                await resumePlan({ data: { blueprintId: blueprint.id } });
+                toast.success("Operator resumed");
+                await refreshWorkspace();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Resume failed");
+              } finally {
+                setActionBusy(false);
+              }
+            }}
           />
         )}
         <div className="mt-5">
@@ -539,11 +556,13 @@ function BlueprintPanel({
   actionBusy,
   approve,
   pause,
+  resume,
 }: {
   blueprint: Blueprint;
   actionBusy: boolean;
   approve: () => void;
   pause: () => void;
+  resume: () => void;
 }) {
   const strategy = blueprint.strategy ?? {};
   return (
@@ -622,11 +641,19 @@ function BlueprintPanel({
             )}{" "}
             Approve & build
           </Button>
+        ) : blueprint.status === "paused" ? (
+          <Button className="w-full gap-2" disabled={actionBusy} onClick={resume}>
+            {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Resume Operator
+          </Button>
+        ) : blueprint.status === "completed" ? (
+          <Button className="w-full gap-2" variant="outline" disabled>
+            <Check className="h-4 w-4" /> Campaign build complete
+          </Button>
         ) : (
           <Button
             className="w-full gap-2"
             variant="outline"
-            disabled={actionBusy || blueprint.status === "paused"}
+            disabled={actionBusy}
             onClick={pause}
           >
             <Pause className="h-4 w-4" /> Pause Operator
