@@ -106,17 +106,15 @@ export const verifyLeadEmail = createServerFn({ method: "POST" })
       .eq("lead_id", data.leadId);
 
     // Also write to the per-user lead_verifications cache
-    await supabaseAdmin
-      .from("lead_verifications")
-      .upsert({
-        user_id: userId,
-        lead_id: data.leadId,
-        status,
-        result: mvResult,
-        quality: mvQuality,
-        email,
-        verified_at: new Date().toISOString(),
-      });
+    await supabaseAdmin.from("lead_verifications").upsert({
+      user_id: userId,
+      lead_id: data.leadId,
+      status,
+      result: mvResult,
+      quality: mvQuality,
+      email,
+      verified_at: new Date().toISOString(),
+    });
 
     return { ok: true as const, status, result: mvResult, quality: mvQuality, charged: true };
   });
@@ -177,17 +175,15 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
       }
       if (!email) {
         results.push({ leadId: id, status: "invalid", result: "no_email" });
-        await supabaseAdmin
-          .from("lead_verifications")
-          .upsert({
-            user_id: userId,
-            lead_id: id,
-            status: "invalid",
-            result: "no_email",
-            quality: "bad",
-            email: null,
-            verified_at: new Date().toISOString(),
-          });
+        await supabaseAdmin.from("lead_verifications").upsert({
+          user_id: userId,
+          lead_id: id,
+          status: "invalid",
+          result: "no_email",
+          quality: "bad",
+          email: null,
+          verified_at: new Date().toISOString(),
+        });
         continue;
       }
       toVerify.push({ id, email });
@@ -213,7 +209,14 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
           const r = await verifyOneEmail(apiKey, email);
           return { id, email, ...r, ok: true as const };
         } catch (err: any) {
-          return { id, email, result: "error", quality: "bad", ok: false as const, err: String(err?.message ?? "unknown") };
+          return {
+            id,
+            email,
+            result: "error",
+            quality: "bad",
+            ok: false as const,
+            err: String(err?.message ?? "unknown"),
+          };
         }
       }),
     );
@@ -249,7 +252,11 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
       });
     }
 
-    return { results, charged: toVerify.length - refunds, skipped: results.length - toVerify.length };
+    return {
+      results,
+      charged: toVerify.length - refunds,
+      skipped: results.length - toVerify.length,
+    };
   });
 
 // ---------- Load cached verifications for a set of lead ids ----------
