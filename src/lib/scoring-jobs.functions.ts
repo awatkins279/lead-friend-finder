@@ -17,8 +17,8 @@ export type ScoreRow = {
   gaps: string[];
 };
 
-const BATCH_SIZE = 15;
-const MAX_LEADS_PER_JOB = 20000;
+const BATCH_SIZE = 250;
+const MAX_LEADS_PER_JOB = 100000;
 const PROCESSING_STALE_MS = 75_000;
 // How many batches to claim+score in parallel inside one processNextBatch call.
 // Cuts HTTP round-trips between the browser worker and the server fn.
@@ -30,6 +30,21 @@ const createInput = z.object({
   leadIds: z.array(z.string().min(1)).min(1).max(MAX_LEADS_PER_JOB),
   context: z.string().min(10).max(4000),
 });
+
+function buildFastRubric(context: string) {
+  const normalized = context.toLowerCase();
+  const words = normalized.match(/[a-z][a-z0-9+.-]{2,}/g) ?? [];
+  const ignored = new Set(["the", "and", "for", "with", "that", "this", "from", "into", "sell", "selling", "want", "need", "company", "companies", "business", "leads"]);
+  const keywords = Array.from(new Set(words.filter((word) => !ignored.has(word)))).slice(0, 24);
+  const titleCatalog = ["owner", "founder", "ceo", "president", "chief", "vp", "vice president", "director", "head", "manager"];
+  const industryCatalog = ["software", "saas", "healthcare", "financial", "insurance", "construction", "manufacturing", "real estate", "marketing", "technology", "retail", "logistics"];
+  return {
+    titles: titleCatalog.filter((value) => normalized.includes(value)),
+    industries: industryCatalog.filter((value) => normalized.includes(value)),
+    keywords,
+    exclusions: ["student", "intern", "assistant"],
+  };
+}
 
 export const createScoringJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -52,6 +67,8 @@ export const createScoringJob = createServerFn({ method: "POST" })
         total_batches: batches.length,
         total_leads: unique.length,
         status: "running",
+        scoring_mode: "hybrid_fast",
+        rubric: buildFastRubric(data.context),
       })
       .select("id")
       .single();
@@ -91,35 +108,15 @@ export const processNextBatch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => processInput.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-
-    // Fan out: claim + score up to FANOUT_PER_CALL batches in parallel inside
-    // a single HTTP round-trip from the browser worker.
-    const tasks = Array.from({ length: FANOUT_PER_CALL }, () =>
-      processOneBatch(supabase, data.jobId, false),
-    );
-    const settled = await Promise.all(tasks);
-
-    let claimedAny = false;
-    const allResults: ScoreRow[] = [];
-    let lastJob: any = null;
-    let anyError: string | undefined;
-    for (const r of settled) {
-      if (r.claimed) {
-        claimedAny = true;
-        if (r.results) allResults.push(...r.results);
-        if (r.error) anyError = r.error;
-      } else if (r.job) {
-        lastJob = r.job;
-      }
-    }
-
-    return {
-      claimed: claimedAny,
-      results: allResults,
-      job: lastJob,
-      error: anyError,
-    };
+    const { supabase, userId } = context;
+    const { data: ownedJob } = await supabase.from("scoring_jobs").select("id,status").eq("id", data.jobId).eq("user_id", userId).maybeSingle();
+    if (!ownedJob) throw new Error("Scoring job not found");
+    if (ownedJob.status !== "running") return { claimed: false, results: [], job: ownedJob };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: processed, error } = await supabaseAdmin.rpc("process_fast_scoring_batch_admin", { p_job_id: data.jobId, p_limit: 1000 });
+    if (error) throw new Error(error.message);
+    const count = Number(processed?.[0]?.processed ?? 0);
+    return { claimed: count > 0, results: [] as ScoreRow[], job: null, processed: count };
   });
 
 // Shared core: claim a single batch, score it, update bookkeeping.
@@ -275,16 +272,13 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
 
     const results: ScoreRow[] = [];
     if (data.includeResults) {
-      const { data: doneBatches, error: batchErr } = await supabase
-        .from("scoring_job_batches")
-        .select("results")
+      const { data: scoreRows, error: batchErr } = await supabase
+        .from("scoring_results")
+        .select("lead_id,score,reasoning,signals,strengths,gaps")
         .eq("job_id", data.jobId)
-        .eq("status", "done");
+        .limit(100000);
       if (batchErr) throw new Error(batchErr.message);
-
-      for (const b of doneBatches ?? []) {
-        if (Array.isArray(b.results)) results.push(...(b.results as ScoreRow[]));
-      }
+      for (const row of scoreRows ?? []) results.push({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: Array.isArray(row.signals) ? row.signals as Signal[] : [], strengths: Array.isArray(row.strengths) ? row.strengths as string[] : [], gaps: Array.isArray(row.gaps) ? row.gaps as string[] : [] });
     }
     return { job, results };
   });
