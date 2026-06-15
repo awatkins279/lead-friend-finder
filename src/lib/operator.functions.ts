@@ -103,7 +103,7 @@ export const approveOperatorBlueprint = createServerFn({ method: "POST" })
         campaignId: campaign.id,
         offerBrief: String(blueprint.offer_brief),
         play,
-        maxLeads: Math.max(1, Math.floor(Number(guardrails?.maxLeads ?? play.filters ? 20_000 : 1_000) / Math.max(plays.length, 1))),
+        maxLeads: Math.max(1, Math.floor(Number(guardrails?.maxLeads ?? 1_000) / Math.max(plays.length, 1))),
         scoreThreshold: 60,
       });
     }
@@ -126,9 +126,31 @@ export const resumeOperatorBlueprint = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ blueprintId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.supabase as any;
-    const { data: blueprint, error } = await db.from("operator_blueprints").update({ status: "running" }).eq("id", data.blueprintId).eq("user_id", context.userId).eq("status", "paused").select("id,thread_id").maybeSingle();
+    const { data: blueprint, error } = await db.from("operator_blueprints").update({ status: "running" }).eq("id", data.blueprintId).eq("user_id", context.userId).eq("status", "paused").select("id,thread_id,offer_brief,strategy,guardrails").maybeSingle();
     if (error || !blueprint) throw new Error("This plan is not paused or cannot be resumed");
-    await db.from("operator_events").update({ status: "running" }).eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "operator_pipeline").eq("status", "paused");
+    const { data: pipelines } = await db.from("operator_events").select("id,status").eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "operator_pipeline");
+    if ((pipelines ?? []).length > 0) {
+      await db.from("operator_events").update({ status: "running" }).eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "operator_pipeline").eq("status", "paused");
+    } else {
+      const { data: campaignEvents } = await db.from("operator_events").select("details").eq("blueprint_id", blueprint.id).eq("user_id", context.userId).eq("event_type", "campaign_draft_created").order("created_at");
+      const plays = Array.isArray(blueprint.strategy?.plays) ? blueprint.strategy.plays : [];
+      const { startOperatorPipeline } = await import("@/lib/operator-execution.server");
+      for (let index = 0; index < Math.min(plays.length, campaignEvents?.length ?? 0); index += 1) {
+        const campaignId = campaignEvents[index]?.details?.campaign_id;
+        if (typeof campaignId !== "string") continue;
+        await startOperatorPipeline({
+          db,
+          userId: context.userId,
+          threadId: blueprint.thread_id,
+          blueprintId: blueprint.id,
+          campaignId,
+          offerBrief: String(blueprint.offer_brief),
+          play: plays[index],
+          maxLeads: Math.max(1, Math.floor(Number(blueprint.guardrails?.maxLeads ?? 1_000) / Math.max(plays.length, 1))),
+          scoreThreshold: 60,
+        });
+      }
+    }
     await db.from("operator_events").insert({ thread_id: blueprint.thread_id, blueprint_id: blueprint.id, user_id: context.userId, event_type: "operator_resumed", status: "completed", title: "Operator resumed by user" });
     return { ok: true };
   });

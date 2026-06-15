@@ -43,7 +43,9 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
 
           if (error) throw new Error(error.message);
           if (!jobs || jobs.length === 0) {
-            return Response.json({ ok: true, ...stats, message: "no running jobs" });
+            const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
+            const pipelines = await processOperatorPipelines(supabaseAdmin);
+            return Response.json({ ok: true, ...stats, pipelines, message: "no running scoring jobs" });
           }
 
           stats.jobs = jobs.length;
