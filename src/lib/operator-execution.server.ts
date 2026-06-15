@@ -23,6 +23,7 @@ type PipelineDetails = {
   generation_cursor?: number;
   generated?: number;
   phone_ready?: number;
+  outreach_template?: { emails: any[]; callScript: any };
   progress_current?: number;
   progress_total?: number;
   live_text?: string;
@@ -155,29 +156,32 @@ async function advanceScoring(db: any, event: any, details: PipelineDetails) {
     await updateEvent(db, event.id, `Scoring contacts · ${job.scored_leads}/${job.total_leads}`, next);
     return { id: event.id, stage: "scoring" };
   }
-  const { data: batches, error: batchError } = await db
-    .from("scoring_job_batches")
-    .select("results")
-    .eq("job_id", details.scoring_job_id)
-    .eq("status", "done");
-  if (batchError) throw new Error(batchError.message);
-  const qualified = (batches ?? [])
-    .flatMap((batch: any) => (Array.isArray(batch.results) ? batch.results : []))
-    .filter((row: any) => Number(row.score) > details.score_threshold)
-    .map((row: any) => ({
-      id: String(row.leadId),
-      score: Number(row.score),
-      research: { reasoning: row.reasoning ?? "", ipp_breakdown: row.signals ?? [], strengths: row.strengths ?? [], gaps: row.gaps ?? [] },
-    }));
-  const next: PipelineDetails = { ...details, stage: "validating", qualified, validation_cursor: 0, deliverable: [], progress_current: 0, progress_total: qualified.length, live_text: "Checking qualified email addresses for deliverability" };
-  await updateEvent(db, event.id, `Validating ${qualified.length.toLocaleString()} qualified email addresses`, next);
-  return { id: event.id, stage: "validating", qualified: qualified.length };
+  let qualifiedCount = 0;
+  for (let offset = 0; ; offset += 1000) {
+    const { data: rows, error: resultError } = await db.from("scoring_results")
+      .select("lead_id,score,reasoning,signals,strengths,gaps")
+      .eq("job_id", details.scoring_job_id).gt("score", details.score_threshold).range(offset, offset + 999);
+    if (resultError) throw new Error(resultError.message);
+    if (!rows?.length) break;
+    const { error: insertError } = await db.from("list_leads").upsert(rows.map((row: any) => ({
+      list_id: details.campaign_id, lead_id: row.lead_id, score: row.score,
+      research: { reasoning: row.reasoning, ipp_breakdown: row.signals, strengths: row.strengths, gaps: row.gaps }, status: "new",
+    })), { onConflict: "list_id,lead_id" });
+    if (insertError) throw new Error(insertError.message);
+    qualifiedCount += rows.length;
+    if (rows.length < 1000) break;
+  }
+  const next: PipelineDetails = { ...details, stage: "validating", validation_cursor: 0, progress_current: 0, progress_total: qualifiedCount, live_text: "Checking qualified email addresses for deliverability" };
+  await updateEvent(db, event.id, `Validating ${qualifiedCount.toLocaleString()} qualified email addresses`, next);
+  return { id: event.id, stage: "validating", qualified: qualifiedCount };
 }
 
 async function advanceValidation(db: any, event: any, details: PipelineDetails) {
-  const qualified = details.qualified ?? [];
   const cursor = details.validation_cursor ?? 0;
-  const slice = qualified.slice(cursor, cursor + VERIFY_BATCH_SIZE);
+  const { data: pending, error: pendingError } = await db.from("list_leads").select("lead_id,score,research")
+    .eq("list_id", details.campaign_id).is("verification_status", null).limit(VERIFY_BATCH_SIZE);
+  if (pendingError) throw new Error(pendingError.message);
+  const slice = (pending ?? []).map((row: any) => ({ id: row.lead_id, score: row.score, research: row.research }));
   if (slice.length) {
     const ids = slice.map((row) => row.id);
     const { data: leads, error } = await db.from("leads").select("id,email").in("id", ids);
@@ -202,43 +206,36 @@ async function advanceValidation(db: any, event: any, details: PipelineDetails) 
       verified.map((row) => ({ user_id: event.user_id, lead_id: row.id, status: row.status, result: row.result, quality: row.quality, email: row.email, verified_at: new Date().toISOString() })),
     );
     const byId = new Map(slice.map((row) => [row.id, row]));
-    const deliverable = [
-      ...(details.deliverable ?? []),
-      ...verified.filter((row) => row.status === "deliverable").map((row) => byId.get(row.id)).filter(Boolean),
-    ] as PipelineDetails["deliverable"];
-    const next = { ...details, validation_cursor: cursor + slice.length, deliverable, progress_current: cursor + slice.length, progress_total: qualified.length, live_text: `Verifying email batch ${cursor + 1}-${Math.min(cursor + slice.length, qualified.length)}` };
-    await updateEvent(db, event.id, `Validating emails · ${Math.min(cursor + slice.length, qualified.length)}/${qualified.length}`, next);
+    await Promise.all(verified.map((row) => db.from("list_leads").update({ verification_status: row.status }).eq("list_id", details.campaign_id).eq("lead_id", row.id)));
+    const total = details.progress_total ?? 0;
+    const next = { ...details, validation_cursor: cursor + slice.length, progress_current: cursor + slice.length, progress_total: total, live_text: `Verifying email batch ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
+    await updateEvent(db, event.id, `Validating emails · ${Math.min(cursor + slice.length, total)}/${total}`, next);
     return { id: event.id, stage: "validating", processed: slice.length };
   }
-  const deliverable = details.deliverable ?? [];
-  for (let index = 0; index < deliverable.length; index += 500) {
-    const { error } = await db.from("list_leads").upsert(
-      deliverable.slice(index, index + 500).map((row) => ({ list_id: details.campaign_id, lead_id: row.id, score: row.score, research: row.research, verification_status: "deliverable", status: "new" })),
-      { onConflict: "list_id,lead_id" },
-    );
-    if (error) throw new Error(error.message);
-  }
-  const next: PipelineDetails = { ...details, qualified: undefined, stage: "generating", generation_cursor: 0, generated: 0, phone_ready: 0, progress_current: 0, progress_total: deliverable.length, live_text: "Writing personalized email sequences and call plans" };
-  await updateEvent(db, event.id, `Generating personalized outreach for ${deliverable.length.toLocaleString()} validated contacts`, next);
-  return { id: event.id, stage: "generating", deliverable: deliverable.length };
+  const { count: deliverableCount } = await db.from("list_leads").select("lead_id", { count: "exact", head: true }).eq("list_id", details.campaign_id).eq("verification_status", "deliverable");
+  const next: PipelineDetails = { ...details, stage: "generating", generation_cursor: 0, generated: 0, phone_ready: 0, progress_current: 0, progress_total: deliverableCount ?? 0, live_text: "Writing personalized email sequences and call plans" };
+  await updateEvent(db, event.id, `Generating personalized outreach for ${(deliverableCount ?? 0).toLocaleString()} validated contacts`, next);
+  return { id: event.id, stage: "generating", deliverable: deliverableCount ?? 0 };
 }
 
 async function advanceGeneration(db: any, event: any, details: PipelineDetails) {
-  const deliverable = details.deliverable ?? [];
   const cursor = details.generation_cursor ?? 0;
-  const slice = deliverable.slice(cursor, cursor + GENERATE_BATCH_SIZE);
+  const { data: pending } = await db.from("list_leads").select("lead_id").eq("list_id", details.campaign_id).eq("verification_status", "deliverable").neq("status", "enriched").limit(GENERATE_BATCH_SIZE);
+  const slice = pending ?? [];
   if (slice.length) {
     const [{ data: campaign }, { data: leads }] = await Promise.all([
       db.from("lists").select("name,what_selling,key_selling_points,extra_instructions,num_emails,sender_name,sender_company").eq("id", details.campaign_id).single(),
-      db.from("leads").select("id,first_name,last_name,title,email,phone,org_name,org_industry,org_description,org_employee_count").in("id", slice.map((row) => row.id)),
+      db.from("leads").select("id,first_name,last_name,title,email,phone,org_name,org_industry,org_description,org_employee_count").in("id", slice.map((row: any) => row.lead_id)),
     ]);
-    const generated = await Promise.all((leads ?? []).map((lead: any) => generateOutreach(campaign, lead)));
+    const template = details.outreach_template ?? await generateOutreach(campaign, (leads ?? [])[0] ?? {});
+    const generated = (leads ?? []).map((lead: any) => personalizeTemplate(template, lead));
     for (const item of generated) {
       const { error } = await db.from("list_leads").update({ emails: item.emails, email_subject: item.emails[0]?.subject ?? "", email_body: item.emails[0]?.body ?? "", call_script: item.callScript, status: "enriched" }).eq("list_id", details.campaign_id).eq("lead_id", item.leadId);
       if (error) throw new Error(error.message);
     }
-    const next = { ...details, generation_cursor: cursor + slice.length, generated: (details.generated ?? 0) + generated.length, phone_ready: (details.phone_ready ?? 0) + (leads ?? []).filter((lead: any) => Boolean(lead.phone)).length, progress_current: cursor + slice.length, progress_total: deliverable.length, live_text: `Personalizing outreach for contacts ${cursor + 1}-${Math.min(cursor + slice.length, deliverable.length)}` };
-    await updateEvent(db, event.id, `Building emails and call plans · ${Math.min(cursor + slice.length, deliverable.length)}/${deliverable.length}`, next);
+    const total = details.progress_total ?? 0;
+    const next = { ...details, outreach_template: template, generation_cursor: cursor + slice.length, generated: (details.generated ?? 0) + generated.length, phone_ready: (details.phone_ready ?? 0) + (leads ?? []).filter((lead: any) => Boolean(lead.phone)).length, progress_current: cursor + slice.length, progress_total: total, live_text: `Personalizing outreach for contacts ${cursor + 1}-${Math.min(cursor + slice.length, total)}` };
+    await updateEvent(db, event.id, `Building emails and call plans · ${Math.min(cursor + slice.length, total)}/${total}`, next);
     return { id: event.id, stage: "generating", processed: slice.length };
   }
   await db.from("operator_events").update({ status: "completed", title: `Campaign ready · ${details.generated ?? 0} contacts prepared`, details }).eq("id", event.id);
