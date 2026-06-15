@@ -557,6 +557,7 @@ export type Database = {
           hubspot_status: string | null
           hubspot_sync_date: string | null
           id: string
+          imported_by: string | null
           last_name: string | null
           linkedin_url: string | null
           org_annual_revenue: string | null
@@ -581,6 +582,7 @@ export type Database = {
           hubspot_status?: string | null
           hubspot_sync_date?: string | null
           id: string
+          imported_by?: string | null
           last_name?: string | null
           linkedin_url?: string | null
           org_annual_revenue?: string | null
@@ -605,6 +607,7 @@ export type Database = {
           hubspot_status?: string | null
           hubspot_sync_date?: string | null
           id?: string
+          imported_by?: string | null
           last_name?: string | null
           linkedin_url?: string | null
           org_annual_revenue?: string | null

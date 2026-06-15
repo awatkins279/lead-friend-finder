@@ -46,6 +46,7 @@ import {
   Sparkles,
   ListPlus,
   Send,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -68,6 +69,7 @@ import {
   loadLeadVerifications as loadLeadVerificationsFn,
 } from "@/lib/verify.functions";
 import { ShieldCheck } from "lucide-react";
+import { importLeadsForScoring as importLeadsForScoringFn } from "@/lib/lead-import.functions";
 
 type VerificationStatus = "deliverable" | "risky" | "invalid" | "disposable" | "unknown";
 
@@ -173,6 +175,72 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
 
+const IMPORT_HEADER_ALIASES: Record<string, string> = {
+  firstname: "first_name",
+  first: "first_name",
+  lastname: "last_name",
+  last: "last_name",
+  emailaddress: "email",
+  jobtitle: "title",
+  companyname: "company",
+  organization: "company",
+  companyindustry: "industry",
+  companysize: "company_size",
+  employeecount: "company_size",
+  phonenumber: "phone",
+  linkedin: "linkedin_url",
+  linkedinurl: "linkedin_url",
+  website: "company_website",
+  companywebsite: "company_website",
+  description: "company_description",
+};
+
+function parseCsvLeads(text: string): Array<Record<string, string>> {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '"') {
+      if (quoted && text[i + 1] === '"') {
+        cell += '"';
+        i += 1;
+      } else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[i + 1] === "\n") i += 1;
+      row.push(cell);
+      cell = "";
+      if (row.some((value) => value.trim())) records.push(row);
+      row = [];
+    } else cell += char;
+  }
+  row.push(cell);
+  if (row.some((value) => value.trim())) records.push(row);
+  if (records.length < 2) return [];
+  const headers = records[0].map((header) => {
+    const normalized = header
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+    return (
+      IMPORT_HEADER_ALIASES[normalized] ??
+      header
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+    );
+  });
+  return records
+    .slice(1)
+    .map((values) =>
+      Object.fromEntries(headers.map((header, index) => [header, (values[index] ?? "").trim()])),
+    );
+}
+
 function escapeForOr(v: string) {
   // PostgREST .or() uses commas as separators; escape them in user input.
   return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -262,7 +330,11 @@ function PeoplePage() {
   // sessions on the server (lead_verifications table) but loaded lazily here.
   const [verifications, setVerifications] = useState<Map<string, VerificationStatus>>(new Map());
   const [verifyBusy, setVerifyBusy] = useState(false);
-  const [verifyProgress, setVerifyProgress] = useState<{ done: number; total: number } | null>(null);
+  const [verifyProgress, setVerifyProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
+  const [importBusy, setImportBusy] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const createScoringJobCall = useServerFn(createScoringJobFn);
   const processNextBatchCall = useServerFn(processNextBatchFn);
@@ -271,6 +343,7 @@ function PeoplePage() {
   const finalizeScoringJobCall = useServerFn(finalizeScoringJobFn);
   const verifyLeadEmailsBatchCall = useServerFn(verifyLeadEmailsBatchFn);
   const loadLeadVerificationsCall = useServerFn(loadLeadVerificationsFn);
+  const importLeadsForScoringCall = useServerFn(importLeadsForScoringFn);
 
   useEffect(() => setPage(0), [filters]);
 
@@ -790,11 +863,11 @@ function PeoplePage() {
     [scoredEligibleIds, verifications],
   );
 
-  const verifyScoredEmails = async () => {
+  const verifyEmails = async (requestedIds: string[]) => {
     if (verifyBusy) return;
-    const ids = unverifiedScoredIds;
+    const ids = requestedIds.filter((id) => !verifications.has(id));
     if (ids.length === 0) {
-      toast.info("All scored leads have already been verified.");
+      toast.info("Those leads have already been verified.");
       return;
     }
     setVerifyBusy(true);
@@ -821,11 +894,57 @@ function PeoplePage() {
         setVerifyProgress({ done, total: ids.length });
       }
       toast.success(`Verified ${ids.length.toLocaleString()} emails`);
-    } catch (e: any) {
-      toast.error(e.message ?? "Verification failed");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Verification failed");
     } finally {
       setVerifyBusy(false);
       setVerifyProgress(null);
+    }
+  };
+
+  const verifyScoredEmails = () => verifyEmails(scoredEligibleIds);
+  const verifySelectedEmails = () => verifyEmails(Array.from(picked));
+
+  const keepVerificationResults = (allowed: VerificationStatus[]) => {
+    const allowedSet = new Set(allowed);
+    setPicked(
+      (previous) =>
+        new Set(
+          Array.from(previous).filter((id) => allowedSet.has(verifications.get(id) ?? "unknown")),
+        ),
+    );
+    toast.success(
+      allowed.length === 1 ? "Kept deliverable emails only" : "Kept deliverable and risky emails",
+    );
+  };
+
+  const importAndScore = async (file: File) => {
+    if (!scoringContext.trim() || scoringContext.trim().length < 10) {
+      toast.error("Describe your ideal customer profile before importing");
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      toast.error("Upload a CSV file");
+      return;
+    }
+    if (file.size > 5_000_000) {
+      toast.error("CSV files must be 5 MB or smaller");
+      return;
+    }
+    setImportBusy(true);
+    try {
+      const leads = parseCsvLeads(await file.text());
+      if (leads.length === 0) throw new Error("No lead rows were found in the CSV");
+      if (leads.length > 5000) throw new Error("Import up to 5,000 leads at a time");
+      const result = await importLeadsForScoringCall({ data: { leads } });
+      setPicked(new Set(result.ids));
+      toast.success(`Imported ${result.imported.toLocaleString()} leads`);
+      await startScoringJob(result.ids);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Lead import failed");
+    } finally {
+      setImportBusy(false);
+      if (importInputRef.current) importInputRef.current.value = "";
     }
   };
 
@@ -837,6 +956,35 @@ function PeoplePage() {
     () => new Map(pickedIds.map((id) => [id, scores.get(id)?.score ?? null] as const)),
     [pickedIds, scores],
   );
+
+  useEffect(() => {
+    const missing = pickedIds.filter((id) => !verifications.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        for (let i = 0; i < missing.length; i += 5000) {
+          const result = await loadLeadVerificationsCall({
+            data: { leadIds: missing.slice(i, i + 5000) },
+          });
+          if (cancelled) return;
+          setVerifications((previous) => {
+            const next = new Map(previous);
+            for (const row of result.verifications as Array<{ lead_id: string; status: string }>) {
+              next.set(row.lead_id, row.status as VerificationStatus);
+            }
+            return next;
+          });
+        }
+      } catch (error) {
+        console.warn("Failed to load selected email validations", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickedIds.join(",")]);
 
   // Lazily fetch heavy detail fields only when the side sheet opens
   const { data: selectedDetail } = useQuery({
@@ -1168,17 +1316,43 @@ function PeoplePage() {
 
         {/* Selection bar */}
         {hasSelection && (
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[oklch(0.70_0.18_290/0.08)] px-4 py-2.5 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[oklch(0.70_0.18_290/0.08)] px-4 py-2.5 text-sm">
             <div className="flex items-center gap-2">
               <span className="font-medium">{picked.size.toLocaleString()} leads selected</span>
               <span className="text-muted-foreground">· selection persists across pages</span>
             </div>
-            <button
-              onClick={clearSelection}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear selection
-            </button>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={verifySelectedEmails}
+                disabled={verifyBusy}
+              >
+                {verifyBusy ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <ShieldCheck className="mr-1 h-3 w-3" />
+                )}
+                Validate selected
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => keepVerificationResults(["deliverable"])}
+              >
+                Keep deliverable
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => keepVerificationResults(["deliverable", "risky"])}
+              >
+                Keep deliverable + risky
+              </Button>
+              <Button size="sm" variant="ghost" onClick={clearSelection}>
+                Clear
+              </Button>
+            </div>
           </div>
         )}
 
@@ -1268,6 +1442,9 @@ function PeoplePage() {
                     Location
                   </TableHead>
                   <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Email status
+                  </TableHead>
+                  <TableHead className="text-xs uppercase tracking-wider text-muted-foreground">
                     AI Score
                   </TableHead>
                 </TableRow>
@@ -1276,7 +1453,7 @@ function PeoplePage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="py-12 text-center text-sm text-muted-foreground"
                     >
                       Loading…
@@ -1285,7 +1462,7 @@ function PeoplePage() {
                 ) : rows.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="py-12 text-center text-sm text-muted-foreground"
                     >
                       No leads match your filters.
@@ -1348,6 +1525,9 @@ function PeoplePage() {
                           <MapPin className="h-3 w-3" />
                           {[r.city, r.state].filter(Boolean).join(", ") || r.country || "—"}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <VerificationBadge status={verifications.get(r.id)} hasEmail={!!r.email} />
                       </TableCell>
                       <TableCell>
                         <ScoreBadge info={scores.get(r.id)} />
@@ -1450,6 +1630,35 @@ function PeoplePage() {
             placeholder="Describe your ideal customer profile…"
             className="border-white/10 bg-white/[0.03] text-xs"
           />
+
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void importAndScore(file);
+            }}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-2 w-full border-dashed border-white/15 bg-white/[0.03]"
+            disabled={importBusy || scoringBusy}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importBusy ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <Upload className="mr-1 h-3 w-3" />
+            )}
+            Upload CSV and score leads
+          </Button>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+            Supports name, email, title, company, industry, location, phone, and LinkedIn columns.
+            Up to 5,000 rows.
+          </p>
 
           {/* Threshold */}
           <div className="mt-4">
@@ -1806,6 +2015,7 @@ function PeoplePage() {
         onOpenChange={setCampaignOpen}
         leadIds={pickedIds}
         leadScores={campaignLeadScores}
+        leadVerifications={verifications}
         onAdded={() => setPicked(new Set())}
       />
       <AddToListDialog
@@ -2510,6 +2720,40 @@ const verdictDot: Record<Signal["verdict"], string> = {
   weak: "bg-rose-500",
   unknown: "bg-muted-foreground/40",
 };
+
+function VerificationBadge({
+  status,
+  hasEmail,
+}: {
+  status: VerificationStatus | undefined;
+  hasEmail: boolean;
+}) {
+  if (!hasEmail)
+    return (
+      <Badge variant="outline" className="text-[10px]">
+        No email
+      </Badge>
+    );
+  if (!status)
+    return (
+      <Badge variant="outline" className="text-[10px]">
+        Not validated
+      </Badge>
+    );
+  const style =
+    status === "deliverable"
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+      : status === "risky"
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+        : status === "invalid" || status === "disposable"
+          ? "border-rose-500/30 bg-rose-500/10 text-rose-400"
+          : "text-muted-foreground";
+  return (
+    <Badge variant="outline" className={`text-[10px] capitalize ${style}`}>
+      {status}
+    </Badge>
+  );
+}
 
 function ScoreBadge({ info }: { info: ScoreInfo | undefined }) {
   if (!info) return <span className="text-xs text-muted-foreground">—</span>;
