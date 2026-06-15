@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { processOneBatch } from "@/lib/scoring-jobs.functions";
 
-// Background worker invoked by pg_cron every ~10s. Picks up to a small batch
-// of running scoring jobs and processes a handful of batches per tick using
-// the *_admin RPC variants (no end-user auth context).
+// Background worker invoked by pg_cron. One invocation keeps advancing work
+// for most of its runtime so scoring and operator stages do not wait a minute.
 //
 // Auth: requires `apikey` header == Supabase anon key (matches other
 // /api/public/* endpoints in this project). Endpoint must remain idempotent
@@ -13,6 +12,7 @@ const MAX_JOBS_PER_TICK = 5;
 const BATCHES_PER_JOB_PER_TICK = 6;
 const CONCURRENT_BATCHES_PER_JOB = 3;
 const HARD_DEADLINE_MS = 45_000;
+const LOOP_DELAY_MS = 2_000;
 
 export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
   server: {
@@ -34,27 +34,19 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
         };
 
         try {
-          // Pick the oldest running jobs (across all users — admin context).
-          const { data: jobs, error } = await supabaseAdmin
-            .from("scoring_jobs")
-            .select("id,total_batches,completed_batches,failed_batches")
-            .eq("status", "running")
-            .order("created_at", { ascending: true })
-            .limit(MAX_JOBS_PER_TICK);
+          const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
+          do {
+            const { data: jobs, error } = await supabaseAdmin
+              .from("scoring_jobs")
+              .select("id,total_batches,completed_batches,failed_batches")
+              .eq("status", "running")
+              .order("created_at", { ascending: true })
+              .limit(MAX_JOBS_PER_TICK);
+            if (error) throw new Error(error.message);
+            stats.jobs = Math.max(stats.jobs, jobs?.length ?? 0);
 
-          if (error) throw new Error(error.message);
-          if (!jobs || jobs.length === 0) {
-            const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
-            const pipelines = await processOperatorPipelines(supabaseAdmin);
-            return Response.json({ ok: true, ...stats, pipelines, message: "no running scoring jobs" });
-          }
-
-          stats.jobs = jobs.length;
-
-          // Hybrid jobs are scored in database-side blocks of up to 1,000 leads.
-          // This avoids model latency for the initial qualification pass.
-          await Promise.all(
-            jobs.map(async (job: { id: string }) => {
+            await Promise.all(
+              (jobs ?? []).map(async (job: { id: string }) => {
               const { data: fastRows, error: fastError } = await supabaseAdmin.rpc(
                 "process_fast_scoring_batch_admin",
                 { p_job_id: job.id, p_limit: 5_000 },
@@ -110,11 +102,12 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
               } catch {
                 // ignore — next tick will retry
               }
-            }),
-          );
-
-          const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
-          await processOperatorPipelines(supabaseAdmin);
+              }),
+            );
+            await processOperatorPipelines(supabaseAdmin, 8);
+            if (Date.now() - startedAt + LOOP_DELAY_MS >= HARD_DEADLINE_MS) break;
+            await new Promise((resolve) => setTimeout(resolve, LOOP_DELAY_MS));
+          } while (Date.now() - startedAt < HARD_DEADLINE_MS);
 
           return Response.json({
             ok: true,
