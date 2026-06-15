@@ -26,7 +26,7 @@ const importInput = z.object({
 export const importLeadsForScoring = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => importInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const seenEmails = new Set<string>();
     const rows = data.leads
@@ -40,6 +40,7 @@ export const importLeadsForScoring = createServerFn({ method: "POST" })
       })
       .map((lead) => ({
         id: crypto.randomUUID(),
+        imported_by: context.userId,
         first_name: lead.first_name || null,
         last_name: lead.last_name || null,
         email: lead.email.toLowerCase() || null,
