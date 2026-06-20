@@ -277,18 +277,7 @@ export const loadLeadVerifications = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .in("lead_id", data.leadIds);
     if (error) throw new Error(error.message);
-    const { data: leads, error: leadsError } = await supabaseAdmin
-      .from("leads")
-      .select("id,email")
-      .in("id", data.leadIds)
-      .or(`imported_by.is.null,imported_by.eq.${userId}`);
-    if (leadsError) throw new Error(leadsError.message);
-    const currentEmails = new Map(
-      (leads ?? []).map((lead) => [lead.id, lead.email?.toLowerCase() ?? null]),
-    );
     return {
-      verifications: (rows ?? []).filter(
-        (row) => currentEmails.get(row.lead_id) === row.email?.toLowerCase(),
-      ),
+      verifications: rows ?? [],
     };
   });
