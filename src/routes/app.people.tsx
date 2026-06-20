@@ -1336,16 +1336,15 @@ function PeoplePage() {
                       }}
                     >
                       <PopoverTrigger asChild>
-                        <button className="flex items-center gap-1 rounded hover:bg-white/5 px-1 py-0.5">
-                          <Checkbox
-                            checked={
-                              allPageChecked ? true : somePageChecked ? "indeterminate" : false
-                            }
-                            onCheckedChange={() => {}}
-                            onClick={(e) => e.preventDefault()}
-                          />
+                        <div className="flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-white/5">
+                          <span
+                            aria-hidden="true"
+                            className="grid h-4 w-4 shrink-0 place-content-center rounded-sm border border-primary bg-transparent text-[10px] leading-none text-primary"
+                          >
+                            {allPageChecked ? "✓" : somePageChecked ? "–" : ""}
+                          </span>
                           <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                        </button>
+                        </div>
                       </PopoverTrigger>
                       <PopoverContent align="start" className="w-64 p-1">
                         {!advancedMode ? (
@@ -1662,7 +1661,7 @@ function PeoplePage() {
             {!hasSelection && (
               <p className="text-[10px] leading-relaxed text-muted-foreground">
                 Tip: click the checkbox header above the table to select all matching leads (up to
-                50,000), then score them all at once.
+                100,000), then score them all at once.
               </p>
             )}
             {scoredEligibleIds.length > 0 && (
