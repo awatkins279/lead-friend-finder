@@ -314,20 +314,43 @@ function PeoplePage() {
     refetchOnWindowFocus: false,
     queryKey,
     queryFn: async () => {
-      // Inline exact count. The previous "estimated" approach used the planner
-      // estimate, which under-counts massively against the RLS predicate on
-      // leads (showed ~15k against 1.5M). A separate HEAD count request
-      // silently returned null. Inline exact is the reliable option.
-      let q: any = supabase.from("leads").select(LIST_COLS, { count: "exact" });
+      // Order by `id` (PK index) instead of `last_name` — there's no btree
+      // index on last_name, so sorting 1.5M rows tripped the statement
+      // timeout (HTTP 500 "canceling statement due to statement timeout").
+      // Count comes from a fast RPC or PostgREST's planner-based "estimated"
+      // when filters are active; an exact count over 1.5M rows times out.
+      const hasFilters =
+        (filters.name ?? "").trim() !== "" ||
+        (filters.titles ?? []).length > 0 ||
+        (filters.company ?? "").trim() !== "" ||
+        (filters.locations ?? []).length > 0 ||
+        (filters.industry ?? "").trim() !== "" ||
+        (filters.companySize ?? []).length > 0 ||
+        !!filters.hasPhone ||
+        !!filters.hasEmail;
+
+      let q: any = supabase
+        .from("leads")
+        .select(LIST_COLS, hasFilters ? { count: "estimated" } : undefined);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-      q = q.order("last_name", { ascending: true, nullsFirst: false }).range(from, to);
-      const { data, count, error } = await q;
-      if (error) throw error;
-      return { rows: (data ?? []) as Lead[], count: count ?? 0 };
+      q = q.order("id", { ascending: true }).range(from, to);
+
+      const [rowsRes, totalRes] = await Promise.all([
+        q,
+        hasFilters
+          ? Promise.resolve({ data: null as number | null, error: null as any })
+          : supabase.rpc("leads_total_estimate"),
+      ]);
+      if (rowsRes.error) throw rowsRes.error;
+      const count = hasFilters
+        ? rowsRes.count ?? 0
+        : Number(totalRes.data ?? 0);
+      return { rows: (rowsRes.data ?? []) as Lead[], count };
     },
   });
+
 
 
 
