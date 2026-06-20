@@ -16,13 +16,14 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { filters, limit } = data;
 
-    // Page through the filtered result set in API-safe chunks. A STABLE sort is
-    // required: without ORDER BY, offset paging returns rows in arbitrary physical
-    // order, so successive chunks overlap and skip rows — "select all" then loses
-    // leads. Ordering by the indexed primary key is cheap (no costly text sort).
+    // Keyset pagination (id > lastId) rather than offset/range. With 1.5M rows
+    // and trigram ilike filters, deep `.range()` offsets force Postgres to scan
+    // and discard everything before the offset on each chunk — which trips the
+    // statement timeout on "select all matching". Keyset uses the PK index and
+    // stays O(chunk) regardless of how deep we are.
     const CHUNK = 1000;
     const ids: string[] = [];
-    let offset = 0;
+    let lastId: string | null = null;
 
     while (ids.length < limit) {
       const take = Math.min(CHUNK, limit - ids.length);
@@ -30,15 +31,15 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
 
       // Single source of truth — shared with the in-app People Search list.
       q = buildLeadQuery(q, filters);
-
-      q = q.order("id", { ascending: true }).range(offset, offset + take - 1);
+      if (lastId) q = q.gt("id", lastId);
+      q = q.order("id", { ascending: true }).limit(take);
 
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const batch = (rows ?? []) as { id: string }[];
       if (batch.length === 0) break;
       for (const r of batch) ids.push(r.id);
-      offset += batch.length;
+      lastId = batch[batch.length - 1].id;
       if (batch.length < take) break;
     }
 
