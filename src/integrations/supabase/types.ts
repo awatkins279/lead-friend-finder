@@ -439,6 +439,84 @@ export type Database = {
         }
         Relationships: []
       }
+      email_orders: {
+        Row: {
+          config: Json
+          created_at: string
+          currency: string
+          domain_cents: number
+          domain_count: number
+          environment: string | null
+          fulfillment: Json
+          id: string
+          mailbox_count: number
+          mailbox_monthly_cents: number
+          monthly_cents: number
+          one_time_cents: number
+          paid_at: string | null
+          setup_cents: number
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
+          stripe_subscription_id: string | null
+          terms_accepted: boolean
+          terms_accepted_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          currency?: string
+          domain_cents?: number
+          domain_count?: number
+          environment?: string | null
+          fulfillment?: Json
+          id?: string
+          mailbox_count?: number
+          mailbox_monthly_cents?: number
+          monthly_cents?: number
+          one_time_cents?: number
+          paid_at?: string | null
+          setup_cents?: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_subscription_id?: string | null
+          terms_accepted?: boolean
+          terms_accepted_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          currency?: string
+          domain_cents?: number
+          domain_count?: number
+          environment?: string | null
+          fulfillment?: Json
+          id?: string
+          mailbox_count?: number
+          mailbox_monthly_cents?: number
+          monthly_cents?: number
+          one_time_cents?: number
+          paid_at?: string | null
+          setup_cents?: number
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_subscription_id?: string | null
+          terms_accepted?: boolean
+          terms_accepted_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_calendar_connections: {
         Row: {
           access_token: string
