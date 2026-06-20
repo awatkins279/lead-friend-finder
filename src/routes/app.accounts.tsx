@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Card } from "@/components/ui/card";
 import {
   Phone,
@@ -9,7 +10,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Mail,
-  Sparkles,
+  ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,14 @@ import { PhoneAccountDialog, type PhoneAccountRow } from "@/components/PhoneAcco
 import { ProviderAccountDialog, PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
 import { type EmailAccountRow } from "@/components/EmailAccountDialog";
 import { InstantlyConnectCard } from "@/components/InstantlyConnectCard";
+import { OrderAccounts } from "@/components/OrderAccounts";
+import { checkIsAdmin } from "@/lib/admin.functions";
 import { toast } from "sonner";
+
+// White-label: customers never see the underlying provider name (e.g. "instantly").
+function providerLabel(provider: string): string {
+  return provider === "instantly" ? "Managed" : provider;
+}
 
 export const Route = createFileRoute("/app/accounts")({
   component: AccountsPage,
@@ -55,6 +63,9 @@ function AccountsPage() {
   const [providerOpen, setProviderOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<PhoneAccountRow | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const isAdminFn = useServerFn(checkIsAdmin);
 
   const load = async () => {
     setLoading(true);
@@ -80,6 +91,10 @@ function AccountsPage() {
 
   useEffect(() => {
     load();
+    isAdminFn()
+      .then((r) => setIsAdmin(r.isAdmin))
+      .catch(() => setIsAdmin(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const removeEmail = async (id: string) => {
@@ -140,6 +155,9 @@ function AccountsPage() {
           </TabsTrigger>
           <TabsTrigger value="email" className="gap-2">
             <Mail className="h-3.5 w-3.5" /> Email accounts
+          </TabsTrigger>
+          <TabsTrigger value="buy" className="gap-2">
+            <ShoppingCart className="h-3.5 w-3.5" /> Buy more
           </TabsTrigger>
         </TabsList>
 
@@ -226,11 +244,13 @@ function AccountsPage() {
 
         {/* EMAIL TAB */}
         <TabsContent value="email" className="space-y-4">
-          {userId && <InstantlyConnectCard onChanged={load} />}
+          {userId && isAdmin && <InstantlyConnectCard onChanged={load} />}
 
           <p className="text-sm text-muted-foreground">
-            These are the inboxes your AI SDR sends &amp; replies through. Connect
-            Instantly above to import all your mailboxes automatically.
+            These are the inboxes your AI SDR sends &amp; replies through.
+            {isAdmin
+              ? " Connect Instantly above to import mailboxes."
+              : " Need more inboxes? Use the Buy more tab."}
           </p>
 
           {loading ? (
@@ -242,8 +262,9 @@ function AccountsPage() {
               </div>
               <p className="text-sm font-medium">No email accounts yet</p>
               <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
-                Connect Instantly above to import your domains &amp; mailboxes. They'll
-                appear here and your SDR agents can send through them.
+                {isAdmin
+                  ? "Connect Instantly above to import your mailboxes — they'll appear here."
+                  : "Your mailboxes appear here once they're set up. Need some? Use the Buy more tab to order domains + mailboxes."}
               </p>
             </Card>
           ) : (
@@ -254,7 +275,7 @@ function AccountsPage() {
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-primary" />
                       <span className="font-medium">{a.email_address}</span>
-                      <Badge variant="outline" className="text-[10px] capitalize">{a.provider}</Badge>
+                      <Badge variant="outline" className="text-[10px] capitalize">{providerLabel(a.provider)}</Badge>
                       {a.status === "active" ? (
                         <Badge variant="secondary" className="gap-1">
                           <CheckCircle2 className="h-3 w-3" /> Ready
@@ -278,6 +299,15 @@ function AccountsPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* BUY MORE TAB — order more domains + mailboxes */}
+        <TabsContent value="buy" className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Order more done-for-you domains &amp; mailboxes. We set them up and add them
+            straight to your account.
+          </p>
+          <OrderAccounts showHeader={false} />
         </TabsContent>
       </Tabs>
 
