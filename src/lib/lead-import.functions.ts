@@ -62,15 +62,35 @@ export const importLeadsForScoring = createServerFn({ method: "POST" })
     if (rows.length === 0) throw new Error("The file did not contain any usable leads");
 
     const ids: string[] = [];
+    const warnings: { batch: number; error: string }[] = [];
     for (let i = 0; i < rows.length; i += 500) {
+      const batchNum = Math.floor(i / 500) + 1;
       const slice = rows.slice(i, i + 500);
       const { data: inserted, error } = await supabaseAdmin
         .from("leads")
         .insert(slice)
         .select("id");
-      if (error) throw new Error(error.message);
+      // Don't abort the whole import on one bad batch — record it and keep going,
+      // otherwise a single failure mid-way leaves a partial import with no report.
+      if (error) {
+        warnings.push({ batch: batchNum, error: error.message });
+        continue;
+      }
       ids.push(...(inserted ?? []).map((row) => row.id));
     }
 
-    return { ids, imported: ids.length };
+    // Only hard-fail if NOTHING imported; otherwise return partial success.
+    if (ids.length === 0) {
+      throw new Error(
+        warnings[0]?.error
+          ? `No leads could be imported: ${warnings[0].error}`
+          : "No leads could be imported",
+      );
+    }
+
+    return {
+      ids,
+      imported: ids.length,
+      warnings: warnings.length ? warnings : undefined,
+    };
   });

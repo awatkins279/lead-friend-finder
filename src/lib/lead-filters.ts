@@ -31,21 +31,28 @@ export const LEAD_FILTERS_SCHEMA = z.object({
 });
 
 export const SIZE_BUCKETS: Record<string, string[]> = {
+  // Each raw employee-count string maps to EXACTLY ONE bucket, so picking a size
+  // never drags in companies from a neighbouring bucket. (The source data uses
+  // coarse ranges, so a spanning value like "11 to 50" is absorbed by one bucket.)
   "1-10": ["1", "1 to 10", "2 to 10"],
   "11-25": ["11 to 25", "11 to 50"],
-  "26-50": ["26 to 50", "11 to 50"],
+  "26-50": ["26 to 50"],
   "51-100": ["51 to 100", "51 to 200"],
-  "101-250": ["101 to 250", "51 to 200", "201 to 500"],
+  "101-250": ["101 to 250"],
   "251-500": ["251 to 500", "201 to 500"],
   "501-1000": ["501 to 1000", "501 to 1,000"],
-  "1001-2500": ["1001 to 5000", "1,001 to 5,000"],
-  "2501-5000": ["1001 to 5000", "1,001 to 5,000"],
+  "1001-5000": ["1001 to 5000", "1,001 to 5,000"],
   "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+"],
 };
 
 export function escapeForOr(v: string): string {
   // PostgREST .or() uses commas/parens as syntax; escape them in user input.
-  return v.replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  // Backslash must be escaped FIRST or it would double-escape the others.
+  return v
+    .replace(/\\/g, "\\\\")
+    .replace(/,/g, "\\,")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
 }
 
 // Full US state name -> 2-letter abbreviation (+ DC).
@@ -81,11 +88,15 @@ function locationConditions(term: string): string[] {
     out.push(`city.ilike.%${escapeForOr(l)}%`);
     out.push(`country.ilike.%${escapeForOr(l)}%`);
   } else if (l.length === 2 && STATE_ABBR_TO_NAME[l]) {
-    // Abbreviation typed → match the abbreviation OR the full name in `state`.
+    // Abbreviation typed → match the abbreviation OR the full name in `state`,
+    // and fall back to city/country on the FULL name so a lead whose `state` is
+    // blank (e.g. city "Miami", state "") still surfaces for "FL". The full name
+    // is unambiguous, so this won't false-match the way a bare 2-letter token would.
     const name = STATE_ABBR_TO_NAME[l];
     out.push(`state.ilike.${escapeForOr(l)}`); // exact "FL"
     out.push(`state.ilike.%${escapeForOr(name)}%`);
-    // Don't broad-match city/country on a 2-letter token (false positives).
+    out.push(`city.ilike.%${escapeForOr(name)}%`);
+    out.push(`country.ilike.%${escapeForOr(name)}%`);
   } else {
     // Not a US state — treat as a free city/state/country contains-match.
     out.push(`city.ilike.%${escapeForOr(l)}%`);

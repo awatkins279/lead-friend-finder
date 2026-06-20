@@ -117,7 +117,7 @@ export const processNextBatch = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const count = Number(processed?.[0]?.processed ?? 0);
     const { data: recentRows, error: recentError } = count > 0
-      ? await supabase.from("scoring_results").select("lead_id,score,reasoning,signals,strengths,gaps").eq("job_id", data.jobId).order("updated_at", { ascending: false }).limit(count)
+      ? await supabase.from("scoring_results").select("lead_id,score,reasoning,signals,strengths,gaps").eq("job_id", data.jobId).eq("user_id", userId).order("updated_at", { ascending: false }).limit(count)
       : { data: [], error: null };
     if (recentError) throw new Error(recentError.message);
     const results = (recentRows ?? []).map((row: any) => ({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: row.signals ?? [], strengths: row.strengths ?? [], gaps: row.gaps ?? [] })) as ScoreRow[];

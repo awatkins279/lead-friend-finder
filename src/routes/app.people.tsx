@@ -145,21 +145,8 @@ const EMPTY: Filters = {
   hasEmail: false,
 };
 
-// Maps user-facing size bucket → raw strings present in org_employee_count.
-// Source data uses many notations (commas, "to" vs "+"), so we enumerate.
-const SIZE_BUCKETS: Record<string, string[]> = {
-  "1-10": ["1", "1 to 10", "2 to 10"],
-  "11-25": ["11 to 25", "11 to 50"],
-  "26-50": ["26 to 50", "11 to 50"],
-  "51-100": ["51 to 100", "51 to 200"],
-  "101-250": ["101 to 250", "51 to 200", "201 to 500"],
-  "251-500": ["251 to 500", "201 to 500"],
-  "501-1000": ["501 to 1000", "501 to 1,000"],
-  "1001-2500": ["1001 to 5000", "1,001 to 5,000"],
-  "2501-5000": ["1001 to 5000", "1,001 to 5,000"],
-  "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+"],
-};
-
+// Company-size dropdown options. The raw value → bucket mapping lives in the
+// shared SIZE_BUCKETS (lead-filters.ts) so the list and bulk-select agree.
 const SIZE_OPTIONS: { value: string; label: string }[] = [
   { value: "1-10", label: "1-10" },
   { value: "11-25", label: "11-25" },
@@ -168,8 +155,7 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
   { value: "101-250", label: "101-250" },
   { value: "251-500", label: "251-500" },
   { value: "501-1000", label: "501-1,000" },
-  { value: "1001-2500", label: "1,001-2,500" },
-  { value: "2501-5000", label: "2,501-5,000" },
+  { value: "1001-5000", label: "1,001-5,000" },
   { value: "5000+", label: "5,000+" },
 ];
 
@@ -194,6 +180,16 @@ const IMPORT_HEADER_ALIASES: Record<string, string> = {
   website: "company_website",
   companywebsite: "company_website",
   description: "company_description",
+  // Location — common header variants that must land in city/state/country,
+  // otherwise Zod silently drops them and location search finds nothing.
+  city: "city",
+  location: "city",
+  state: "state",
+  stateprovince: "state",
+  region: "state",
+  province: "state",
+  country: "country",
+  nation: "country",
 };
 
 function mapImportedRows(records: string[][]): Array<Record<string, string>> {
