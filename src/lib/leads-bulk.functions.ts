@@ -6,7 +6,8 @@ import { LEAD_FILTERS_SCHEMA, buildLeadQuery } from "@/lib/lead-filters";
 
 const Input = z.object({
   filters: LEAD_FILTERS_SCHEMA,
-  limit: z.number().int().min(1).max(100000),
+  limit: z.number().int().min(1).max(1000),
+  afterId: z.string().min(1).nullable().optional(),
 });
 
 export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
@@ -15,42 +16,29 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { filters, limit } = data;
+    const { filters, limit, afterId } = data;
 
-    // Keyset pagination (id > lastId) rather than offset/range. With 1.5M rows
-    // and trigram ilike filters, deep `.range()` offsets force Postgres to scan
-    // and discard everything before the offset on each chunk — which trips the
-    // statement timeout on "select all matching". Keyset uses the PK index and
-    // stays O(chunk) regardless of how deep we are.
-    const CHUNK = 1000;
-    const ids: string[] = [];
-    let lastId: string | null = null;
+    let q: any = supabaseAdmin
+      .from("leads")
+      .select("id")
+      .or(`imported_by.is.null,imported_by.eq.${userId}`);
 
-    while (ids.length < limit) {
-      const take = Math.min(CHUNK, limit - ids.length);
-      let q: any = supabaseAdmin
-        .from("leads")
-        .select("id")
-        .or(`imported_by.is.null,imported_by.eq.${userId}`);
+    // Keyset pagination (id > afterId) keeps every request small. Returning
+    // 100k IDs from one server action can exceed runtime/response limits, so
+    // the client asks for repeated 1k pages instead.
+    q = buildLeadQuery(q, filters);
+    if (afterId) q = q.gt("id", afterId);
+    q = q.order("id", { ascending: true }).limit(limit);
 
-      // Single source of truth — shared with the in-app People Search list.
-      q = buildLeadQuery(q, filters);
-      if (lastId) q = q.gt("id", lastId);
-      q = q.order("id", { ascending: true }).limit(take);
-
-      const { data: rows, error } = await q;
-      if (error) throw new Error(error.message);
-      const batch = (rows ?? []) as { id: string }[];
-      if (batch.length === 0) break;
-      for (const r of batch) ids.push(r.id);
-      lastId = batch[batch.length - 1].id;
-      if (batch.length < take) break;
-    }
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    const ids = ((rows ?? []) as { id: string }[]).map((row) => row.id);
+    const nextCursor = ids.length > 0 ? ids[ids.length - 1] : null;
 
     // Meter pulled contacts (admin bypass automatic)
     if (ids.length > 0) {
       await chargeUser(userId, "pull_contacts", ids.length, `bulk_pull:${ids.length}`);
     }
 
-    return { ids };
+    return { ids, nextCursor };
   });
