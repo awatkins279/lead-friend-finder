@@ -126,7 +126,7 @@ type Filters = {
   name: string;
   titles: string[];
   company: string;
-  location: string;
+  locations: string[];
   industry: string;
   companySize: string[];
   hasPhone: boolean;
@@ -137,7 +137,7 @@ const EMPTY: Filters = {
   name: "",
   titles: [],
   company: "",
-  location: "",
+  locations: [],
   industry: "",
   companySize: [],
   hasPhone: false,
@@ -269,9 +269,16 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   }
   if (f.company.trim()) r = r.ilike("org_name", `%${f.company.trim()}%`);
   if (f.industry.trim()) r = r.ilike("org_industry", `%${f.industry.trim()}%`);
-  if (f.location.trim()) {
-    const t = f.location.trim();
-    r = r.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
+  const locations = (f.locations ?? []).map((l) => l.trim()).filter(Boolean);
+  if (locations.length > 0) {
+    // A lead matches if any of city/state/country matches ANY chosen location.
+    const expr = locations
+      .map(
+        (l) =>
+          `city.ilike.%${escapeForOr(l)}%,state.ilike.%${escapeForOr(l)}%,country.ilike.%${escapeForOr(l)}%`,
+      )
+      .join(",");
+    r = r.or(expr);
   }
   const sizes = f.companySize ?? [];
   if (sizes.length > 0) {
@@ -1011,7 +1018,7 @@ function PeoplePage() {
 
   const industryActive = !!draft.industry;
   const sizeActive = draft.companySize.length > 0;
-  const locationActive = !!draft.location;
+  const locationActive = draft.locations.length > 0;
   const titleActive = draft.titles.length > 0;
   const nameActive = !!draft.name || !!draft.company;
 
@@ -1178,13 +1185,19 @@ function PeoplePage() {
                   Location
                 </span>
                 <span className="mt-0.5 flex items-center gap-2 text-sm text-foreground">
-                  <span className="truncate">{locationActive ? draft.location : "Anywhere"}</span>
+                  <span className="truncate">
+                    {locationActive
+                      ? draft.locations.length === 1
+                        ? draft.locations[0]
+                        : `${draft.locations.length} locations`
+                      : "Anywhere"}
+                  </span>
                   {locationActive && (
                     <X
                       className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const next = { ...filters, location: "" };
+                        const next = { ...filters, locations: [] };
                         setFilters(next);
                         setDraft(next);
                       }}
@@ -1193,14 +1206,14 @@ function PeoplePage() {
                 </span>
               </button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-72 p-3">
-              <AutocompleteField
-                icon={<MapPin className="h-3.5 w-3.5" />}
-                label="Location"
-                placeholder="city, state or country"
-                value={draft.location}
-                onChange={(v) => setDraft({ ...draft, location: v })}
+            <PopoverContent align="start" className="w-80 p-3">
+              <MultiTagSelect
+                values={draft.locations}
+                onChange={(next) => setDraft({ ...draft, locations: next })}
                 options={COMMON_LOCATIONS}
+                label="Location"
+                icon={<MapPin className="h-3.5 w-3.5" />}
+                placeholder="Search city, state or country…"
               />
             </PopoverContent>
           </Popover>
@@ -1235,9 +1248,13 @@ function PeoplePage() {
               </button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80 p-3">
-              <TitleMultiSelect
+              <MultiTagSelect
                 values={draft.titles}
                 onChange={(next) => setDraft({ ...draft, titles: next })}
+                options={COMMON_TITLES}
+                label="Job title"
+                icon={<Briefcase className="h-3.5 w-3.5" />}
+                placeholder="Search job titles…"
               />
             </PopoverContent>
           </Popover>
@@ -2517,12 +2534,20 @@ function fuzzyScore(query: string, target: string): number {
   return matched > 0 ? 50 : 0;
 }
 
-function TitleMultiSelect({
+function MultiTagSelect({
   values,
   onChange,
+  options,
+  label,
+  icon,
+  placeholder,
 }: {
   values: string[];
   onChange: (next: string[]) => void;
+  options: string[];
+  label: string;
+  icon: React.ReactNode;
+  placeholder: string;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -2539,14 +2564,14 @@ function TitleMultiSelect({
 
   const suggestions = useMemo(() => {
     const selected = new Set(values.map((v) => v.toLowerCase()));
-    const scored = COMMON_TITLES.filter((t) => !selected.has(t.toLowerCase()))
+    const scored = options.filter((t) => !selected.has(t.toLowerCase()))
       .map((t) => ({ t, s: fuzzyScore(query.trim(), t) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 12)
       .map((x) => x.t);
     return scored;
-  }, [query, values]);
+  }, [query, values, options]);
 
   const addTitle = (t: string) => {
     const v = t.trim();
@@ -2569,7 +2594,7 @@ function TitleMultiSelect({
     <div className="space-y-2" ref={containerRef}>
       <div className="flex items-center justify-between">
         <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <Briefcase className="h-3.5 w-3.5" /> Job title
+          {icon} {label}
         </Label>
         {values.length > 0 && (
           <button
@@ -2622,7 +2647,7 @@ function TitleMultiSelect({
                 setOpen(false);
               }
             }}
-            placeholder={values.length === 0 ? "Search job titles…" : ""}
+            placeholder={values.length === 0 ? placeholder : ""}
             className="flex-1 min-w-[8ch] bg-transparent px-1 py-1 text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
