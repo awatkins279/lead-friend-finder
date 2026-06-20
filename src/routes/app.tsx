@@ -15,6 +15,7 @@ import {
   Shield,
   Package,
   Calendar,
+  ShoppingCart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,6 +79,7 @@ function AppShell() {
     { to: "/app/inbox", icon: Inbox, label: "Inbox" },
     { to: "/app/saved", icon: Bookmark, label: "Saved Searches" },
     { to: "/app/accounts", icon: Mail, label: "Sending Accounts" },
+    { to: "/app/order", icon: ShoppingCart, label: "Buy Accounts" },
     { to: "/app/sdr-agents", icon: Bot, label: "AI SDR Agents" },
     { to: "/app/voicemail-agent", icon: Voicemail, label: "AI Voicemail Agent" },
     { to: "/app/product-info", icon: Package, label: "Product Info" },

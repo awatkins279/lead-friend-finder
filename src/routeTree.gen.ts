@@ -20,6 +20,7 @@ import { Route as AppSdrAgentsRouteImport } from './routes/app.sdr-agents'
 import { Route as AppSavedRouteImport } from './routes/app.saved'
 import { Route as AppProductInfoRouteImport } from './routes/app.product-info'
 import { Route as AppPeopleRouteImport } from './routes/app.people'
+import { Route as AppOrderRouteImport } from './routes/app.order'
 import { Route as AppInboxRouteImport } from './routes/app.inbox'
 import { Route as AppCoachingStylesRouteImport } from './routes/app.coaching-styles'
 import { Route as AppCalendarRouteImport } from './routes/app.calendar'
@@ -92,6 +93,11 @@ const AppProductInfoRoute = AppProductInfoRouteImport.update({
 const AppPeopleRoute = AppPeopleRouteImport.update({
   id: '/people',
   path: '/people',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrderRoute = AppOrderRouteImport.update({
+  id: '/order',
+  path: '/order',
   getParentRoute: () => AppRoute,
 } as any)
 const AppInboxRoute = AppInboxRouteImport.update({
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/app/calendar': typeof AppCalendarRoute
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
+  '/app/order': typeof AppOrderRoute
   '/app/people': typeof AppPeopleRoute
   '/app/product-info': typeof AppProductInfoRoute
   '/app/saved': typeof AppSavedRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/app/calendar': typeof AppCalendarRoute
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
+  '/app/order': typeof AppOrderRoute
   '/app/people': typeof AppPeopleRoute
   '/app/product-info': typeof AppProductInfoRoute
   '/app/saved': typeof AppSavedRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   '/app/calendar': typeof AppCalendarRoute
   '/app/coaching-styles': typeof AppCoachingStylesRoute
   '/app/inbox': typeof AppInboxRoute
+  '/app/order': typeof AppOrderRoute
   '/app/people': typeof AppPeopleRoute
   '/app/product-info': typeof AppProductInfoRoute
   '/app/saved': typeof AppSavedRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/app/calendar'
     | '/app/coaching-styles'
     | '/app/inbox'
+    | '/app/order'
     | '/app/people'
     | '/app/product-info'
     | '/app/saved'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/app/calendar'
     | '/app/coaching-styles'
     | '/app/inbox'
+    | '/app/order'
     | '/app/people'
     | '/app/product-info'
     | '/app/saved'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/app/calendar'
     | '/app/coaching-styles'
     | '/app/inbox'
+    | '/app/order'
     | '/app/people'
     | '/app/product-info'
     | '/app/saved'
@@ -479,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: '/people'
       fullPath: '/app/people'
       preLoaderRoute: typeof AppPeopleRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/order': {
+      id: '/app/order'
+      path: '/order'
+      fullPath: '/app/order'
+      preLoaderRoute: typeof AppOrderRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/inbox': {
@@ -616,6 +635,7 @@ interface AppRouteChildren {
   AppCalendarRoute: typeof AppCalendarRoute
   AppCoachingStylesRoute: typeof AppCoachingStylesRoute
   AppInboxRoute: typeof AppInboxRoute
+  AppOrderRoute: typeof AppOrderRoute
   AppPeopleRoute: typeof AppPeopleRoute
   AppProductInfoRoute: typeof AppProductInfoRoute
   AppSavedRoute: typeof AppSavedRoute
@@ -631,6 +651,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCalendarRoute: AppCalendarRoute,
   AppCoachingStylesRoute: AppCoachingStylesRoute,
   AppInboxRoute: AppInboxRoute,
+  AppOrderRoute: AppOrderRoute,
   AppPeopleRoute: AppPeopleRoute,
   AppProductInfoRoute: AppProductInfoRoute,
   AppSavedRoute: AppSavedRoute,
@@ -675,3 +696,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

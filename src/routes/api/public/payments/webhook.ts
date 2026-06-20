@@ -14,6 +14,9 @@ function getSupabase(): any {
 }
 
 async function handleSubscriptionCreated(subscription: any, env: StripeEnv) {
+  // Email-order subscriptions are tracked on email_orders (via the order's
+  // checkout.session.completed), NOT as a plan in the subscriptions table.
+  if (subscription.metadata?.kind === "email_order" || subscription.metadata?.order_id) return;
   const userId = subscription.metadata?.userId;
   if (!userId) {
     console.error("No userId in subscription metadata");
@@ -53,6 +56,7 @@ async function handleSubscriptionCreated(subscription: any, env: StripeEnv) {
 }
 
 async function handleSubscriptionUpdated(subscription: any, env: StripeEnv) {
+  if (subscription.metadata?.kind === "email_order" || subscription.metadata?.order_id) return;
   const item = subscription.items?.data?.[0];
   const priceId =
     item?.price?.lookup_key ||
@@ -85,9 +89,37 @@ async function handleSubscriptionDeleted(subscription: any, env: StripeEnv) {
     .eq("environment", env);
 }
 
+// Mark a done-for-you email order paid once Stripe confirms the checkout.
+async function handleOrderCheckoutCompleted(session: any, env: StripeEnv) {
+  if (session.metadata?.kind !== "email_order") return; // not an order checkout
+  const orderId = session.metadata?.order_id;
+  if (!orderId) {
+    console.error("email_order checkout without order_id");
+    return;
+  }
+  // Only advance pending -> paid (idempotent; never clobber a later admin status).
+  await getSupabase()
+    .from("email_orders")
+    .update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      stripe_subscription_id: session.subscription ?? null,
+      stripe_payment_intent_id: session.payment_intent ?? null,
+      stripe_customer_id: session.customer ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", orderId)
+    .eq("environment", env)
+    .eq("status", "pending")
+    .is("paid_at", null); // belt-and-suspenders: never re-mark an already-paid order
+}
+
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event = await verifyWebhook(req, env);
   switch (event.type) {
+    case "checkout.session.completed":
+      await handleOrderCheckoutCompleted(event.data.object, env);
+      break;
     case "customer.subscription.created":
       await handleSubscriptionCreated(event.data.object, env);
       break;
