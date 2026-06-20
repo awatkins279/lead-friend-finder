@@ -15,7 +15,6 @@ import {
   Shield,
   Package,
   Calendar,
-  Orbit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,7 +72,6 @@ function AppShell() {
     label: string;
     disabled?: boolean;
   }> = [
-    { to: "/app/operator", icon: Orbit, label: "AI Operator" },
     { to: "/app/people", icon: Users, label: "People Search" },
     { to: "/app/lists", icon: Send, label: "Campaigns" },
     { to: "/app/calendar", icon: Calendar, label: "Calendar" },

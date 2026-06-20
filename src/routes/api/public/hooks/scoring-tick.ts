@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Background worker invoked by pg_cron. One invocation keeps advancing work
-// for most of its runtime so scoring and operator stages do not wait a minute.
+// Background worker invoked by pg_cron. One invocation keeps advancing scoring
+// work for most of its runtime so scoring jobs do not wait a minute per batch.
 //
 // Auth: requires `apikey` header == Supabase anon key (matches other
 // /api/public/* endpoints in this project). Endpoint must remain idempotent
@@ -31,10 +31,7 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
         };
 
         try {
-          const { processOperatorPipelines } = await import("@/lib/operator-execution.server");
-          const { processOperatorBuilds } = await import("@/lib/operator-build.server");
           do {
-            await processOperatorBuilds(supabaseAdmin, 1);
             const { data: jobs, error } = await supabaseAdmin
               .from("scoring_jobs")
               .select("id,total_batches,completed_batches,failed_batches")
@@ -62,7 +59,6 @@ export const Route = createFileRoute("/api/public/hooks/scoring-tick")({
                 }
               }),
             );
-            await processOperatorPipelines(supabaseAdmin, 8);
             if (Date.now() - startedAt + LOOP_DELAY_MS >= HARD_DEADLINE_MS) break;
             await new Promise((resolve) => setTimeout(resolve, LOOP_DELAY_MS));
           } while (Date.now() - startedAt < HARD_DEADLINE_MS);
