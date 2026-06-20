@@ -2445,6 +2445,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      leads_total_estimate: { Args: never; Returns: number }
       process_fast_scoring_batch_admin: {
         Args: { p_job_id: string; p_limit?: number }
         Returns: {
