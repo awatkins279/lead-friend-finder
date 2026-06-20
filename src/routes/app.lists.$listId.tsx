@@ -24,7 +24,6 @@ import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 import { VoicemailRecorder } from "@/components/VoicemailRecorder";
 import { getVoicemailProfile } from "@/lib/voicemail.functions";
-import { generateVoicemailScript, synthesizeVoicemail, logVoicemailDrop } from "@/lib/voicemail.functions";
 
 import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -1424,11 +1423,6 @@ function CallWorkstation({
   const [voicemailDropping, setVoicemailDropping] = useState(false);
 
   // ---- AI Voicemail Agent ----
-  const genVmScriptFn = useServerFn(generateVoicemailScript);
-  const synthVmFn = useServerFn(synthesizeVoicemail);
-  const logVmFn = useServerFn(logVoicemailDrop);
-  const vmScriptsRef = useRef<Map<string, Promise<string>>>(new Map());
-  const [aiVmDropping, setAiVmDropping] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -1704,97 +1698,6 @@ function CallWorkstation({
     }
   };
 
-  /**
-   * AI Voicemail Drop:
-   *  - Uses the pre-generated personalized script (or generates on demand)
-   *  - Synthesizes via ElevenLabs in the user's cloned voice
-   *  - Pipes the MP3 through the active call's outbound RTP sender
-   *  - Logs the drop, hangs up, and advances to the next prospect
-   */
-  const dropAiVoicemailAndNext = async () => {
-    if (!active) return;
-    const sender = getOutboundAudioSender();
-    if (!sender) { toast.error("AI voicemail isn't available on this call"); return; }
-    setAiVmDropping(true);
-    let script = "";
-    let voiceId: string | null = null;
-    try {
-      const pending = vmScriptsRef.current.get(active.lead_id);
-      script = pending
-        ? await pending
-        : (await genVmScriptFn({ data: { listId, leadId: active.lead_id } })).script;
-      if (!script) throw new Error("Empty script");
-
-      const synth = await synthVmFn({ data: { script } });
-      voiceId = synth.voiceId;
-
-      const audio = new Audio(`data:audio/mpeg;base64,${synth.audioBase64}`);
-      audio.crossOrigin = "anonymous";
-      vmAudioRef.current = audio;
-
-      const ctx = new AudioContext();
-      vmCtxRef.current = ctx;
-      const source = ctx.createMediaElementSource(audio);
-      const dest = ctx.createMediaStreamDestination();
-      source.connect(dest);
-
-      vmOriginalTrackRef.current = sender.track ?? null;
-      vmSenderRef.current = sender;
-      const vmTrack = dest.stream.getAudioTracks()[0];
-      await sender.replaceTrack(vmTrack);
-
-      const leadIdSnap = active.lead_id;
-      const callIdSnap = callId;
-
-      audio.onended = async () => {
-        try { await sender.replaceTrack(vmOriginalTrackRef.current); } catch {}
-        try { await ctx.close(); } catch {}
-        vmAudioRef.current = null;
-        vmCtxRef.current = null;
-        vmOriginalTrackRef.current = null;
-        vmSenderRef.current = null;
-        logVmFn({ data: {
-          listId, leadId: leadIdSnap, callId: callIdSnap,
-          script, voiceId, audioSeconds: audio.duration || undefined, status: "sent",
-        }}).catch(() => {});
-        vmScriptsRef.current.delete(leadIdSnap);
-        toast.success("AI voicemail sent");
-        await hangupAndNext();
-        setAiVmDropping(false);
-      };
-      audio.onerror = () => {
-        logVmFn({ data: {
-          listId, leadId: leadIdSnap, callId: callIdSnap,
-          script, voiceId, status: "failed", error: "playback error",
-        }}).catch(() => {});
-        toast.error("Couldn't play AI voicemail");
-        setAiVmDropping(false);
-      };
-      await audio.play();
-    } catch (e: any) {
-      logVmFn({ data: {
-        listId, leadId: active.lead_id, callId,
-        script: script || "(generation failed)",
-        voiceId, status: "failed", error: (e?.message ?? "unknown").slice(0, 400),
-      }}).catch(() => {});
-      toast.error(e?.message ?? "AI voicemail failed");
-      setAiVmDropping(false);
-    }
-  };
-
-  // Pre-generate the AI voicemail script the moment a call begins, so the drop
-  // is instant if it goes to voicemail. If the prospect answers we silently
-  // discard it (no ElevenLabs credit used since audio is never synthesized).
-  useEffect(() => {
-    if (!active) return;
-    if (callStatus !== "connecting" && callStatus !== "ringing") return;
-    if (vmScriptsRef.current.has(active.lead_id)) return;
-    const leadId = active.lead_id;
-    const p = genVmScriptFn({ data: { listId, leadId } })
-      .then((r) => r.script)
-      .catch(() => "");
-    vmScriptsRef.current.set(leadId, p);
-  }, [callStatus, active, listId, genVmScriptFn]);
 
 
 
@@ -2151,9 +2054,6 @@ function CallWorkstation({
         canDropVoicemail={!!voicemailAudioPath && callStatus === "in_progress" && !voicemailDropping}
         onDropVoicemail={dropVoicemailAndNext}
         voicemailDropping={voicemailDropping}
-        canDropAiVoicemail={callStatus === "in_progress" && !aiVmDropping}
-        onDropAiVoicemail={dropAiVoicemailAndNext}
-        aiVmDropping={aiVmDropping}
         outcomeBusy={outcomeBusy}
         onLogOutcome={logOutcome}
       />
@@ -2189,9 +2089,6 @@ function FocusCallView({
   canDropVoicemail,
   onDropVoicemail,
   voicemailDropping,
-  canDropAiVoicemail,
-  onDropAiVoicemail,
-  aiVmDropping,
   outcomeBusy,
   onLogOutcome,
 }: {
@@ -2218,9 +2115,6 @@ function FocusCallView({
   canDropVoicemail: boolean;
   onDropVoicemail: () => void;
   voicemailDropping: boolean;
-  canDropAiVoicemail: boolean;
-  onDropAiVoicemail: () => void;
-  aiVmDropping: boolean;
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
@@ -2338,18 +2232,6 @@ function FocusCallView({
               title={muted ? "Unmute" : "Mute"}
             >
               {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </Button>
-            <Button
-              size="sm"
-              onClick={onDropAiVoicemail}
-              disabled={!canDropAiVoicemail}
-              className="h-10 rounded-xl border-0 bg-gradient-to-r from-[oklch(0.50_0.22_295)] to-[oklch(0.58_0.20_275)] px-4 text-white shadow-[0_0_22px_-6px_oklch(0.70_0.18_290/0.9)] hover:opacity-95"
-            >
-              {aiVmDropping ? (
-                <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Sending…</>
-              ) : (
-                <><Sparkles className="mr-1.5 h-4 w-4" /> AI Voicemail</>
-              )}
             </Button>
           </div>
 
