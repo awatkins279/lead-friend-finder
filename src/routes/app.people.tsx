@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildLeadQuery } from "@/lib/lead-filters";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -245,49 +246,8 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   q: T,
   f: Filters,
 ): T {
-  let r: any = q;
-  const nameQ = (f.name ?? "").trim();
-  if (nameQ) {
-    const parts = nameQ.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      const first = escapeForOr(parts[0]);
-      const last = escapeForOr(parts.slice(1).join(" "));
-      r = r
-        .or(`first_name.ilike.%${first}%,last_name.ilike.%${first}%`)
-        .or(`first_name.ilike.%${last}%,last_name.ilike.%${last}%`);
-    } else {
-      const t = escapeForOr(nameQ);
-      r = r.or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
-    }
-  }
-  const titles = (f.titles ?? []).map((t) => t.trim()).filter(Boolean);
-  if (titles.length === 1) {
-    r = r.ilike("title", `%${titles[0]}%`);
-  } else if (titles.length > 1) {
-    const expr = titles.map((t) => `title.ilike.%${escapeForOr(t)}%`).join(",");
-    r = r.or(expr);
-  }
-  if (f.company.trim()) r = r.ilike("org_name", `%${f.company.trim()}%`);
-  if (f.industry.trim()) r = r.ilike("org_industry", `%${f.industry.trim()}%`);
-  const locations = (f.locations ?? []).map((l) => l.trim()).filter(Boolean);
-  if (locations.length > 0) {
-    // A lead matches if any of city/state/country matches ANY chosen location.
-    const expr = locations
-      .map(
-        (l) =>
-          `city.ilike.%${escapeForOr(l)}%,state.ilike.%${escapeForOr(l)}%,country.ilike.%${escapeForOr(l)}%`,
-      )
-      .join(",");
-    r = r.or(expr);
-  }
-  const sizes = f.companySize ?? [];
-  if (sizes.length > 0) {
-    const raw = Array.from(new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])));
-    if (raw.length > 0) r = r.in("org_employee_count", raw);
-  }
-  if (f.hasPhone) r = r.not("phone", "is", null).neq("phone", "");
-  if (f.hasEmail) r = r.not("email", "is", null).neq("email", "");
-  return r;
+  // Single source of truth — shared with the bulk select-all server function.
+  return buildLeadQuery(q, f) as T;
 }
 
 async function fetchMatchingIds(filters: Filters, limit: number): Promise<string[]> {

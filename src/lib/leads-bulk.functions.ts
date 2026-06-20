@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { chargeUser } from "@/lib/credits.functions";
+import { LEAD_FILTERS_SCHEMA, buildLeadQuery } from "@/lib/lead-filters";
 
 const FiltersSchema = z.object({
   name: z.string().max(200).optional().default(""),
@@ -28,7 +29,7 @@ const SIZE_BUCKETS: Record<string, string[]> = {
 };
 
 const Input = z.object({
-  filters: FiltersSchema,
+  filters: LEAD_FILTERS_SCHEMA,
   limit: z.number().int().min(1).max(100000),
 });
 
@@ -55,42 +56,8 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
       const take = Math.min(CHUNK, limit - ids.length);
       let q: any = supabase.from("leads").select("id");
 
-      const nameQ = (filters.name ?? "").trim();
-      if (nameQ) {
-        const parts = nameQ.split(/\s+/).filter(Boolean);
-        if (parts.length >= 2) {
-          const first = escapeForOr(parts[0]);
-          const last = escapeForOr(parts.slice(1).join(" "));
-          q = q
-            .or(`first_name.ilike.%${first}%,last_name.ilike.%${first}%`)
-            .or(`first_name.ilike.%${last}%,last_name.ilike.%${last}%`);
-        } else {
-          const t = escapeForOr(nameQ);
-          q = q.or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%`);
-        }
-      }
-
-      const titles = (filters.titles ?? []).map((t) => t.trim()).filter(Boolean);
-      if (titles.length === 1) {
-        q = q.ilike("title", `%${titles[0]}%`);
-      } else if (titles.length > 1) {
-        q = q.or(titles.map((t) => `title.ilike.%${escapeForOr(t)}%`).join(","));
-      }
-      if (filters.company.trim()) q = q.ilike("org_name", `%${filters.company.trim()}%`);
-      if (filters.industry.trim()) q = q.ilike("org_industry", `%${filters.industry.trim()}%`);
-      if (filters.location.trim()) {
-        const t = filters.location.trim();
-        q = q.or(`city.ilike.%${t}%,state.ilike.%${t}%,country.ilike.%${t}%`);
-      }
-      const sizes = filters.companySize ?? [];
-      if (sizes.length > 0) {
-        const raw = Array.from(
-          new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])),
-        );
-        if (raw.length > 0) q = q.in("org_employee_count", raw);
-      }
-      if (filters.hasPhone) q = q.not("phone", "is", null).neq("phone", "");
-      if (filters.hasEmail) q = q.not("email", "is", null).neq("email", "");
+      // Single source of truth — shared with the in-app People Search list.
+      q = buildLeadQuery(q, filters);
 
       q = q.range(offset, offset + take - 1);
 
