@@ -314,16 +314,26 @@ function PeoplePage() {
     refetchOnWindowFocus: false,
     queryKey,
     queryFn: async () => {
-      let q: any = supabase.from("leads").select(LIST_COLS, { count: "estimated" });
+      // Rows: no count here — PostgREST's "estimated" count uses the planner
+      // estimate which, with the RLS predicate on leads, is wildly low
+      // (showed ~15k against 1.5M real rows). We fetch the count separately.
+      let q: any = supabase.from("leads").select(LIST_COLS);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       q = q.order("last_name", { ascending: true, nullsFirst: false }).range(from, to);
-      const { data, count, error } = await q;
-      if (error) throw error;
-      return { rows: (data ?? []) as Lead[], count: count ?? 0 };
+
+      // Count: HEAD request, exact, runs in parallel with the row fetch.
+      let cq: any = supabase.from("leads").select("id", { count: "exact", head: true });
+      cq = applyFilters(cq, filters);
+
+      const [rowsRes, countRes] = await Promise.all([q, cq]);
+      if (rowsRes.error) throw rowsRes.error;
+      if (countRes.error) throw countRes.error;
+      return { rows: (rowsRes.data ?? []) as Lead[], count: countRes.count ?? 0 };
     },
   });
+
 
   const total = data?.count ?? 0;
   const rows = data?.rows ?? [];
