@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { AdminOrders } from "@/components/AdminOrders";
 import { DollarSign, Users, Repeat, Zap } from "lucide-react";
 
 export const Route = createFileRoute("/app/admin")({
@@ -110,6 +111,16 @@ function AdminDashboard() {
           }% utilization`}
         />
       </div>
+
+      {/* Email-account orders (done-for-you fulfillment) */}
+      <Card className="p-5">
+        <h2 className="mb-1 text-sm font-semibold">Email account orders</h2>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Fulfill paid orders: record the real mailboxes you create, push them into your Instantly,
+          and assign them to the customer.
+        </p>
+        <AdminOrders />
+      </Card>
 
       {/* By plan */}
       <Card className="p-5">

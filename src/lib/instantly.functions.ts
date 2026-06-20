@@ -102,6 +102,66 @@ export async function instantlyListEmails(apiKey: string, eaccount: string): Pro
   }
 }
 
+// Add an existing mailbox (SMTP/IMAP) to the Instantly workspace, then enable
+// warmup. Used by admin order fulfillment. Throws on failure.
+export type InstantlyMailboxCreds = {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  provider_code?: string | number;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_username: string;
+  smtp_password: string;
+  imap_host: string;
+  imap_port: number;
+  imap_username: string;
+  imap_password: string;
+};
+
+export async function instantlyAddAccount(
+  apiKey: string,
+  m: InstantlyMailboxCreds,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${INSTANTLY_BASE}/accounts`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: m.email,
+        first_name: m.first_name ?? "",
+        last_name: m.last_name ?? "",
+        ...(m.provider_code !== undefined ? { provider_code: m.provider_code } : {}),
+        imap_username: m.imap_username,
+        imap_password: m.imap_password,
+        imap_host: m.imap_host,
+        imap_port: m.imap_port,
+        smtp_username: m.smtp_username,
+        smtp_password: m.smtp_password,
+        smtp_host: m.smtp_host,
+        smtp_port: m.smtp_port,
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      return { ok: false, error: `Instantly add-account failed (${res.status})${t ? `: ${t.slice(0, 200)}` : ""}` };
+    }
+    // Best-effort: kick off warmup (don't fail the whole add if warmup errors).
+    try {
+      await fetch(`${INSTANTLY_BASE}/accounts/warmup/enable`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: [m.email] }),
+      });
+    } catch {
+      /* warmup can be enabled later */
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 // POST a reply to an existing Instantly email. Throws on failure.
 export async function instantlySendReply(opts: {
   apiKey: string;
