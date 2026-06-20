@@ -951,9 +951,9 @@ function PeoplePage() {
     let cancelled = false;
     void (async () => {
       try {
-        for (let i = 0; i < missing.length; i += 5000) {
+        for (let i = 0; i < missing.length; i += 200) {
           const result = await loadLeadVerificationsCall({
-            data: { leadIds: missing.slice(i, i + 5000) },
+            data: { leadIds: missing.slice(i, i + 200) },
           });
           if (cancelled) return;
           setVerifications((previous) => {

@@ -13,7 +13,8 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Input.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { filters, limit } = data;
 
     // Keyset pagination (id > lastId) rather than offset/range. With 1.5M rows
@@ -27,7 +28,10 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
 
     while (ids.length < limit) {
       const take = Math.min(CHUNK, limit - ids.length);
-      let q: any = supabase.from("leads").select("id");
+      let q: any = supabaseAdmin
+        .from("leads")
+        .select("id")
+        .or(`imported_by.is.null,imported_by.eq.${userId}`);
 
       // Single source of truth — shared with the in-app People Search list.
       q = buildLeadQuery(q, filters);
