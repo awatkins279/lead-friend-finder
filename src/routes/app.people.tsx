@@ -160,7 +160,8 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
 ];
 
 const PAGE_SIZE = 25;
-const MAX_BULK = 100000;
+const MAX_BULK = 5000;
+const BULK_ID_PAGE_SIZE = 1000;
 
 const IMPORT_HEADER_ALIASES: Record<string, string> = {
   firstname: "first_name",
@@ -247,11 +248,23 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
 }
 
 async function fetchMatchingIds(filters: Filters, limit: number): Promise<string[]> {
-  // One server round trip; the worker keyset-paginates locally over a fast
-  // PG connection. Avoids dozens of cross-internet round trips from the
-  // browser, which was the main source of slowness for large selections.
-  const res = await fetchMatchingIdsBulk({ data: { filters, limit } });
-  return res.ids;
+  const ids: string[] = [];
+  let afterId: string | null = null;
+
+  while (ids.length < limit) {
+    const res = await fetchMatchingIdsBulk({
+      data: {
+        filters,
+        limit: Math.min(BULK_ID_PAGE_SIZE, limit - ids.length),
+        afterId,
+      },
+    });
+    ids.push(...res.ids);
+    afterId = res.nextCursor ?? null;
+    if (res.ids.length === 0 || !afterId) break;
+  }
+
+  return ids;
 }
 
 function PeoplePage() {
