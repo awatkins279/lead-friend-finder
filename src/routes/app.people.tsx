@@ -393,6 +393,10 @@ function PeoplePage() {
       }),
     [filters],
   );
+  const matchingCountLabel = matchingExceedsBulkLimit
+    ? `${MAX_BULK.toLocaleString()}+`
+    : total.toLocaleString();
+  const matchingCountPrefix = activeChips.length > 0 && !matchingExceedsBulkLimit ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
@@ -999,7 +1003,7 @@ function PeoplePage() {
 
   useEffect(() => {
     const missing = pickedIds.filter((id) => !verifications.has(id));
-    if (missing.length === 0) return;
+    if (missing.length === 0 || pickedIds.length > 1000) return;
     let cancelled = false;
     void (async () => {
       try {
