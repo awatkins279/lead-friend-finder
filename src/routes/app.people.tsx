@@ -354,7 +354,7 @@ function PeoplePage() {
 
       let q: any = supabase
         .from("leads")
-        .select(LIST_COLS);
+        .select(LIST_COLS, hasFilters ? { count: "estimated" } : undefined);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
