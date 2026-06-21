@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { countMatchingIdsBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -247,7 +247,11 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   return buildLeadQuery(q, f) as T;
 }
 
-async function fetchMatchingIds(filters: Filters, limit: number): Promise<string[]> {
+async function fetchMatchingIds(
+  filters: Filters,
+  limit: number,
+  onProgress?: (count: number) => void,
+): Promise<string[]> {
   const ids: string[] = [];
   let afterId: string | null = null;
 
@@ -260,6 +264,7 @@ async function fetchMatchingIds(filters: Filters, limit: number): Promise<string
       },
     });
     ids.push(...res.ids);
+    onProgress?.(ids.length);
     afterId = res.nextCursor ?? null;
     if (res.ids.length === 0 || !afterId) break;
   }
