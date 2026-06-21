@@ -367,7 +367,9 @@ function PeoplePage() {
           : supabase.rpc("leads_total_estimate"),
       ]);
       if (rowsRes.error) throw rowsRes.error;
-      const count = hasFilters ? (totalRes as { count: number }).count : Number(totalRes.data ?? 0);
+      const count = hasFilters
+        ? (totalRes as { count: number }).count
+        : Number((totalRes as { data: number | null }).data ?? 0);
       const exceedsLimit = hasFilters
         ? (totalRes as { exceedsLimit: boolean }).exceedsLimit
         : count > MAX_BULK;
