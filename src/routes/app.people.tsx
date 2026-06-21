@@ -1748,8 +1748,8 @@ function PeoplePage() {
             </Button>
             {!hasSelection && (
               <p className="text-[10px] leading-relaxed text-muted-foreground">
-                Tip: click the checkbox header above the table to select all matching leads (up to
-                100,000), then score them all at once.
+                Tip: click the checkbox header above the table to select all matching leads, then
+                score them all at once.
               </p>
             )}
             {scoredEligibleIds.length > 0 && (
