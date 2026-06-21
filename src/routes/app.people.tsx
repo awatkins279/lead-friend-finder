@@ -435,17 +435,17 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
+    if (matchingExceedsBulkLimit || total > MAX_BULK) {
+      toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
+      setSelectMenuOpen(false);
+      setAdvancedMode(false);
+      return;
+    }
     setBulkBusy(true);
+    setBulkSelectedCount(0);
     try {
-      // Do NOT cap by `total` — it is only the planner's ESTIMATE and is often
-      // low, which would silently select fewer leads than actually match (and
-      // then under-feed scoring/export). Ask for the hard cap and let the keyset
-      // bulk fetch return however many genuinely match.
-      const requested = MAX_BULK;
-      // Over-fetch so we can drop already-scored leads (session dedupe) and
-      // still land near `requested`. Capped at MAX_BULK to honor the server cap.
-      const overFetch = Math.min(MAX_BULK, requested + scores.size);
-      const ids = await fetchMatchingIds(filters, overFetch);
+      const requested = Math.min(total, MAX_BULK);
+      const ids = await fetchMatchingIds(filters, requested, setBulkSelectedCount);
       const fresh = ids.filter((id) => !scores.has(id)).slice(0, requested);
       const skipped = ids.length - fresh.length;
       setPicked(new Set(fresh));
@@ -466,21 +466,27 @@ function PeoplePage() {
       toast.error(e.message ?? "Failed to select");
     } finally {
       setBulkBusy(false);
+      setBulkSelectedCount(0);
       setSelectMenuOpen(false);
       setAdvancedMode(false);
     }
   };
 
   const applyAdvanced = async () => {
-    const n = Math.max(1, Math.min(MAX_BULK, parseInt(advancedN, 10) || 0));
+    const n = parseInt(advancedN, 10) || 0;
     if (n <= 0) {
       toast.error("Enter a positive number");
       return;
     }
+    if (n > MAX_BULK) {
+      toast.error("Cannot select more than 50,000 leads");
+      return;
+    }
     setBulkBusy(true);
+    setBulkSelectedCount(0);
     try {
       const overFetch = Math.min(MAX_BULK, n + scores.size);
-      const ids = await fetchMatchingIds(filters, overFetch);
+      const ids = await fetchMatchingIds(filters, overFetch, setBulkSelectedCount);
       const fresh = ids.filter((id) => !scores.has(id)).slice(0, n);
       const skipped = ids.length - fresh.length;
       setPicked(new Set(fresh));
@@ -501,6 +507,7 @@ function PeoplePage() {
       toast.error(e.message ?? "Failed to select");
     } finally {
       setBulkBusy(false);
+      setBulkSelectedCount(0);
       setSelectMenuOpen(false);
       setAdvancedMode(false);
     }
