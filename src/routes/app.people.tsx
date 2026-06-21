@@ -420,25 +420,18 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
-    if (matchingExceedsBulkLimit || total > MAX_BULK) {
-      toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
-      setSelectMenuOpen(false);
-      setAdvancedMode(false);
-      return;
-    }
     setBulkBusy(true);
     setBulkSelectedCount(0);
     try {
-      const requested = Math.min(total, MAX_BULK);
-      const ids = await fetchMatchingIds(filters, requested, setBulkSelectedCount);
-      const selectedIds = ids.slice(0, requested);
+      const ids = await fetchMatchingIds(filters, MAX_BULK + 1, setBulkSelectedCount);
+      if (ids.length > MAX_BULK) {
+        toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
+        return;
+      }
+      const selectedIds = ids;
       setPicked(new Set(selectedIds));
       if (selectedIds.length === 0) {
         toast.info("No leads match these filters.");
-      } else if (selectedIds.length < requested) {
-        toast.info(
-          `Only ${selectedIds.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
-        );
       } else {
         toast.success(`${selectedIds.length.toLocaleString()} leads selected`);
       }
