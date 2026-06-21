@@ -446,12 +446,26 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
+    // If we know the exact total and it exceeds the cap, fail fast.
+    if (totalIsExact && total > MAX_BULK) {
+      toast.error(
+        `${total.toLocaleString()} leads match — only ${MAX_BULK.toLocaleString()} can be selected at once. Narrow your filters or use Advanced Selection.`,
+      );
+      return;
+    }
+    // Cap the fetch at the displayed total (+ small buffer) when known so we
+    // don't keep paginating past the real result set.
+    const fetchLimit = totalIsExact
+      ? Math.min(total + 1, MAX_BULK + 1)
+      : MAX_BULK + 1;
     setBulkBusy(true);
     setBulkSelectedCount(0);
     try {
-      const ids = await fetchMatchingIds(filters, MAX_BULK + 1, setBulkSelectedCount);
+      const ids = await fetchMatchingIds(filters, fetchLimit, setBulkSelectedCount);
       if (ids.length > MAX_BULK) {
-        toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
+        toast.error(
+          `More than ${MAX_BULK.toLocaleString()} leads match. Narrow your filters or use Advanced Selection.`,
+        );
         return;
       }
       const selectedIds = ids;
