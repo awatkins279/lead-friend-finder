@@ -365,7 +365,7 @@ function PeoplePage() {
           .from("leads")
           .select("id", { count: "exact", head: true });
         cq = applyFilters(cq, filters);
-        countPromise = cq.then((r: any) =>
+        countPromise = Promise.resolve(cq).then((r: any) =>
           r.error
             ? { count: 0, exact: false }
             : { count: r.count ?? 0, exact: true },
