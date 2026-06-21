@@ -6,7 +6,9 @@ import { LEAD_FILTERS_SCHEMA, buildLeadQuery } from "@/lib/lead-filters";
 
 const Input = z.object({
   filters: LEAD_FILTERS_SCHEMA,
-  limit: z.number().int().min(1).max(1000),
+  // 10k pages: the underlying PK index scan returns 10k rows in ~10ms server-side,
+  // and a 50k selection now needs only 5 round-trips instead of 50.
+  limit: z.number().int().min(1).max(10000),
   afterId: z.string().min(1).nullable().optional(),
 });
 
