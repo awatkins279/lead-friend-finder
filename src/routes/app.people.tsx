@@ -161,7 +161,7 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
 
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
-const BULK_ID_PAGE_SIZE = 10000;
+const BULK_ID_PAGE_SIZE = 2500;
 
 const IMPORT_HEADER_ALIASES: Record<string, string> = {
   firstname: "first_name",
@@ -255,14 +255,20 @@ async function fetchMatchingIds(
   const ids: string[] = [];
   let afterId: string | null = null;
 
+  let pageSize = Math.min(BULK_ID_PAGE_SIZE, limit);
   while (ids.length < limit) {
-    const res: { ids: string[]; nextCursor: string | null } = await fetchMatchingIdsBulk({
-      data: {
-        filters,
-        limit: Math.min(BULK_ID_PAGE_SIZE, limit - ids.length),
-        afterId,
-      },
-    });
+    let res: { ids: string[]; nextCursor: string | null };
+    try {
+      res = await fetchMatchingIdsBulk({
+        data: { filters, limit: Math.min(pageSize, limit - ids.length), afterId },
+      });
+    } catch (error: any) {
+      if (/statement timeout|canceling statement/i.test(String(error?.message ?? error)) && pageSize > 500) {
+        pageSize = Math.max(500, Math.floor(pageSize / 2));
+        continue;
+      }
+      throw error;
+    }
     ids.push(...res.ids);
     onProgress?.(ids.length);
     afterId = res.nextCursor ?? null;
