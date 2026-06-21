@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { countMatchingIdsBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -161,7 +161,7 @@ const SIZE_OPTIONS: { value: string; label: string }[] = [
 
 const PAGE_SIZE = 25;
 const MAX_BULK = 50000;
-const BULK_ID_PAGE_SIZE = 10000;
+const BULK_ID_PAGE_SIZE = 2500;
 
 const IMPORT_HEADER_ALIASES: Record<string, string> = {
   firstname: "first_name",
@@ -255,14 +255,20 @@ async function fetchMatchingIds(
   const ids: string[] = [];
   let afterId: string | null = null;
 
+  let pageSize = Math.min(BULK_ID_PAGE_SIZE, limit);
   while (ids.length < limit) {
-    const res: { ids: string[]; nextCursor: string | null } = await fetchMatchingIdsBulk({
-      data: {
-        filters,
-        limit: Math.min(BULK_ID_PAGE_SIZE, limit - ids.length),
-        afterId,
-      },
-    });
+    let res: { ids: string[]; nextCursor: string | null };
+    try {
+      res = await fetchMatchingIdsBulk({
+        data: { filters, limit: Math.min(pageSize, limit - ids.length), afterId },
+      });
+    } catch (error: any) {
+      if (/statement timeout|canceling statement/i.test(String(error?.message ?? error)) && pageSize > 500) {
+        pageSize = Math.max(500, Math.floor(pageSize / 2));
+        continue;
+      }
+      throw error;
+    }
     ids.push(...res.ids);
     onProgress?.(ids.length);
     afterId = res.nextCursor ?? null;
@@ -270,10 +276,6 @@ async function fetchMatchingIds(
   }
 
   return ids;
-}
-
-async function countMatchingIds(filters: Filters): Promise<{ count: number; exceedsLimit: boolean }> {
-  return countMatchingIdsBulk({ data: { filters, max: MAX_BULK + 1 } });
 }
 
 function PeoplePage() {
@@ -340,8 +342,6 @@ function PeoplePage() {
       // Order by `id` (PK index) instead of `last_name` — there's no btree
       // index on last_name, so sorting 1.5M rows tripped the statement
       // timeout (HTTP 500 "canceling statement due to statement timeout").
-      // Exact counts are collected up to the 50k selection ceiling so the menu
-      // can show the real selectable count and block over-limit all-matches.
       const hasFilters =
         (filters.name ?? "").trim() !== "" ||
         (filters.titles ?? []).length > 0 ||
@@ -354,26 +354,16 @@ function PeoplePage() {
 
       let q: any = supabase
         .from("leads")
-        .select(LIST_COLS);
+        .select(LIST_COLS, hasFilters ? { count: "estimated" } : undefined);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       q = q.order("id", { ascending: true }).range(from, to);
 
-      const [rowsRes, totalRes] = await Promise.all([
-        q,
-        hasFilters
-          ? countMatchingIds(filters)
-          : supabase.rpc("leads_total_estimate"),
-      ]);
+      const [rowsRes, totalRes] = await Promise.all([q, supabase.rpc("leads_total_estimate")]);
       if (rowsRes.error) throw rowsRes.error;
-      const count = hasFilters
-        ? (totalRes as { count: number }).count
-        : Number((totalRes as { data: number | null }).data ?? 0);
-      const exceedsLimit = hasFilters
-        ? (totalRes as { exceedsLimit: boolean }).exceedsLimit
-        : count > MAX_BULK;
-      return { rows: (rowsRes.data ?? []) as Lead[], count, exceedsLimit };
+      const count = hasFilters ? (rowsRes.count ?? 0) : Number(totalRes.data ?? 0);
+      return { rows: (rowsRes.data ?? []) as Lead[], count };
     },
   });
 
@@ -381,7 +371,6 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
-  const matchingExceedsBulkLimit = data?.exceedsLimit ?? false;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -393,10 +382,8 @@ function PeoplePage() {
       }),
     [filters],
   );
-  const matchingCountLabel = matchingExceedsBulkLimit
-    ? `${MAX_BULK.toLocaleString()}+`
-    : total.toLocaleString();
-  const matchingCountPrefix = activeChips.length > 0 && !matchingExceedsBulkLimit ? "" : "About ";
+  const matchingCountLabel = total > MAX_BULK ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
+  const matchingCountPrefix = activeChips.length > 0 && total <= MAX_BULK ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
@@ -439,25 +426,18 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
-    if (matchingExceedsBulkLimit || total > MAX_BULK) {
-      toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
-      setSelectMenuOpen(false);
-      setAdvancedMode(false);
-      return;
-    }
     setBulkBusy(true);
     setBulkSelectedCount(0);
     try {
-      const requested = Math.min(total, MAX_BULK);
-      const ids = await fetchMatchingIds(filters, requested, setBulkSelectedCount);
-      const selectedIds = ids.slice(0, requested);
+      const ids = await fetchMatchingIds(filters, MAX_BULK + 1, setBulkSelectedCount);
+      if (ids.length > MAX_BULK) {
+        toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
+        return;
+      }
+      const selectedIds = ids;
       setPicked(new Set(selectedIds));
       if (selectedIds.length === 0) {
         toast.info("No leads match these filters.");
-      } else if (selectedIds.length < requested) {
-        toast.info(
-          `Only ${selectedIds.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
-        );
       } else {
         toast.success(`${selectedIds.length.toLocaleString()} leads selected`);
       }
