@@ -336,8 +336,6 @@ function PeoplePage() {
       // Order by `id` (PK index) instead of `last_name` — there's no btree
       // index on last_name, so sorting 1.5M rows tripped the statement
       // timeout (HTTP 500 "canceling statement due to statement timeout").
-      // Exact counts are collected up to the 50k selection ceiling so the menu
-      // can show the real selectable count and block over-limit all-matches.
       const hasFilters =
         (filters.name ?? "").trim() !== "" ||
         (filters.titles ?? []).length > 0 ||
@@ -356,20 +354,10 @@ function PeoplePage() {
       const to = from + PAGE_SIZE - 1;
       q = q.order("id", { ascending: true }).range(from, to);
 
-      const [rowsRes, totalRes] = await Promise.all([
-        q,
-        hasFilters
-          ? countMatchingIds(filters)
-          : supabase.rpc("leads_total_estimate"),
-      ]);
+      const [rowsRes, totalRes] = await Promise.all([q, supabase.rpc("leads_total_estimate")]);
       if (rowsRes.error) throw rowsRes.error;
-      const count = hasFilters
-        ? (totalRes as { count: number }).count
-        : Number((totalRes as { data: number | null }).data ?? 0);
-      const exceedsLimit = hasFilters
-        ? (totalRes as { exceedsLimit: boolean }).exceedsLimit
-        : count > MAX_BULK;
-      return { rows: (rowsRes.data ?? []) as Lead[], count, exceedsLimit };
+      const count = hasFilters ? (rowsRes.count ?? 0) : Number(totalRes.data ?? 0);
+      return { rows: (rowsRes.data ?? []) as Lead[], count };
     },
   });
 
@@ -377,7 +365,6 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
-  const matchingExceedsBulkLimit = data?.exceedsLimit ?? false;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -389,10 +376,8 @@ function PeoplePage() {
       }),
     [filters],
   );
-  const matchingCountLabel = matchingExceedsBulkLimit
-    ? `${MAX_BULK.toLocaleString()}+`
-    : total.toLocaleString();
-  const matchingCountPrefix = activeChips.length > 0 && !matchingExceedsBulkLimit ? "" : "About ";
+  const matchingCountLabel = total > MAX_BULK ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
+  const matchingCountPrefix = activeChips.length > 0 && total <= MAX_BULK ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
