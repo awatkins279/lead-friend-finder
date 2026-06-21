@@ -252,7 +252,7 @@ async function fetchMatchingIds(filters: Filters, limit: number): Promise<string
   let afterId: string | null = null;
 
   while (ids.length < limit) {
-    const res = await fetchMatchingIdsBulk({
+    const res: { ids: string[]; nextCursor: string | null } = await fetchMatchingIdsBulk({
       data: {
         filters,
         limit: Math.min(BULK_ID_PAGE_SIZE, limit - ids.length),
