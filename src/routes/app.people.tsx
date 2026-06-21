@@ -354,7 +354,7 @@ function PeoplePage() {
 
       let q: any = supabase
         .from("leads")
-        .select(LIST_COLS, hasFilters ? { count: "estimated" } : undefined);
+        .select(LIST_COLS);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -1086,7 +1086,7 @@ function PeoplePage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">People Search</h1>
             <p className="mt-1 text-sm text-muted-foreground font-mono-num">
-              About {total.toLocaleString()} matching contacts · 25 shown per page
+              {matchingCountPrefix}{matchingCountLabel} matching contacts · 25 shown per page
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1437,8 +1437,8 @@ function PeoplePage() {
                             <MenuItem onClick={selectThisPage}>Select this page</MenuItem>
                             <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
                               {bulkBusy
-                                ? "Selecting…"
-                                : `Select matching${total ? ` (up to ${Math.min(total, MAX_BULK).toLocaleString()})` : ""}`}
+                                ? `Selecting${bulkSelectedCount ? ` ${bulkSelectedCount.toLocaleString()}` : ""}…`
+                                : `Select matching (${matchingCountLabel})`}
                             </MenuItem>
                             <MenuItem onClick={() => setAdvancedMode(true)}>
                               Advanced Selection
