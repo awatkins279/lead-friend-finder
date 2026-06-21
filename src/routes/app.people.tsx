@@ -423,7 +423,11 @@ function PeoplePage() {
   const selectAllMatching = async () => {
     setBulkBusy(true);
     try {
-      const requested = Math.min(total || MAX_BULK, MAX_BULK);
+      // Do NOT cap by `total` — it is only the planner's ESTIMATE and is often
+      // low, which would silently select fewer leads than actually match (and
+      // then under-feed scoring/export). Ask for the hard cap and let the keyset
+      // bulk fetch return however many genuinely match.
+      const requested = MAX_BULK;
       // Over-fetch so we can drop already-scored leads (session dedupe) and
       // still land near `requested`. Capped at MAX_BULK to honor the server cap.
       const overFetch = Math.min(MAX_BULK, requested + scores.size);
@@ -499,7 +503,7 @@ function PeoplePage() {
     try {
       let ids: string[] = Array.from(picked);
       if (ids.length === 0) {
-        ids = await fetchMatchingIds(filters, Math.min(total || MAX_BULK, MAX_BULK));
+        ids = await fetchMatchingIds(filters, MAX_BULK);
       }
       const all: Lead[] = [];
       const cols =
@@ -576,10 +580,18 @@ function PeoplePage() {
 
   const cancelTokenRef = useRef<{ cancelled: boolean }>({ cancelled: false });
   const workerRunIdRef = useRef(0);
+  // Ensures the terminal (completed/failed) toast fires once per run, even though
+  // several workers plus the final reconciliation all call syncJobSnapshot.
+  const terminalHandledRef = useRef(0);
 
   const syncJobSnapshot = useCallback(
-    async (jobId: string, runId: number, token: { cancelled: boolean }) => {
-      const snap = await getJobSnapshotCall({ data: { jobId, includeResults: false } });
+    async (
+      jobId: string,
+      runId: number,
+      token: { cancelled: boolean },
+      includeResults = false,
+    ) => {
+      const snap = await getJobSnapshotCall({ data: { jobId, includeResults } });
       if (workerRunIdRef.current !== runId) return snap;
 
       if (snap.results.length > 0) mergeScoreResults(snap.results);
@@ -595,7 +607,8 @@ function PeoplePage() {
       if (snap.job.status !== "running") {
         localStorage.removeItem(STORAGE_KEY);
         setActiveJobId(null);
-        if (!token.cancelled) {
+        if (!token.cancelled && terminalHandledRef.current !== runId) {
+          terminalHandledRef.current = runId;
           const failed = snap.job.failed_batches;
           if (snap.job.status === "completed") {
             toast.success(
@@ -603,7 +616,7 @@ function PeoplePage() {
             );
           } else if (snap.job.status === "completed_with_errors") {
             toast.warning(
-              `Scored ${snap.job.scored_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed`,
+              `Scored ${snap.job.scored_leads.toLocaleString()} of ${snap.job.total_leads.toLocaleString()} leads — ${failed} batch${failed === 1 ? "" : "es"} failed. Re-select the unscored leads and run scoring again to finish them.`,
             );
           } else if (snap.job.status === "failed") {
             toast.error(
@@ -698,7 +711,12 @@ function PeoplePage() {
     }
 
     try {
-      await syncJobSnapshot(jobId, runId, token);
+      // Authoritative full reconciliation. The per-batch worker fetches order by
+      // updated_at, so under concurrent workers some freshly-scored rows can be
+      // missed in the live merge. Load ALL results from the DB once the run ends
+      // so the UI shows exactly what was scored (and downstream campaign/verify
+      // operate on the complete set).
+      await syncJobSnapshot(jobId, runId, token, true);
     } catch (error) {
       console.error("Failed to fetch final scoring snapshot", error);
     }

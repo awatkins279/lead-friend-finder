@@ -29,9 +29,6 @@ export const scoreLeads = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ scores: ScoreRow[] }> => {
     const { supabase, userId } = context;
 
-    // Each scored lead = 1 generate_email credit unit
-    await chargeUser(userId, "generate_email", data.leadIds.length, `score:${data.leadIds.length}`);
-
     const { data: leads, error } = await supabase
       .from("leads")
       .select(
@@ -146,6 +143,10 @@ ${JSON.stringify(compact)}`;
           : [],
       }))
       .filter((s) => data.leadIds.includes(s.leadId));
+
+    // Charge ONLY after a successful AI run + parse — never bill the user for a
+    // failed fetch, AI error, or unparseable response. Admin accounts bypass.
+    await chargeUser(userId, "generate_email", data.leadIds.length, `score:${data.leadIds.length}`);
 
     return { scores };
   });

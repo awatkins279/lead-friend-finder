@@ -239,7 +239,17 @@ export const verifyLeadEmailsBatch = createServerFn({ method: "POST" })
     }
 
     if (rowsToUpsert.length > 0) {
-      await supabaseAdmin.from("lead_verifications").upsert(rowsToUpsert);
+      // Best-effort cache write. The user is already charged and the MillionVerifier
+      // calls already ran, so a persist failure must NOT discard the results or skip
+      // the refund below — log and continue.
+      try {
+        const { error: upsertErr } = await supabaseAdmin
+          .from("lead_verifications")
+          .upsert(rowsToUpsert);
+        if (upsertErr) console.error("Failed to persist verification cache", upsertErr);
+      } catch (err) {
+        console.error("Failed to persist verification cache", err);
+      }
     }
 
     if (refunds > 0) {

@@ -79,7 +79,8 @@ export const launchCampaign = createServerFn({ method: "POST" })
       await db
         .from("lists")
         .update({ campaign_status: "active", launched_at: new Date().toISOString() })
-        .eq("id", list.id);
+        .eq("id", list.id)
+        .eq("user_id", context.userId);
       return { status: "active" as const, resumed: true };
     }
 
@@ -110,9 +111,14 @@ export const launchCampaign = createServerFn({ method: "POST" })
     if (!mailboxes.length)
       throw new Error("Choose at least one active Instantly mailbox in Campaign config");
 
-    const emailReady = (leadRows ?? []).filter(
-      (row: any) => row.lead?.email && Array.isArray(row.emails) && row.emails.length > 0,
+    // Distinguish WHY a selected lead isn't launchable so we can report it instead
+    // of silently launching a smaller campaign than the user expects.
+    const withEmail = (leadRows ?? []).filter((row: any) => row.lead?.email);
+    const emailReady = withEmail.filter(
+      (row: any) => Array.isArray(row.emails) && row.emails.length > 0,
     );
+    const droppedNoEmail = (leadRows ?? []).length - withEmail.length;
+    const droppedNoSequence = withEmail.length - emailReady.length;
     const blockedByValidation = emailReady.filter(
       (row: any) => !["deliverable", "risky"].includes(row.verification_status),
     );
@@ -233,7 +239,13 @@ export const launchCampaign = createServerFn({ method: "POST" })
       .eq("id", list.id)
       .eq("user_id", context.userId);
     if (updateError) throw new Error(updateError.message);
-    return { status: "active" as const, resumed: false, prospects: leads.length };
+    return {
+      status: "active" as const,
+      resumed: false,
+      prospects: leads.length,
+      droppedNoSequence,
+      droppedNoEmail,
+    };
   });
 
 export const pauseCampaign = createServerFn({ method: "POST" })

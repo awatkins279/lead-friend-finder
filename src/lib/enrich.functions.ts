@@ -40,9 +40,6 @@ export const enrichLead = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    // Charge credits up front (admin bypass is automatic)
-    await chargeUser(userId, "enrich", 1, `lead:${data.leadId}`);
-
     const { data: list, error: listErr } = await supabase
       .from("lists")
       .select(
@@ -233,6 +230,10 @@ Return JSON with this exact shape:
       .eq("list_id", data.listId)
       .eq("lead_id", data.leadId);
     if (updErr) throw new Error(updErr.message);
+
+    // Charge only after the enrichment fully succeeded — never bill for a missing
+    // list/lead, an unconfigured campaign, or an AI failure. Admin bypass automatic.
+    await chargeUser(userId, "enrich", 1, `lead:${data.leadId}`);
 
     return { ok: true as const, score, emailCount: emails.length };
   });
