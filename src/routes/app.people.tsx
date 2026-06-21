@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { countMatchingIdsBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -247,7 +247,11 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   return buildLeadQuery(q, f) as T;
 }
 
-async function fetchMatchingIds(filters: Filters, limit: number): Promise<string[]> {
+async function fetchMatchingIds(
+  filters: Filters,
+  limit: number,
+  onProgress?: (count: number) => void,
+): Promise<string[]> {
   const ids: string[] = [];
   let afterId: string | null = null;
 
@@ -260,11 +264,16 @@ async function fetchMatchingIds(filters: Filters, limit: number): Promise<string
       },
     });
     ids.push(...res.ids);
+    onProgress?.(ids.length);
     afterId = res.nextCursor ?? null;
     if (res.ids.length === 0 || !afterId) break;
   }
 
   return ids;
+}
+
+async function countMatchingIds(filters: Filters): Promise<{ count: number; exceedsLimit: boolean }> {
+  return countMatchingIdsBulk({ data: { filters, max: MAX_BULK + 1 } });
 }
 
 function PeoplePage() {
@@ -281,6 +290,7 @@ function PeoplePage() {
   const [advancedMode, setAdvancedMode] = useState(false);
   const [advancedN, setAdvancedN] = useState("1000");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
   const [exportBusy, setExportBusy] = useState(false);
 
   const [scoringContext, setScoringContext] = useState("");
@@ -330,8 +340,8 @@ function PeoplePage() {
       // Order by `id` (PK index) instead of `last_name` — there's no btree
       // index on last_name, so sorting 1.5M rows tripped the statement
       // timeout (HTTP 500 "canceling statement due to statement timeout").
-      // Count comes from a fast RPC or PostgREST's planner-based "estimated"
-      // when filters are active; an exact count over 1.5M rows times out.
+      // Exact counts are collected up to the 50k selection ceiling so the menu
+      // can show the real selectable count and block over-limit all-matches.
       const hasFilters =
         (filters.name ?? "").trim() !== "" ||
         (filters.titles ?? []).length > 0 ||
@@ -344,7 +354,7 @@ function PeoplePage() {
 
       let q: any = supabase
         .from("leads")
-        .select(LIST_COLS, hasFilters ? { count: "estimated" } : undefined);
+        .select(LIST_COLS);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -353,14 +363,17 @@ function PeoplePage() {
       const [rowsRes, totalRes] = await Promise.all([
         q,
         hasFilters
-          ? Promise.resolve({ data: null as number | null, error: null as any })
+          ? countMatchingIds(filters)
           : supabase.rpc("leads_total_estimate"),
       ]);
       if (rowsRes.error) throw rowsRes.error;
       const count = hasFilters
-        ? rowsRes.count ?? 0
-        : Number(totalRes.data ?? 0);
-      return { rows: (rowsRes.data ?? []) as Lead[], count };
+        ? (totalRes as { count: number }).count
+        : Number((totalRes as { data: number | null }).data ?? 0);
+      const exceedsLimit = hasFilters
+        ? (totalRes as { exceedsLimit: boolean }).exceedsLimit
+        : count > MAX_BULK;
+      return { rows: (rowsRes.data ?? []) as Lead[], count, exceedsLimit };
     },
   });
 
@@ -368,6 +381,7 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
+  const matchingExceedsBulkLimit = data?.exceedsLimit ?? false;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -379,6 +393,10 @@ function PeoplePage() {
       }),
     [filters],
   );
+  const matchingCountLabel = matchingExceedsBulkLimit
+    ? `${MAX_BULK.toLocaleString()}+`
+    : total.toLocaleString();
+  const matchingCountPrefix = activeChips.length > 0 && !matchingExceedsBulkLimit ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
@@ -421,72 +439,68 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
+    if (matchingExceedsBulkLimit || total > MAX_BULK) {
+      toast.error("Cannot select more than 50,000 leads. Narrow your filters or use Advanced Selection.");
+      setSelectMenuOpen(false);
+      setAdvancedMode(false);
+      return;
+    }
     setBulkBusy(true);
+    setBulkSelectedCount(0);
     try {
-      // Do NOT cap by `total` — it is only the planner's ESTIMATE and is often
-      // low, which would silently select fewer leads than actually match (and
-      // then under-feed scoring/export). Ask for the hard cap and let the keyset
-      // bulk fetch return however many genuinely match.
-      const requested = MAX_BULK;
-      // Over-fetch so we can drop already-scored leads (session dedupe) and
-      // still land near `requested`. Capped at MAX_BULK to honor the server cap.
-      const overFetch = Math.min(MAX_BULK, requested + scores.size);
-      const ids = await fetchMatchingIds(filters, overFetch);
-      const fresh = ids.filter((id) => !scores.has(id)).slice(0, requested);
-      const skipped = ids.length - fresh.length;
-      setPicked(new Set(fresh));
-      if (fresh.length === 0) {
-        toast.info("No unscored leads match these filters — every match has been scored already.");
-      } else if (skipped > 0) {
-        toast.success(
-          `${fresh.length.toLocaleString()} new leads selected (skipped ${skipped.toLocaleString()} already scored)`,
-        );
-      } else if (fresh.length < requested) {
+      const requested = Math.min(total, MAX_BULK);
+      const ids = await fetchMatchingIds(filters, requested, setBulkSelectedCount);
+      const selectedIds = ids.slice(0, requested);
+      setPicked(new Set(selectedIds));
+      if (selectedIds.length === 0) {
+        toast.info("No leads match these filters.");
+      } else if (selectedIds.length < requested) {
         toast.info(
-          `Only ${fresh.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+          `Only ${selectedIds.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
         );
       } else {
-        toast.success(`${fresh.length.toLocaleString()} leads selected`);
+        toast.success(`${selectedIds.length.toLocaleString()} leads selected`);
       }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
     } finally {
       setBulkBusy(false);
+      setBulkSelectedCount(0);
       setSelectMenuOpen(false);
       setAdvancedMode(false);
     }
   };
 
   const applyAdvanced = async () => {
-    const n = Math.max(1, Math.min(MAX_BULK, parseInt(advancedN, 10) || 0));
+    const n = parseInt(advancedN, 10) || 0;
     if (n <= 0) {
       toast.error("Enter a positive number");
       return;
     }
+    if (n > MAX_BULK) {
+      toast.error("Cannot select more than 50,000 leads");
+      return;
+    }
     setBulkBusy(true);
+    setBulkSelectedCount(0);
     try {
-      const overFetch = Math.min(MAX_BULK, n + scores.size);
-      const ids = await fetchMatchingIds(filters, overFetch);
-      const fresh = ids.filter((id) => !scores.has(id)).slice(0, n);
-      const skipped = ids.length - fresh.length;
-      setPicked(new Set(fresh));
-      if (fresh.length === 0) {
-        toast.info("No unscored leads match — every match has been scored already.");
-      } else if (skipped > 0) {
-        toast.success(
-          `${fresh.length.toLocaleString()} new leads selected (skipped ${skipped.toLocaleString()} already scored)`,
-        );
-      } else if (fresh.length < n) {
+      const ids = await fetchMatchingIds(filters, n, setBulkSelectedCount);
+      const selectedIds = ids.slice(0, n);
+      setPicked(new Set(selectedIds));
+      if (selectedIds.length === 0) {
+        toast.info("No leads match these filters.");
+      } else if (selectedIds.length < n) {
         toast.info(
-          `Only ${fresh.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
+          `Only ${selectedIds.length.toLocaleString()} leads match your current filters, so all matching leads were selected.`,
         );
       } else {
-        toast.success(`${fresh.length.toLocaleString()} leads selected`);
+        toast.success(`${selectedIds.length.toLocaleString()} leads selected`);
       }
     } catch (e: any) {
       toast.error(e.message ?? "Failed to select");
     } finally {
       setBulkBusy(false);
+      setBulkSelectedCount(0);
       setSelectMenuOpen(false);
       setAdvancedMode(false);
     }
@@ -978,7 +992,7 @@ function PeoplePage() {
 
   useEffect(() => {
     const missing = pickedIds.filter((id) => !verifications.has(id));
-    if (missing.length === 0) return;
+    if (missing.length === 0 || pickedIds.length > 1000) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -1061,7 +1075,7 @@ function PeoplePage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">People Search</h1>
             <p className="mt-1 text-sm text-muted-foreground font-mono-num">
-              About {total.toLocaleString()} matching contacts · 25 shown per page
+              {matchingCountPrefix}{matchingCountLabel} matching contacts · 25 shown per page
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1412,8 +1426,8 @@ function PeoplePage() {
                             <MenuItem onClick={selectThisPage}>Select this page</MenuItem>
                             <MenuItem onClick={selectAllMatching} disabled={bulkBusy}>
                               {bulkBusy
-                                ? "Selecting…"
-                                : `Select matching${total ? ` (up to ${Math.min(total, MAX_BULK).toLocaleString()})` : ""}`}
+                                ? `Selecting${bulkSelectedCount ? ` ${bulkSelectedCount.toLocaleString()}` : ""}…`
+                                : `Select matching (${matchingCountLabel})`}
                             </MenuItem>
                             <MenuItem onClick={() => setAdvancedMode(true)}>
                               Advanced Selection
