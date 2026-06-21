@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { countMatchingIdsBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -270,10 +270,6 @@ async function fetchMatchingIds(
   }
 
   return ids;
-}
-
-async function countMatchingIds(filters: Filters): Promise<{ count: number; exceedsLimit: boolean }> {
-  return countMatchingIdsBulk({ data: { filters, max: MAX_BULK + 1 } });
 }
 
 function PeoplePage() {
