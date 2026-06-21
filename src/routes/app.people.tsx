@@ -339,9 +339,6 @@ function PeoplePage() {
     refetchOnWindowFocus: false,
     queryKey,
     queryFn: async () => {
-      // Order by `id` (PK index) instead of `last_name` — there's no btree
-      // index on last_name, so sorting 1.5M rows tripped the statement
-      // timeout (HTTP 500 "canceling statement due to statement timeout").
       const hasFilters =
         (filters.name ?? "").trim() !== "" ||
         (filters.titles ?? []).length > 0 ||
@@ -352,18 +349,40 @@ function PeoplePage() {
         !!filters.hasPhone ||
         !!filters.hasEmail;
 
-      let q: any = supabase
-        .from("leads")
-        .select(LIST_COLS, hasFilters ? { count: "estimated" } : undefined);
+      let q: any = supabase.from("leads").select(LIST_COLS);
       q = applyFilters(q, filters);
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       q = q.order("id", { ascending: true }).range(from, to);
 
-      const [rowsRes, totalRes] = await Promise.all([q, supabase.rpc("leads_total_estimate")]);
+      // When filters are active, run an EXACT count via a HEAD request in
+      // parallel. PostgREST's estimated count was wildly off (reported 16k
+      // when the real result was >50k), so "Select matching" trusted the
+      // small number and then blew past it up to the 50k cap.
+      let countPromise: Promise<{ count: number; exact: boolean }>;
+      if (hasFilters) {
+        let cq: any = supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true });
+        cq = applyFilters(cq, filters);
+        countPromise = cq.then((r: any) =>
+          r.error
+            ? { count: 0, exact: false }
+            : { count: r.count ?? 0, exact: true },
+        );
+      } else {
+        countPromise = supabase
+          .rpc("leads_total_estimate")
+          .then((r: any) => ({ count: Number(r.data ?? 0), exact: false }));
+      }
+
+      const [rowsRes, countRes] = await Promise.all([q, countPromise]);
       if (rowsRes.error) throw rowsRes.error;
-      const count = hasFilters ? (rowsRes.count ?? 0) : Number(totalRes.data ?? 0);
-      return { rows: (rowsRes.data ?? []) as Lead[], count };
+      return {
+        rows: (rowsRes.data ?? []) as Lead[],
+        count: countRes.count,
+        exact: countRes.exact,
+      };
     },
   });
 
@@ -371,6 +390,7 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
+  const totalIsExact = data?.exact ?? false;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -382,8 +402,8 @@ function PeoplePage() {
       }),
     [filters],
   );
-  const matchingCountLabel = total > MAX_BULK ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
-  const matchingCountPrefix = activeChips.length > 0 && total <= MAX_BULK ? "" : "About ";
+  const matchingCountLabel = total.toLocaleString();
+  const matchingCountPrefix = totalIsExact ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
