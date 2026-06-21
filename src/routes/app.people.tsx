@@ -272,6 +272,10 @@ async function fetchMatchingIds(
   return ids;
 }
 
+async function countMatchingIds(filters: Filters): Promise<{ count: number; exceedsLimit: boolean }> {
+  return countMatchingIdsBulk({ data: { filters, max: MAX_BULK + 1 } });
+}
+
 function PeoplePage() {
   const [draft, setDraft] = useState<Filters>(EMPTY);
   const [filters, setFilters] = useState<Filters>(EMPTY);
@@ -286,6 +290,7 @@ function PeoplePage() {
   const [advancedMode, setAdvancedMode] = useState(false);
   const [advancedN, setAdvancedN] = useState("1000");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
   const [exportBusy, setExportBusy] = useState(false);
 
   const [scoringContext, setScoringContext] = useState("");
@@ -335,8 +340,8 @@ function PeoplePage() {
       // Order by `id` (PK index) instead of `last_name` — there's no btree
       // index on last_name, so sorting 1.5M rows tripped the statement
       // timeout (HTTP 500 "canceling statement due to statement timeout").
-      // Count comes from a fast RPC or PostgREST's planner-based "estimated"
-      // when filters are active; an exact count over 1.5M rows times out.
+      // Exact counts are collected up to the 50k selection ceiling so the menu
+      // can show the real selectable count and block over-limit all-matches.
       const hasFilters =
         (filters.name ?? "").trim() !== "" ||
         (filters.titles ?? []).length > 0 ||
@@ -358,14 +363,15 @@ function PeoplePage() {
       const [rowsRes, totalRes] = await Promise.all([
         q,
         hasFilters
-          ? Promise.resolve({ data: null as number | null, error: null as any })
+          ? countMatchingIds(filters)
           : supabase.rpc("leads_total_estimate"),
       ]);
       if (rowsRes.error) throw rowsRes.error;
-      const count = hasFilters
-        ? rowsRes.count ?? 0
-        : Number(totalRes.data ?? 0);
-      return { rows: (rowsRes.data ?? []) as Lead[], count };
+      const count = hasFilters ? (totalRes as { count: number }).count : Number(totalRes.data ?? 0);
+      const exceedsLimit = hasFilters
+        ? (totalRes as { exceedsLimit: boolean }).exceedsLimit
+        : count > MAX_BULK;
+      return { rows: (rowsRes.data ?? []) as Lead[], count, exceedsLimit };
     },
   });
 
@@ -373,6 +379,7 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
+  const matchingExceedsBulkLimit = data?.exceedsLimit ?? false;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
