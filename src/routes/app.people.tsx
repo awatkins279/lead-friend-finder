@@ -371,9 +371,9 @@ function PeoplePage() {
             : { count: r.count ?? 0, exact: true },
         );
       } else {
-        countPromise = supabase
-          .rpc("leads_total_estimate")
-          .then((r: any) => ({ count: Number(r.data ?? 0), exact: false }));
+        countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
+          (r: any) => ({ count: Number(r.data ?? 0), exact: false }),
+        );
       }
 
       const [rowsRes, countRes] = await Promise.all([q, countPromise]);
