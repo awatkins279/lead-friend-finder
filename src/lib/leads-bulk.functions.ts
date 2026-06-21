@@ -12,11 +12,6 @@ const Input = z.object({
   afterId: z.string().min(1).nullable().optional(),
 });
 
-const CountInput = z.object({
-  filters: LEAD_FILTERS_SCHEMA,
-  max: z.number().int().min(1).max(50001),
-});
-
 export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Input.parse(input))
@@ -48,34 +43,4 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     }
 
     return { ids, nextCursor };
-  });
-
-export const countMatchingIdsBulk = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => CountInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { filters, max } = data;
-    let count = 0;
-    let afterId: string | null = null;
-
-    while (count < max) {
-      let q: any = supabaseAdmin
-        .from("leads")
-        .select("id")
-        .or(`imported_by.is.null,imported_by.eq.${userId}`);
-      q = buildLeadQuery(q, filters);
-      if (afterId) q = q.gt("id", afterId);
-      q = q.order("id", { ascending: true }).limit(Math.min(10000, max - count));
-
-      const { data: rows, error } = await q;
-      if (error) throw new Error(error.message);
-      const ids = ((rows ?? []) as { id: string }[]).map((row) => row.id);
-      count += ids.length;
-      afterId = ids.length > 0 ? ids[ids.length - 1] : null;
-      if (ids.length === 0 || !afterId) break;
-    }
-
-    return { count, exceedsLimit: count >= max };
   });
