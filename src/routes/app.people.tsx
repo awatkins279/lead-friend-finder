@@ -247,35 +247,13 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   return buildLeadQuery(q, f) as T;
 }
 
+// Single round-trip — server returns IDs capped at MAX_BULK + 1 so we can
+// detect "too many to select" without paginating ourselves.
 async function fetchMatchingIds(
   filters: Filters,
   limit: number,
-  onProgress?: (count: number) => void,
-): Promise<string[]> {
-  const ids: string[] = [];
-  let afterId: string | null = null;
-
-  let pageSize = Math.min(BULK_ID_PAGE_SIZE, limit);
-  while (ids.length < limit) {
-    let res: { ids: string[]; nextCursor: string | null };
-    try {
-      res = await fetchMatchingIdsBulk({
-        data: { filters, limit: Math.min(pageSize, limit - ids.length), afterId },
-      });
-    } catch (error: any) {
-      if (/statement timeout|canceling statement/i.test(String(error?.message ?? error)) && pageSize > 500) {
-        pageSize = Math.max(500, Math.floor(pageSize / 2));
-        continue;
-      }
-      throw error;
-    }
-    ids.push(...res.ids);
-    onProgress?.(ids.length);
-    afterId = res.nextCursor ?? null;
-    if (res.ids.length === 0 || !afterId) break;
-  }
-
-  return ids;
+): Promise<{ ids: string[]; capped: boolean }> {
+  return fetchMatchingIdsBulk({ data: { filters, limit } });
 }
 
 function PeoplePage() {
