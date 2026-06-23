@@ -247,35 +247,13 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
   return buildLeadQuery(q, f) as T;
 }
 
+// Single round-trip — server returns IDs capped at MAX_BULK + 1 so we can
+// detect "too many to select" without paginating ourselves.
 async function fetchMatchingIds(
   filters: Filters,
   limit: number,
-  onProgress?: (count: number) => void,
-): Promise<string[]> {
-  const ids: string[] = [];
-  let afterId: string | null = null;
-
-  let pageSize = Math.min(BULK_ID_PAGE_SIZE, limit);
-  while (ids.length < limit) {
-    let res: { ids: string[]; nextCursor: string | null };
-    try {
-      res = await fetchMatchingIdsBulk({
-        data: { filters, limit: Math.min(pageSize, limit - ids.length), afterId },
-      });
-    } catch (error: any) {
-      if (/statement timeout|canceling statement/i.test(String(error?.message ?? error)) && pageSize > 500) {
-        pageSize = Math.max(500, Math.floor(pageSize / 2));
-        continue;
-      }
-      throw error;
-    }
-    ids.push(...res.ids);
-    onProgress?.(ids.length);
-    afterId = res.nextCursor ?? null;
-    if (res.ids.length === 0 || !afterId) break;
-  }
-
-  return ids;
+): Promise<{ ids: string[]; capped: boolean }> {
+  return fetchMatchingIdsBulk({ data: { filters, limit } });
 }
 
 function PeoplePage() {
@@ -355,24 +333,21 @@ function PeoplePage() {
       const to = from + PAGE_SIZE - 1;
       q = q.order("id", { ascending: true }).range(from, to);
 
-      // When filters are active, run an EXACT count via a HEAD request in
-      // parallel. PostgREST's estimated count was wildly off (reported 16k
-      // when the real result was >50k), so "Select matching" trusted the
-      // small number and then blew past it up to the 50k cap.
-      let countPromise: Promise<{ count: number; exact: boolean }>;
+      // When filters are active, fetch matching IDs (capped at MAX_BULK + 1)
+      // in parallel with the visible page. We use ids.length as the displayed
+      // count AND as the selection source — one round-trip serves both, and
+      // the LIMIT lets PG stop scanning as soon as the cap is hit instead of
+      // counting the whole filtered set (which used to time out).
+      let countPromise: Promise<{ count: number; capped: boolean; ids: string[] }>;
       if (hasFilters) {
-        let cq: any = supabase
-          .from("leads")
-          .select("id", { count: "exact", head: true });
-        cq = applyFilters(cq, filters);
-        countPromise = Promise.resolve(cq).then((r: any) =>
-          r.error
-            ? { count: 0, exact: false }
-            : { count: r.count ?? 0, exact: true },
-        );
+        countPromise = fetchMatchingIdsBulk({
+          data: { filters, limit: MAX_BULK + 1 },
+        })
+          .then((r) => ({ count: r.ids.length, capped: r.capped, ids: r.ids }))
+          .catch(() => ({ count: 0, capped: false, ids: [] }));
       } else {
         countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
-          (r: any) => ({ count: Number(r.data ?? 0), exact: false }),
+          (r: any) => ({ count: Number(r.data ?? 0), capped: false, ids: [] }),
         );
       }
 
@@ -381,7 +356,9 @@ function PeoplePage() {
       return {
         rows: (rowsRes.data ?? []) as Lead[],
         count: countRes.count,
-        exact: countRes.exact,
+        capped: countRes.capped,
+        matchingIds: countRes.ids,
+        hasFilters,
       };
     },
   });
@@ -390,7 +367,9 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
-  const totalIsExact = data?.exact ?? false;
+  const totalIsCapped = data?.capped ?? false;
+  const totalIsExact = !!data?.hasFilters && !totalIsCapped;
+  const matchingIds = data?.matchingIds ?? [];
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -402,8 +381,9 @@ function PeoplePage() {
       }),
     [filters],
   );
-  const matchingCountLabel = total.toLocaleString();
-  const matchingCountPrefix = totalIsExact ? "" : "About ";
+  const matchingCountLabel =
+    totalIsCapped ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
+  const matchingCountPrefix = totalIsExact || totalIsCapped ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
@@ -446,43 +426,23 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
-    // If we know the exact total and it exceeds the cap, fail fast.
-    if (totalIsExact && total > MAX_BULK) {
+    if (totalIsCapped) {
       toast.error(
-        `${total.toLocaleString()} leads match — only ${MAX_BULK.toLocaleString()} can be selected at once. Narrow your filters or use Advanced Selection.`,
+        `More than ${MAX_BULK.toLocaleString()} leads match. Narrow your filters or use Advanced Selection.`,
       );
       return;
     }
-    // Cap the fetch at the displayed total (+ small buffer) when known so we
-    // don't keep paginating past the real result set.
-    const fetchLimit = totalIsExact
-      ? Math.min(total + 1, MAX_BULK + 1)
-      : MAX_BULK + 1;
-    setBulkBusy(true);
-    setBulkSelectedCount(0);
-    try {
-      const ids = await fetchMatchingIds(filters, fetchLimit, setBulkSelectedCount);
-      if (ids.length > MAX_BULK) {
-        toast.error(
-          `More than ${MAX_BULK.toLocaleString()} leads match. Narrow your filters or use Advanced Selection.`,
-        );
-        return;
-      }
-      const selectedIds = ids;
-      setPicked(new Set(selectedIds));
-      if (selectedIds.length === 0) {
-        toast.info("No leads match these filters.");
-      } else {
-        toast.success(`${selectedIds.length.toLocaleString()} leads selected`);
-      }
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to select");
-    } finally {
-      setBulkBusy(false);
-      setBulkSelectedCount(0);
+    // We already fetched the matching IDs alongside the page query — selection
+    // is just turning that cached array into a Set. No second round-trip.
+    if (matchingIds.length === 0) {
+      toast.info("No leads match these filters.");
       setSelectMenuOpen(false);
-      setAdvancedMode(false);
+      return;
     }
+    setPicked(new Set(matchingIds));
+    toast.success(`${matchingIds.length.toLocaleString()} leads selected`);
+    setSelectMenuOpen(false);
+    setAdvancedMode(false);
   };
 
   const applyAdvanced = async () => {
@@ -498,8 +458,8 @@ function PeoplePage() {
     setBulkBusy(true);
     setBulkSelectedCount(0);
     try {
-      const ids = await fetchMatchingIds(filters, n, setBulkSelectedCount);
-      const selectedIds = ids.slice(0, n);
+      const res = await fetchMatchingIds(filters, n);
+      const selectedIds = res.ids.slice(0, n);
       setPicked(new Set(selectedIds));
       if (selectedIds.length === 0) {
         toast.info("No leads match these filters.");
@@ -531,7 +491,8 @@ function PeoplePage() {
     try {
       let ids: string[] = Array.from(picked);
       if (ids.length === 0) {
-        ids = await fetchMatchingIds(filters, MAX_BULK);
+        const res = await fetchMatchingIds(filters, MAX_BULK);
+        ids = res.ids;
       }
       const all: Lead[] = [];
       const cols =
