@@ -333,24 +333,21 @@ function PeoplePage() {
       const to = from + PAGE_SIZE - 1;
       q = q.order("id", { ascending: true }).range(from, to);
 
-      // When filters are active, run an EXACT count via a HEAD request in
-      // parallel. PostgREST's estimated count was wildly off (reported 16k
-      // when the real result was >50k), so "Select matching" trusted the
-      // small number and then blew past it up to the 50k cap.
-      let countPromise: Promise<{ count: number; exact: boolean }>;
+      // When filters are active, fetch matching IDs (capped at MAX_BULK + 1)
+      // in parallel with the visible page. We use ids.length as the displayed
+      // count AND as the selection source — one round-trip serves both, and
+      // the LIMIT lets PG stop scanning as soon as the cap is hit instead of
+      // counting the whole filtered set (which used to time out).
+      let countPromise: Promise<{ count: number; capped: boolean; ids: string[] }>;
       if (hasFilters) {
-        let cq: any = supabase
-          .from("leads")
-          .select("id", { count: "exact", head: true });
-        cq = applyFilters(cq, filters);
-        countPromise = Promise.resolve(cq).then((r: any) =>
-          r.error
-            ? { count: 0, exact: false }
-            : { count: r.count ?? 0, exact: true },
-        );
+        countPromise = fetchMatchingIdsBulk({
+          data: { filters, limit: MAX_BULK + 1 },
+        })
+          .then((r) => ({ count: r.ids.length, capped: r.capped, ids: r.ids }))
+          .catch(() => ({ count: 0, capped: false, ids: [] }));
       } else {
         countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
-          (r: any) => ({ count: Number(r.data ?? 0), exact: false }),
+          (r: any) => ({ count: Number(r.data ?? 0), capped: false, ids: [] }),
         );
       }
 
@@ -359,7 +356,9 @@ function PeoplePage() {
       return {
         rows: (rowsRes.data ?? []) as Lead[],
         count: countRes.count,
-        exact: countRes.exact,
+        capped: countRes.capped,
+        matchingIds: countRes.ids,
+        hasFilters,
       };
     },
   });
@@ -368,7 +367,9 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
-  const totalIsExact = data?.exact ?? false;
+  const totalIsCapped = data?.capped ?? false;
+  const totalIsExact = !!data?.hasFilters && !totalIsCapped;
+  const matchingIds = data?.matchingIds ?? [];
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -380,8 +381,9 @@ function PeoplePage() {
       }),
     [filters],
   );
-  const matchingCountLabel = total.toLocaleString();
-  const matchingCountPrefix = totalIsExact ? "" : "About ";
+  const matchingCountLabel =
+    totalIsCapped ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
+  const matchingCountPrefix = totalIsExact || totalIsCapped ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
