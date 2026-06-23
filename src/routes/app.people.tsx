@@ -426,43 +426,23 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
-    // If we know the exact total and it exceeds the cap, fail fast.
-    if (totalIsExact && total > MAX_BULK) {
+    if (totalIsCapped) {
       toast.error(
-        `${total.toLocaleString()} leads match — only ${MAX_BULK.toLocaleString()} can be selected at once. Narrow your filters or use Advanced Selection.`,
+        `More than ${MAX_BULK.toLocaleString()} leads match. Narrow your filters or use Advanced Selection.`,
       );
       return;
     }
-    // Cap the fetch at the displayed total (+ small buffer) when known so we
-    // don't keep paginating past the real result set.
-    const fetchLimit = totalIsExact
-      ? Math.min(total + 1, MAX_BULK + 1)
-      : MAX_BULK + 1;
-    setBulkBusy(true);
-    setBulkSelectedCount(0);
-    try {
-      const ids = await fetchMatchingIds(filters, fetchLimit, setBulkSelectedCount);
-      if (ids.length > MAX_BULK) {
-        toast.error(
-          `More than ${MAX_BULK.toLocaleString()} leads match. Narrow your filters or use Advanced Selection.`,
-        );
-        return;
-      }
-      const selectedIds = ids;
-      setPicked(new Set(selectedIds));
-      if (selectedIds.length === 0) {
-        toast.info("No leads match these filters.");
-      } else {
-        toast.success(`${selectedIds.length.toLocaleString()} leads selected`);
-      }
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to select");
-    } finally {
-      setBulkBusy(false);
-      setBulkSelectedCount(0);
+    // We already fetched the matching IDs alongside the page query — selection
+    // is just turning that cached array into a Set. No second round-trip.
+    if (matchingIds.length === 0) {
+      toast.info("No leads match these filters.");
       setSelectMenuOpen(false);
-      setAdvancedMode(false);
+      return;
     }
+    setPicked(new Set(matchingIds));
+    toast.success(`${matchingIds.length.toLocaleString()} leads selected`);
+    setSelectMenuOpen(false);
+    setAdvancedMode(false);
   };
 
   const applyAdvanced = async () => {
@@ -478,8 +458,8 @@ function PeoplePage() {
     setBulkBusy(true);
     setBulkSelectedCount(0);
     try {
-      const ids = await fetchMatchingIds(filters, n, setBulkSelectedCount);
-      const selectedIds = ids.slice(0, n);
+      const res = await fetchMatchingIds(filters, n);
+      const selectedIds = res.ids.slice(0, n);
       setPicked(new Set(selectedIds));
       if (selectedIds.length === 0) {
         toast.info("No leads match these filters.");
@@ -511,7 +491,8 @@ function PeoplePage() {
     try {
       let ids: string[] = Array.from(picked);
       if (ids.length === 0) {
-        ids = await fetchMatchingIds(filters, MAX_BULK);
+        const res = await fetchMatchingIds(filters, MAX_BULK);
+        ids = res.ids;
       }
       const all: Lead[] = [];
       const cols =
