@@ -2393,6 +2393,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      count_leads_for_people_search: {
+        Args: { p_filters?: Json; p_user_id: string }
+        Returns: number
+      }
       create_operator_scoring_job_admin: {
         Args: {
           p_context: string
