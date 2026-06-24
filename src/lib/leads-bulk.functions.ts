@@ -40,7 +40,8 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    const result = (payload ?? {}) as { ids?: unknown; capped?: unknown };
+    const result = (payload ?? {}) as { ids?: unknown; totalCount?: unknown; capped?: unknown };
     const ids = Array.isArray(result.ids) ? result.ids.filter((id): id is string => typeof id === "string") : [];
-    return { ids, capped: result.capped === true };
+    const totalCount = typeof result.totalCount === "number" ? result.totalCount : ids.length;
+    return { ids, totalCount, capped: result.capped === true };
   });
