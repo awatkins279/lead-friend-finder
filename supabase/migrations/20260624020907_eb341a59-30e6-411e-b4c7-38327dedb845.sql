@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS leads_pending_backfill_idx ON public.leads (id) WHERE location_tokens IS NULL;

@@ -19,6 +19,30 @@ const IdsInput = z.object({
 
 const CountInput = z.object({ filters: LEAD_FILTERS_SCHEMA });
 
+// In-memory LRU cache (per Worker isolate). 30-min TTL — kills repeat-query
+// load while the user is typing/paging through the same filter set.
+type CacheEntry = { expires: number; value: unknown };
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_MAX = 200;
+const _cache: Map<string, CacheEntry> =
+  (globalThis as any).__peopleSearchCache ??
+  ((globalThis as any).__peopleSearchCache = new Map<string, CacheEntry>());
+
+function cacheGet<T>(key: string): T | null {
+  const hit = _cache.get(key);
+  if (!hit) return null;
+  if (hit.expires < Date.now()) { _cache.delete(key); return null; }
+  _cache.delete(key); _cache.set(key, hit); // refresh LRU
+  return hit.value as T;
+}
+function cacheSet(key: string, value: unknown) {
+  _cache.set(key, { expires: Date.now() + CACHE_TTL_MS, value });
+  if (_cache.size > CACHE_MAX) {
+    const oldest = _cache.keys().next().value;
+    if (oldest !== undefined) _cache.delete(oldest);
+  }
+}
+
 /**
  * Unified People-Search page fetch. Returns rows for the visible page AND the
  * total match count (capped) in a SINGLE round-trip so the table and the
@@ -29,8 +53,11 @@ export const searchLeadsPage = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => PageInput.parse(input))
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const cacheKey = `page:${userId}:${data.page}:${data.pageSize}:${JSON.stringify(data.filters)}`;
+    const cached = cacheGet<{ rows: any[]; totalCount: number; capped: boolean }>(cacheKey);
+    if (cached) return cached;
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const offset = data.page * data.pageSize;
     const { data: res, error } = await supabaseAdmin.rpc("search_leads", {
       p_user_id: userId,
@@ -41,11 +68,13 @@ export const searchLeadsPage = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     const payload = (res ?? {}) as { rows?: any[]; totalCount?: number; capped?: boolean };
-    return {
+    const result = {
       rows: (payload.rows ?? []) as any[],
       totalCount: Number(payload.totalCount ?? 0),
       capped: Boolean(payload.capped),
     };
+    cacheSet(cacheKey, result);
+    return result;
   });
 
 /** Just the total match count (capped). Kept for callers that don't need rows. */
