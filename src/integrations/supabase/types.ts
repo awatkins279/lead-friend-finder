@@ -2487,6 +2487,8 @@ export type Database = {
         }
         Returns: number
       }
+      us_abbr_to_state: { Args: { s: string }; Returns: string }
+      us_state_to_abbr: { Args: { s: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "customer"
