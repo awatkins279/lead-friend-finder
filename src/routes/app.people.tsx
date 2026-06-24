@@ -1023,9 +1023,11 @@ function PeoplePage() {
   // ===== Right-rail AI gauge math =====
   const scoreVals = Array.from(scores.values()).map((s) => s.score);
   const totalScore = scoreVals.reduce((a, b) => a + b, 0);
-  const maxScore = Math.max(scoreVals.length * 100, 1);
-  const gaugePct = scoreVals.length === 0 ? 0 : totalScore / maxScore;
+  const avgScore = scoreVals.length === 0 ? 0 : Math.round(totalScore / scoreVals.length);
+  const maxScore = 100;
+  const gaugePct = avgScore / 100;
   const aboveThreshold = scoreVals.filter((s) => s >= minScore).length;
+
 
   return (
     <div className="flex h-[calc(100vh-2rem)] gap-4 overflow-hidden">
