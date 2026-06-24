@@ -1097,7 +1097,7 @@ function PeoplePage() {
         {/* Horizontal filter chip row */}
         <div className="flex flex-wrap items-stretch gap-2.5">
           {/* Industry */}
-          <Popover onOpenChange={(o) => !o && apply()}>
+          <Popover>
             <PopoverTrigger asChild>
               <button className={chipBase}>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1138,7 +1138,7 @@ function PeoplePage() {
           </Popover>
 
           {/* Company Size */}
-          <Popover onOpenChange={(o) => !o && apply()}>
+          <Popover>
             <PopoverTrigger asChild>
               <button className={chipBase}>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1189,7 +1189,7 @@ function PeoplePage() {
           </Popover>
 
           {/* Location */}
-          <Popover onOpenChange={(o) => !o && apply()}>
+          <Popover>
             <PopoverTrigger asChild>
               <button className={chipBase}>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1234,7 +1234,7 @@ function PeoplePage() {
           </Popover>
 
           {/* Title */}
-          <Popover onOpenChange={(o) => !o && apply()}>
+          <Popover>
             <PopoverTrigger asChild>
               <button className={chipBase}>
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -1279,7 +1279,7 @@ function PeoplePage() {
           </Popover>
 
           {/* More Filters (name/company/has email/phone) */}
-          <Popover onOpenChange={(o) => !o && apply()}>
+          <Popover>
             <PopoverTrigger asChild>
               <button className={`${chipBase} flex-row items-center gap-2`}>
                 <Filter className="h-4 w-4 text-muted-foreground" />
