@@ -342,7 +342,7 @@ function PeoplePage() {
           data: { filters, limit: MAX_BULK + 1 },
         })
           .then((r) => ({ count: r.totalCount, capped: r.capped, ids: r.ids }))
-          .catch(() => ({ count: 0, capped: false, ids: [] }));
+          .catch(() => ({ count: MAX_BULK + 1, capped: true, ids: [] }));
       } else {
         countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
           (r: any) => ({ count: Number(r.data ?? 0), capped: false, ids: [] }),
@@ -380,7 +380,9 @@ function PeoplePage() {
     [filters],
   );
   const matchingCountLabel =
-    totalIsCapped ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
+    totalIsCapped && total <= MAX_BULK + 1
+      ? `${MAX_BULK.toLocaleString()}+`
+      : total.toLocaleString();
   const matchingCountPrefix = totalIsExact || totalIsCapped ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
