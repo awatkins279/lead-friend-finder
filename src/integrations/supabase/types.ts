@@ -2308,6 +2308,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backfill_leads_step: { Args: { p_limit: number }; Returns: number }
       build_location_tokens: {
         Args: { p_city: string; p_country: string; p_state: string }
         Returns: string[]
