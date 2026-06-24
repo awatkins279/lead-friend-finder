@@ -2478,6 +2478,16 @@ export type Database = {
           processed: number
         }[]
       }
+      search_leads: {
+        Args: {
+          p_count_cap?: number
+          p_filters?: Json
+          p_limit?: number
+          p_offset?: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       spend_credits: {

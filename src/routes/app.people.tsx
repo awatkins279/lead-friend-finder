@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { fetchMatchingCountBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { fetchMatchingCountBulk, fetchMatchingIdsBulk, searchLeadsPage } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -322,40 +322,25 @@ function PeoplePage() {
     refetchOnWindowFocus: false,
     queryKey,
     queryFn: async () => {
-      const hasFilters =
-        (filters.name ?? "").trim() !== "" ||
-        (filters.titles ?? []).length > 0 ||
-        (filters.company ?? "").trim() !== "" ||
-        (filters.locations ?? []).length > 0 ||
-        (filters.industry ?? "").trim() !== "" ||
-        (filters.companySize ?? []).length > 0 ||
-        !!filters.hasPhone ||
-        !!filters.hasEmail;
-
-      let q: any = supabase.from("leads").select(LIST_COLS);
-      q = applyFilters(q, filters);
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      q = q.order("id", { ascending: true }).range(from, to);
-
-      // Count in a separate lightweight request. Do not fetch 50k IDs just to
-      // paint the header — that was causing timeouts/stale "25" states.
-      let countPromise: Promise<{ count: number; exact: boolean }>;
-      if (hasFilters) {
-        countPromise = fetchMatchingCount(filters).then((count) => ({ count, exact: true }));
-      } else {
-        countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
-          (r: any) => ({ count: Number(r.data ?? 0), exact: false }),
-        );
-      }
-
-      const [rowsRes, countRes] = await Promise.all([q, countPromise]);
-      if (rowsRes.error) throw rowsRes.error;
+      // Single round-trip: rows for this page + total match count (capped).
+      // The unified `search_leads` RPC guarantees the table and the
+      // "X matching" header always agree.
+      const res = await searchLeadsPage({
+        data: { filters, page, pageSize: PAGE_SIZE },
+      });
       return {
-        rows: (rowsRes.data ?? []) as Lead[],
-        count: countRes.count,
-        countExact: countRes.exact,
-        hasFilters,
+        rows: (res.rows ?? []) as Lead[],
+        count: res.totalCount,
+        countExact: !res.capped,
+        hasFilters:
+          (filters.name ?? "").trim() !== "" ||
+          (filters.titles ?? []).length > 0 ||
+          (filters.company ?? "").trim() !== "" ||
+          (filters.locations ?? []).length > 0 ||
+          (filters.industry ?? "").trim() !== "" ||
+          (filters.companySize ?? []).length > 0 ||
+          !!filters.hasPhone ||
+          !!filters.hasEmail,
       };
     },
   });
