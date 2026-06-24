@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { z } from "zod";
 
 export type CreditSummary = {
+  unavailable?: boolean;
   isAdmin: boolean;
   planId: string | null;
   planName: string;
@@ -16,12 +16,40 @@ export type CreditSummary = {
   hasSubscription: boolean;
 };
 
+const unavailableCreditSummary: CreditSummary = {
+  unavailable: true,
+  isAdmin: false,
+  planId: null,
+  planName: "Credits unavailable",
+  allowance: 0,
+  used: 0,
+  remaining: 0,
+  periodStart: null,
+  periodEnd: null,
+  byAction: {},
+  hasSubscription: false,
+};
+
+function isTransientBackendError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    message.includes("schema cache") ||
+    message.includes("connection timeout") ||
+    message.includes("connection terminated") ||
+    message.includes("timeout") ||
+    message.includes("temporarily unavailable")
+  );
+}
+
 export const getCreditSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CreditSummary> => {
-    const { userId } = context;
-    const { data, error } = await supabaseAdmin.rpc("get_credit_summary", { _user_id: userId });
-    if (error) throw new Error(error.message);
+    const { supabase, userId } = context;
+    const { data, error } = await supabase.rpc("get_credit_summary", { _user_id: userId });
+    if (error) {
+      if (isTransientBackendError(error)) return unavailableCreditSummary;
+      throw new Error(error.message);
+    }
     const row = Array.isArray(data) && data.length ? (data[0] as any) : null;
     if (!row) {
       return {
@@ -52,6 +80,7 @@ export const getCreditSummary = createServerFn({ method: "GET" })
   });
 
 export const listPlans = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("plans")
     .select("*")
@@ -76,6 +105,7 @@ export const spendCredits = createServerFn({ method: "POST" })
   .inputValidator((input) => SpendInput.parse(input))
   .handler(async ({ context, data }) => {
     const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: costRow, error: costErr } = await supabaseAdmin
       .from("credit_costs")
       .select("cost_per_unit")
@@ -95,25 +125,3 @@ export const spendCredits = createServerFn({ method: "POST" })
     return { remaining: rem as number, charged: totalCost };
   });
 
-/** Internal helper for other server fns. Throws on failure. */
-export async function chargeUser(
-  userId: string,
-  action: "pull_contacts" | "enrich" | "generate_email" | "activate_campaign",
-  units: number,
-  note?: string,
-) {
-  const { data: costRow } = await supabaseAdmin
-    .from("credit_costs")
-    .select("cost_per_unit")
-    .eq("action", action)
-    .single();
-  const totalCost = (costRow?.cost_per_unit ?? 0) * units;
-  if (totalCost <= 0) return;
-  const { error } = await supabaseAdmin.rpc("spend_credits", {
-    _user_id: userId,
-    _action: action,
-    _amount: totalCost,
-    _note: note ?? undefined,
-  });
-  if (error) throw new Error(error.message);
-}
