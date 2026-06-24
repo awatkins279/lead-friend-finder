@@ -1127,7 +1127,11 @@ function PeoplePage() {
                 label="Industry"
                 placeholder="e.g. Software"
                 value={draft.industry}
-                onChange={(v) => setDraft({ ...draft, industry: v })}
+                onChange={(v) => {
+                  const next = { ...draft, industry: v };
+                  setDraft(next);
+                  setFilters(next);
+                }}
                 options={COMMON_INDUSTRIES}
               />
             </PopoverContent>
@@ -1171,7 +1175,9 @@ function PeoplePage() {
                           const next = v
                             ? [...draft.companySize, o.value]
                             : draft.companySize.filter((x) => x !== o.value);
-                          setDraft({ ...draft, companySize: next });
+                          const nextFilters = { ...draft, companySize: next };
+                          setDraft(nextFilters);
+                          setFilters(nextFilters);
                         }}
                       />
                       {o.label}
@@ -1214,7 +1220,11 @@ function PeoplePage() {
             <PopoverContent align="start" className="w-80 p-3">
               <MultiTagSelect
                 values={draft.locations}
-                onChange={(next) => setDraft({ ...draft, locations: next })}
+                onChange={(next) => {
+                  const nextFilters = { ...draft, locations: next };
+                  setDraft(nextFilters);
+                  setFilters(nextFilters);
+                }}
                 options={COMMON_LOCATIONS}
                 label="Location"
                 icon={<MapPin className="h-3.5 w-3.5" />}
@@ -1255,7 +1265,11 @@ function PeoplePage() {
             <PopoverContent align="start" className="w-80 p-3">
               <MultiTagSelect
                 values={draft.titles}
-                onChange={(next) => setDraft({ ...draft, titles: next })}
+                onChange={(next) => {
+                  const nextFilters = { ...draft, titles: next };
+                  setDraft(nextFilters);
+                  setFilters(nextFilters);
+                }}
                 options={COMMON_TITLES}
                 label="Job title"
                 icon={<Briefcase className="h-3.5 w-3.5" />}
@@ -1283,18 +1297,30 @@ function PeoplePage() {
                 label="Company"
                 placeholder="e.g. Acme Corp"
                 value={draft.company}
-                onChange={(v) => setDraft({ ...draft, company: v })}
+                onChange={(v) => {
+                  const next = { ...draft, company: v };
+                  setDraft(next);
+                  setFilters(next);
+                }}
               />
               <div className="space-y-2 pt-1">
                 <Toggle
                   label="Has phone number"
                   checked={draft.hasPhone}
-                  onChange={(v) => setDraft({ ...draft, hasPhone: v })}
+                  onChange={(v) => {
+                    const next = { ...draft, hasPhone: v };
+                    setDraft(next);
+                    setFilters(next);
+                  }}
                 />
                 <Toggle
                   label="Has email"
                   checked={draft.hasEmail}
-                  onChange={(v) => setDraft({ ...draft, hasEmail: v })}
+                  onChange={(v) => {
+                    const next = { ...draft, hasEmail: v };
+                    setDraft(next);
+                    setFilters(next);
+                  }}
                 />
               </div>
               {activeChips.length > 0 && (
