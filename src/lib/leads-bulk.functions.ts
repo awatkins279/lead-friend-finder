@@ -33,17 +33,14 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     const { filters } = data;
     const limit = Math.min(data.limit ?? MAX_BULK + 1, MAX_BULK + 1);
 
-    let q: any = supabaseAdmin
-      .from("leads")
-      .select("id")
-      .or(`imported_by.is.null,imported_by.eq.${userId}`);
-
-    q = buildLeadQuery(q, filters);
-    q = q.limit(limit);
-
-    const { data: rows, error } = await q;
+    const { data: payload, error } = await supabaseAdmin.rpc("match_lead_ids_for_people_search", {
+      p_user_id: userId,
+      p_filters: filters,
+      p_limit: limit,
+    });
     if (error) throw new Error(error.message);
-    const ids = ((rows ?? []) as { id: string }[]).map((row) => row.id);
-    const capped = ids.length > MAX_BULK;
-    return { ids: capped ? ids.slice(0, MAX_BULK) : ids, capped };
+
+    const result = (payload ?? {}) as { ids?: unknown; capped?: unknown };
+    const ids = Array.isArray(result.ids) ? result.ids.filter((id): id is string => typeof id === "string") : [];
+    return { ids, capped: result.capped === true };
   });
