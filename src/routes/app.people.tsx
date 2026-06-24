@@ -1637,15 +1637,16 @@ function PeoplePage() {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div className="font-mono-num text-2xl font-bold tracking-tight">
-                {totalScore.toLocaleString()}
+                {avgScore}
                 <span className="text-sm font-normal text-muted-foreground">
                   {" "}
-                  / {maxScore.toLocaleString()}
+                  / {maxScore}
                 </span>
               </div>
               <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-                Total Score
+                Avg Score
               </div>
+
             </div>
           </div>
 
