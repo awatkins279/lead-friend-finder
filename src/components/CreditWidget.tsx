@@ -13,7 +13,7 @@ export function CreditWidget() {
     staleTime: 30_000,
   });
 
-  if (!data) return null;
+  if (!data || data.unavailable) return null;
 
   // Owner / admin → unlimited badge, no progress bar, no upgrade CTA
   if (data.isAdmin) {

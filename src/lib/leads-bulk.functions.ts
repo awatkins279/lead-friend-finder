@@ -43,6 +43,17 @@ function cacheSet(key: string, value: unknown) {
   }
 }
 
+function isTransientBackendError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    message.includes("schema cache") ||
+    message.includes("connection timeout") ||
+    message.includes("connection terminated") ||
+    message.includes("timeout") ||
+    message.includes("temporarily unavailable")
+  );
+}
+
 /**
  * Unified People-Search page fetch. Returns rows for the visible page AND the
  * total match count (capped) in a SINGLE round-trip so the table and the
@@ -66,7 +77,12 @@ export const searchLeadsPage = createServerFn({ method: "POST" })
       p_offset: offset,
       p_count_cap: MAX_BULK + 1,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (isTransientBackendError(error)) {
+        return { rows: [], totalCount: 0, capped: false, unavailable: true };
+      }
+      throw new Error(error.message);
+    }
     const payload = (res ?? {}) as { rows?: any[]; totalCount?: number; capped?: boolean };
     const result = {
       rows: (payload.rows ?? []) as any[],
@@ -91,7 +107,10 @@ export const fetchMatchingCountBulk = createServerFn({ method: "POST" })
       p_offset: 0,
       p_count_cap: MAX_BULK + 1,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (isTransientBackendError(error)) return { count: 0, unavailable: true };
+      throw new Error(error.message);
+    }
     const payload = (res ?? {}) as { totalCount?: number };
     return { count: Number(payload.totalCount ?? 0) };
   });
@@ -116,7 +135,12 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
       p_offset: 0,
       p_count_cap: limit,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (isTransientBackendError(error)) {
+        return { ids: [], totalCount: 0, capped: false, unavailable: true };
+      }
+      throw new Error(error.message);
+    }
     const payload = (res ?? {}) as { rows?: Array<{ id?: unknown }>; totalCount?: number; capped?: boolean };
     const ids = (payload.rows ?? [])
       .map((r) => r.id)
