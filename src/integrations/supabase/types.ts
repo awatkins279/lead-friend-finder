@@ -631,6 +631,8 @@ export type Database = {
           country: string | null
           created_at: string
           email: string | null
+          employee_max: number | null
+          employee_min: number | null
           first_name: string | null
           hubspot_status: string | null
           hubspot_sync_date: string | null
@@ -638,6 +640,7 @@ export type Database = {
           imported_by: string | null
           last_name: string | null
           linkedin_url: string | null
+          location_tokens: string[] | null
           org_annual_revenue: string | null
           org_description: string | null
           org_employee_count: string | null
@@ -656,6 +659,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           email?: string | null
+          employee_max?: number | null
+          employee_min?: number | null
           first_name?: string | null
           hubspot_status?: string | null
           hubspot_sync_date?: string | null
@@ -663,6 +668,7 @@ export type Database = {
           imported_by?: string | null
           last_name?: string | null
           linkedin_url?: string | null
+          location_tokens?: string[] | null
           org_annual_revenue?: string | null
           org_description?: string | null
           org_employee_count?: string | null
@@ -681,6 +687,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           email?: string | null
+          employee_max?: number | null
+          employee_min?: number | null
           first_name?: string | null
           hubspot_status?: string | null
           hubspot_sync_date?: string | null
@@ -688,6 +696,7 @@ export type Database = {
           imported_by?: string | null
           last_name?: string | null
           linkedin_url?: string | null
+          location_tokens?: string[] | null
           org_annual_revenue?: string | null
           org_description?: string | null
           org_employee_count?: string | null
@@ -2299,6 +2308,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      build_location_tokens: {
+        Args: { p_city: string; p_country: string; p_state: string }
+        Returns: string[]
+      }
       bump_scoring_job_counters: {
         Args: {
           p_completed?: number
@@ -2454,6 +2467,8 @@ export type Database = {
         Args: { p_filters?: Json; p_limit?: number; p_user_id: string }
         Returns: Json
       }
+      parse_employee_max: { Args: { p: string }; Returns: number }
+      parse_employee_min: { Args: { p: string }; Returns: number }
       process_fast_scoring_batch_admin: {
         Args: { p_job_id: string; p_limit?: number }
         Returns: {
