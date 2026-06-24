@@ -31,15 +31,15 @@ export const LEAD_FILTERS_SCHEMA = z.object({
 });
 
 export const SIZE_BUCKETS: Record<string, string[]> = {
-  // Each raw employee-count string maps to EXACTLY ONE bucket, so picking a size
-  // never drags in companies from a neighbouring bucket. (The source data uses
-  // coarse ranges, so a spanning value like "11 to 50" is absorbed by one bucket.)
+  // Keep these buckets literal. The source data also contains broad ranges like
+  // "11 to 50" and "51 to 200"; including those inside narrower filters makes
+  // counts look wildly wrong for users who picked an exact range.
   "1-10": ["1", "1 to 10", "2 to 10"],
-  "11-25": ["11 to 25", "11 to 50"],
+  "11-25": ["11 to 25"],
   "26-50": ["26 to 50"],
-  "51-100": ["51 to 100", "51 to 200"],
+  "51-100": ["51 to 100"],
   "101-250": ["101 to 250"],
-  "251-500": ["251 to 500", "201 to 500"],
+  "251-500": ["251 to 500"],
   "501-1000": ["501 to 1000", "501 to 1,000"],
   "1001-5000": ["1001 to 5000", "1,001 to 5,000"],
   "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+"],

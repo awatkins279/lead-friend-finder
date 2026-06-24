@@ -12,17 +12,38 @@ const Input = z.object({
   limit: z.number().int().min(1).max(MAX_BULK + 1).optional(),
 });
 
+const CountInput = z.object({
+  filters: LEAD_FILTERS_SCHEMA,
+});
+
+function scopedLeadQuery(supabaseAdmin: any, userId: string, select: string, options?: any) {
+  return supabaseAdmin
+    .from("leads")
+    .select(select, options)
+    .or(`imported_by.is.null,imported_by.eq.${userId}`);
+}
+
+export const fetchMatchingCountBulk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CountInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: count, error } = await supabaseAdmin.rpc("count_leads_for_people_search", {
+      p_user_id: userId,
+      p_filters: data.filters,
+    });
+    if (error) throw new Error(error.message);
+    return { count: Number(count ?? 0) };
+  });
+
 /**
- * Returns matching lead IDs in ONE call, capped at MAX_BULK + 1.
+ * Returns matching lead IDs capped at MAX_BULK + 1.
  *
- * No keyset pagination, no ORDER BY id — the planner can stream rows from the
- * cheapest filter index and stop as soon as it hits the LIMIT. This avoids the
- * "canceling statement due to statement timeout" we got when paginating 10k at
- * a time through a filtered scan.
- *
- * The client uses `ids.length` as the displayable matching count
- * (`50,000+` when the result is capped). Selection just turns the same array
- * into a Set — no second round-trip and no credit charge for picking checkboxes.
+ * This deliberately reuses the same TypeScript filter builder as the visible
+ * table. The previous database RPC had its own company-size mapping, so the
+ * displayed rows/count and "Select matching" could disagree.
  */
 export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -32,16 +53,24 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { filters } = data;
     const limit = Math.min(data.limit ?? MAX_BULK + 1, MAX_BULK + 1);
+    const ids: string[] = [];
 
-    const { data: payload, error } = await supabaseAdmin.rpc("match_lead_ids_for_people_search", {
-      p_user_id: userId,
-      p_filters: filters,
-      p_limit: limit,
-    });
-    if (error) throw new Error(error.message);
+    for (let from = 0; from < limit; from += 1000) {
+      const to = Math.min(from + 999, limit - 1);
+      let q: any = scopedLeadQuery(supabaseAdmin, userId, "id")
+        .order("id", { ascending: true })
+        .range(from, to);
+      q = buildLeadQuery(q, filters);
 
-    const result = (payload ?? {}) as { ids?: unknown; totalCount?: unknown; capped?: unknown };
-    const ids = Array.isArray(result.ids) ? result.ids.filter((id): id is string => typeof id === "string") : [];
-    const totalCount = typeof result.totalCount === "number" ? result.totalCount : ids.length;
-    return { ids, totalCount, capped: result.capped === true };
+      const { data: rows, error } = await q;
+      if (error) throw new Error(error.message);
+
+      const pageIds = (rows ?? [])
+        .map((row: { id?: unknown }) => row.id)
+        .filter((id: unknown): id is string => typeof id === "string");
+      ids.push(...pageIds);
+      if (pageIds.length < to - from + 1) break;
+    }
+
+    return { ids, totalCount: ids.length, capped: ids.length > MAX_BULK };
   });

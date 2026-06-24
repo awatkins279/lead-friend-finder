@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { fetchMatchingCountBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -256,6 +256,11 @@ async function fetchMatchingIds(
   return fetchMatchingIdsBulk({ data: { filters, limit } });
 }
 
+async function fetchMatchingCount(filters: Filters): Promise<number> {
+  const res = await fetchMatchingCountBulk({ data: { filters } });
+  return res.count;
+}
+
 function PeoplePage() {
   const [draft, setDraft] = useState<Filters>(EMPTY);
   const [filters, setFilters] = useState<Filters>(EMPTY);
@@ -333,19 +338,14 @@ function PeoplePage() {
       const to = from + PAGE_SIZE - 1;
       q = q.order("id", { ascending: true }).range(from, to);
 
-      // When filters are active, fetch matching IDs (capped at MAX_BULK + 1)
-      // in parallel with the visible page. The server also returns the exact
-      // match count, while the capped ID array stays the selection source.
-      let countPromise: Promise<{ count: number; capped: boolean; ids: string[] }>;
+      // Count in a separate lightweight request. Do not fetch 50k IDs just to
+      // paint the header — that was causing timeouts/stale "25" states.
+      let countPromise: Promise<{ count: number; exact: boolean }>;
       if (hasFilters) {
-        countPromise = fetchMatchingIdsBulk({
-          data: { filters, limit: MAX_BULK + 1 },
-        })
-          .then((r) => ({ count: r.totalCount, capped: r.capped, ids: r.ids }))
-          .catch(() => ({ count: MAX_BULK + 1, capped: true, ids: [] }));
+        countPromise = fetchMatchingCount(filters).then((count) => ({ count, exact: true }));
       } else {
         countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
-          (r: any) => ({ count: Number(r.data ?? 0), capped: false, ids: [] }),
+          (r: any) => ({ count: Number(r.data ?? 0), exact: false }),
         );
       }
 
@@ -354,8 +354,7 @@ function PeoplePage() {
       return {
         rows: (rowsRes.data ?? []) as Lead[],
         count: countRes.count,
-        capped: countRes.capped,
-        matchingIds: countRes.ids,
+        countExact: countRes.exact,
         hasFilters,
       };
     },
@@ -365,9 +364,7 @@ function PeoplePage() {
 
 
   const total = data?.count ?? 0;
-  const totalIsCapped = data?.capped ?? false;
-  const totalIsExact = !!data?.hasFilters && !totalIsCapped;
-  const matchingIds = data?.matchingIds ?? [];
+  const totalIsExact = data?.countExact ?? false;
   const rows = data?.rows ?? [];
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeChips = useMemo(
@@ -379,11 +376,8 @@ function PeoplePage() {
       }),
     [filters],
   );
-  const matchingCountLabel =
-    totalIsCapped && total <= MAX_BULK + 1
-      ? `${MAX_BULK.toLocaleString()}+`
-      : total.toLocaleString();
-  const matchingCountPrefix = totalIsExact || totalIsCapped ? "" : "About ";
+  const matchingCountLabel = total.toLocaleString();
+  const matchingCountPrefix = totalIsExact ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
     let all = true;
@@ -426,23 +420,30 @@ function PeoplePage() {
   };
 
   const selectAllMatching = async () => {
-    if (totalIsCapped) {
+    if (total > MAX_BULK) {
       toast.error(
         `More than ${MAX_BULK.toLocaleString()} leads match. Narrow your filters or use Advanced Selection.`,
       );
       return;
     }
-    // We already fetched the matching IDs alongside the page query — selection
-    // is just turning that cached array into a Set. No second round-trip.
-    if (matchingIds.length === 0) {
-      toast.info("No leads match these filters.");
+    setBulkBusy(true);
+    setBulkSelectedCount(0);
+    try {
+      const res = await fetchMatchingIds(filters, Math.max(1, total));
+      if (res.ids.length === 0) {
+        toast.info("No leads match these filters.");
+      } else {
+        setPicked(new Set(res.ids));
+        toast.success(`${res.ids.length.toLocaleString()} leads selected`);
+      }
       setSelectMenuOpen(false);
-      return;
+      setAdvancedMode(false);
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to select");
+    } finally {
+      setBulkBusy(false);
+      setBulkSelectedCount(0);
     }
-    setPicked(new Set(matchingIds));
-    toast.success(`${matchingIds.length.toLocaleString()} leads selected`);
-    setSelectMenuOpen(false);
-    setAdvancedMode(false);
   };
 
   const applyAdvanced = async () => {
