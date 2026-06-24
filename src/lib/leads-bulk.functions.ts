@@ -30,10 +30,10 @@ export const fetchMatchingCountBulk = createServerFn({ method: "POST" })
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q: any = scopedLeadQuery(supabaseAdmin, userId, "id", { count: "exact", head: true });
-    q = buildLeadQuery(q, data.filters);
-
-    const { count, error } = await q;
+    const { data: count, error } = await supabaseAdmin.rpc("count_leads_for_people_search", {
+      p_user_id: userId,
+      p_filters: data.filters,
+    });
     if (error) throw new Error(error.message);
     return { count: Number(count ?? 0) };
   });
