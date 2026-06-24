@@ -12,6 +12,32 @@ const Input = z.object({
   limit: z.number().int().min(1).max(MAX_BULK + 1).optional(),
 });
 
+const CountInput = z.object({
+  filters: LEAD_FILTERS_SCHEMA,
+});
+
+function scopedLeadQuery(supabaseAdmin: any, userId: string, select: string, options?: any) {
+  return supabaseAdmin
+    .from("leads")
+    .select(select, options)
+    .or(`imported_by.is.null,imported_by.eq.${userId}`);
+}
+
+export const fetchMatchingCountBulk = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CountInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q: any = scopedLeadQuery(supabaseAdmin, userId, "id", { count: "exact", head: true });
+    q = buildLeadQuery(q, data.filters);
+
+    const { count, error } = await q;
+    if (error) throw new Error(error.message);
+    return { count: Number(count ?? 0) };
+  });
+
 /**
  * Returns matching lead IDs capped at MAX_BULK + 1.
  *
@@ -31,10 +57,7 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
 
     for (let from = 0; from < limit; from += 1000) {
       const to = Math.min(from + 999, limit - 1);
-      let q: any = supabaseAdmin
-        .from("leads")
-        .select("id")
-        .or(`imported_by.is.null,imported_by.eq.${userId}`)
+      let q: any = scopedLeadQuery(supabaseAdmin, userId, "id")
         .order("id", { ascending: true })
         .range(from, to);
       q = buildLeadQuery(q, filters);

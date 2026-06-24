@@ -64,7 +64,7 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
+import { fetchMatchingCountBulk, fetchMatchingIdsBulk } from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -256,6 +256,11 @@ async function fetchMatchingIds(
   return fetchMatchingIdsBulk({ data: { filters, limit } });
 }
 
+async function fetchMatchingCount(filters: Filters): Promise<number> {
+  const res = await fetchMatchingCountBulk({ data: { filters } });
+  return res.count;
+}
+
 function PeoplePage() {
   const [draft, setDraft] = useState<Filters>(EMPTY);
   const [filters, setFilters] = useState<Filters>(EMPTY);
@@ -337,12 +342,7 @@ function PeoplePage() {
       // paint the header — that was causing timeouts/stale "25" states.
       let countPromise: Promise<{ count: number; exact: boolean }>;
       if (hasFilters) {
-        let cq: any = supabase.from("leads").select("id", { count: "exact", head: true });
-        cq = applyFilters(cq, filters);
-        countPromise = cq.then((r: any) => {
-          if (r.error) throw r.error;
-          return { count: Number(r.count ?? 0), exact: true };
-        });
+        countPromise = fetchMatchingCount(filters).then((count) => ({ count, exact: true }));
       } else {
         countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
           (r: any) => ({ count: Number(r.data ?? 0), exact: false }),
