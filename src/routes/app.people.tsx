@@ -252,7 +252,7 @@ function applyFilters<T extends { select: any; ilike: any; or: any; not: any; ne
 async function fetchMatchingIds(
   filters: Filters,
   limit: number,
-): Promise<{ ids: string[]; capped: boolean }> {
+): Promise<{ ids: string[]; totalCount: number; capped: boolean }> {
   return fetchMatchingIdsBulk({ data: { filters, limit } });
 }
 
@@ -334,17 +334,15 @@ function PeoplePage() {
       q = q.order("id", { ascending: true }).range(from, to);
 
       // When filters are active, fetch matching IDs (capped at MAX_BULK + 1)
-      // in parallel with the visible page. We use ids.length as the displayed
-      // count AND as the selection source — one round-trip serves both, and
-      // the LIMIT lets PG stop scanning as soon as the cap is hit instead of
-      // counting the whole filtered set (which used to time out).
+      // in parallel with the visible page. The server also returns the exact
+      // match count, while the capped ID array stays the selection source.
       let countPromise: Promise<{ count: number; capped: boolean; ids: string[] }>;
       if (hasFilters) {
         countPromise = fetchMatchingIdsBulk({
           data: { filters, limit: MAX_BULK + 1 },
         })
-          .then((r) => ({ count: r.ids.length, capped: r.capped, ids: r.ids }))
-          .catch(() => ({ count: 0, capped: false, ids: [] }));
+          .then((r) => ({ count: r.totalCount, capped: r.capped, ids: r.ids }))
+          .catch(() => ({ count: MAX_BULK + 1, capped: true, ids: [] }));
       } else {
         countPromise = Promise.resolve(supabase.rpc("leads_total_estimate")).then(
           (r: any) => ({ count: Number(r.data ?? 0), capped: false, ids: [] }),
@@ -382,7 +380,9 @@ function PeoplePage() {
     [filters],
   );
   const matchingCountLabel =
-    totalIsCapped ? `${MAX_BULK.toLocaleString()}+` : total.toLocaleString();
+    totalIsCapped && total <= MAX_BULK + 1
+      ? `${MAX_BULK.toLocaleString()}+`
+      : total.toLocaleString();
   const matchingCountPrefix = totalIsExact || totalIsCapped ? "" : "About ";
   const { allPageChecked, somePageChecked } = useMemo(() => {
     if (rows.length === 0) return { allPageChecked: false, somePageChecked: false };
