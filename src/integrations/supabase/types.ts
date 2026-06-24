@@ -2446,6 +2446,10 @@ export type Database = {
         Returns: boolean
       }
       leads_total_estimate: { Args: never; Returns: number }
+      match_lead_ids_for_people_search: {
+        Args: { p_filters?: Json; p_limit?: number; p_user_id: string }
+        Returns: Json
+      }
       process_fast_scoring_batch_admin: {
         Args: { p_job_id: string; p_limit?: number }
         Returns: {
