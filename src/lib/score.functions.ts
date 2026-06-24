@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { chargeUser } from "@/lib/credits.server";
 
 const inputSchema = z.object({
   leadIds: z.array(z.string().min(1)).min(1).max(25),
@@ -146,6 +145,7 @@ ${JSON.stringify(compact)}`;
 
     // Charge ONLY after a successful AI run + parse — never bill the user for a
     // failed fetch, AI error, or unparseable response. Admin accounts bypass.
+    const { chargeUser } = await import("@/lib/credits.server");
     await chargeUser(userId, "generate_email", data.leadIds.length, `score:${data.leadIds.length}`);
 
     return { scores };

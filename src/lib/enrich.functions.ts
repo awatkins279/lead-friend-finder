@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { chargeUser } from "@/lib/credits.server";
 
 const inputSchema = z.object({
   listId: z.string().uuid(),
@@ -233,6 +232,7 @@ Return JSON with this exact shape:
 
     // Charge only after the enrichment fully succeeded — never bill for a missing
     // list/lead, an unconfigured campaign, or an AI failure. Admin bypass automatic.
+    const { chargeUser } = await import("@/lib/credits.server");
     await chargeUser(userId, "enrich", 1, `lead:${data.leadId}`);
 
     return { ok: true as const, score, emailCount: emails.length };
