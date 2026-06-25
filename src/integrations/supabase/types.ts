@@ -2367,6 +2367,27 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_deep_scoring_batch_admin: {
+        Args: { p_limit?: number }
+        Returns: {
+          city: string
+          context: string
+          country: string
+          first_name: string
+          job_id: string
+          last_name: string
+          lead_id: string
+          org_description: string
+          org_employee_count: number
+          org_industry: string
+          org_name: string
+          org_technologies_used: string
+          prior_score: number
+          state: string
+          title: string
+          user_id: string
+        }[]
+      }
       claim_scoring_batch: {
         Args: { p_job_id: string }
         Returns: {
@@ -2427,6 +2448,10 @@ export type Database = {
           total_batches: number
           total_leads: number
         }[]
+      }
+      fail_deep_scoring_admin: {
+        Args: { p_job_id: string; p_lead_ids: string[] }
+        Returns: undefined
       }
       finalize_scoring_job: {
         Args: { p_job_id: string }
