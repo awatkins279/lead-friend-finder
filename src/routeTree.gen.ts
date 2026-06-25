@@ -39,6 +39,7 @@ import { Route as ApiPublicInstantlyWebhookRouteImport } from './routes/api/publ
 import { Route as ApiPublicInboxIngestRouteImport } from './routes/api/public/inbox.ingest'
 import { Route as ApiPublicHooksSdrReplyTickRouteImport } from './routes/api/public/hooks/sdr-reply-tick'
 import { Route as ApiPublicHooksScoringTickRouteImport } from './routes/api/public/hooks/scoring-tick'
+import { Route as ApiPublicHooksDeepScoringTickRouteImport } from './routes/api/public/hooks/deep-scoring-tick'
 
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
@@ -198,6 +199,12 @@ const ApiPublicHooksScoringTickRoute =
     path: '/api/public/hooks/scoring-tick',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksDeepScoringTickRoute =
+  ApiPublicHooksDeepScoringTickRouteImport.update({
+    id: '/api/public/hooks/deep-scoring-tick',
+    path: '/api/public/hooks/deep-scoring-tick',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/api/public/hooks/deep-scoring-tick': typeof ApiPublicHooksDeepScoringTickRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -253,6 +261,7 @@ export interface FileRoutesByTo {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists': typeof AppListsIndexRoute
+  '/api/public/hooks/deep-scoring-tick': typeof ApiPublicHooksDeepScoringTickRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -286,6 +295,7 @@ export interface FileRoutesById {
   '/api/google-calendar/connect': typeof ApiGoogleCalendarConnectRoute
   '/app/lists/$listId': typeof AppListsListIdRoute
   '/app/lists/': typeof AppListsIndexRoute
+  '/api/public/hooks/deep-scoring-tick': typeof ApiPublicHooksDeepScoringTickRoute
   '/api/public/hooks/scoring-tick': typeof ApiPublicHooksScoringTickRoute
   '/api/public/hooks/sdr-reply-tick': typeof ApiPublicHooksSdrReplyTickRoute
   '/api/public/inbox/ingest': typeof ApiPublicInboxIngestRoute
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists/'
+    | '/api/public/hooks/deep-scoring-tick'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists'
+    | '/api/public/hooks/deep-scoring-tick'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
     | '/api/google-calendar/connect'
     | '/app/lists/$listId'
     | '/app/lists/'
+    | '/api/public/hooks/deep-scoring-tick'
     | '/api/public/hooks/scoring-tick'
     | '/api/public/hooks/sdr-reply-tick'
     | '/api/public/inbox/ingest'
@@ -403,6 +416,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   ApiGoogleCalendarCallbackRoute: typeof ApiGoogleCalendarCallbackRoute
   ApiGoogleCalendarConnectRoute: typeof ApiGoogleCalendarConnectRoute
+  ApiPublicHooksDeepScoringTickRoute: typeof ApiPublicHooksDeepScoringTickRoute
   ApiPublicHooksScoringTickRoute: typeof ApiPublicHooksScoringTickRoute
   ApiPublicHooksSdrReplyTickRoute: typeof ApiPublicHooksSdrReplyTickRoute
   ApiPublicInboxIngestRoute: typeof ApiPublicInboxIngestRoute
@@ -626,6 +640,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksScoringTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/deep-scoring-tick': {
+      id: '/api/public/hooks/deep-scoring-tick'
+      path: '/api/public/hooks/deep-scoring-tick'
+      fullPath: '/api/public/hooks/deep-scoring-tick'
+      preLoaderRoute: typeof ApiPublicHooksDeepScoringTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -683,6 +704,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   ApiGoogleCalendarCallbackRoute: ApiGoogleCalendarCallbackRoute,
   ApiGoogleCalendarConnectRoute: ApiGoogleCalendarConnectRoute,
+  ApiPublicHooksDeepScoringTickRoute: ApiPublicHooksDeepScoringTickRoute,
   ApiPublicHooksScoringTickRoute: ApiPublicHooksScoringTickRoute,
   ApiPublicHooksSdrReplyTickRoute: ApiPublicHooksSdrReplyTickRoute,
   ApiPublicInboxIngestRoute: ApiPublicInboxIngestRoute,
