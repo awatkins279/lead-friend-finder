@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chatCompletion } from "@/lib/ai-client";
 
 const inputSchema = z.object({
   leadIds: z.array(z.string().min(1)).min(1).max(25),
@@ -82,33 +83,16 @@ Use only "strong" / "partial" / "weak" / "unknown" for verdicts. Cite evidence f
 PROSPECTS:
 ${JSON.stringify(compact)}`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      signal: AbortSignal.timeout(50_000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 8000,
-      }),
+    const content = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 8000,
     });
 
-    if (res.status === 429) throw new Error("AI rate limit exceeded. Try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace settings.");
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`AI gateway error ${res.status}: ${text.slice(0, 200)}`);
-    }
-
-    const payload = await res.json();
-    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
     let parsed: { scores?: ScoreRow[] };
     try {
       parsed = extractJson(content) as { scores?: ScoreRow[] };
@@ -116,7 +100,6 @@ ${JSON.stringify(compact)}`;
       console.error("Score JSON parse failed. Raw content:", content.slice(0, 1000));
       throw new Error("AI returned invalid JSON — try scoring fewer leads at once.");
     }
-
 
     const allowed: Signal["verdict"][] = ["strong", "partial", "weak", "unknown"];
     const scores: ScoreRow[] = (parsed.scores ?? [])
@@ -155,21 +138,28 @@ ${JSON.stringify(compact)}`;
 // repairs trailing commas / control chars, and attempts to close a truncated
 // "scores" array so a partial response still yields usable rows.
 function extractJson(raw: string): unknown {
-  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  let s = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = s.search(/[\{\[]/);
   if (start === -1) throw new Error("No JSON found");
   s = s.slice(start);
 
   const tryParse = (txt: string) => JSON.parse(txt);
 
-  try { return tryParse(s); } catch {}
+  try {
+    return tryParse(s);
+  } catch {}
 
   // Clean trailing commas + stray control chars
   let cleaned = s
     .replace(/,\s*}/g, "}")
     .replace(/,\s*]/g, "]")
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
-  try { return tryParse(cleaned); } catch {}
+  try {
+    return tryParse(cleaned);
+  } catch {}
 
   // Truncation repair: cut after the last complete object inside scores[]
   const arrStart = cleaned.indexOf('"scores"');

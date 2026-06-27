@@ -103,9 +103,11 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         const bodyText = p.reply_text ?? null;
         const snippet = (p.reply_text_snippet ?? p.reply_text ?? "").slice(0, 200);
         const rawPayload = p as Record<string, unknown>;
-        const providerMessageId = ["email_id", "message_uuid", "uuid", "id"]
-          .map((key) => rawPayload[key])
-          .find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
+        const providerMessageId =
+          ["email_id", "message_uuid", "uuid", "id"]
+            .map((key) => rawPayload[key])
+            .find((value): value is string => typeof value === "string" && value.length > 0) ??
+          null;
 
         // 4) Resolve which user/mailbox this landed on.
         const { data: account } = await supabaseAdmin
@@ -126,13 +128,23 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
             .eq("message_id", providerMessageId)
             .maybeSingle();
           if (duplicate) {
-            return Response.json({ ok: true, duplicate: true, conversation_id: duplicate.conversation_id });
+            return Response.json({
+              ok: true,
+              duplicate: true,
+              conversation_id: duplicate.conversation_id,
+            });
           }
         }
 
         // Unsubscribe event from Instantly — record and stop here.
         if (p.event_type && /unsub/i.test(p.event_type)) {
-          await recordUnsubscribe(supabaseAdmin, account.user_id, leadEmail, mailbox, p.campaign_name);
+          await recordUnsubscribe(
+            supabaseAdmin,
+            account.user_id,
+            leadEmail,
+            mailbox,
+            p.campaign_name,
+          );
           await supabaseAdmin
             .from("sdr_conversations")
             .update({ intent: "unsubscribe" })
@@ -169,13 +181,13 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
               .eq("instantly_campaign_id", p.campaign_id)
               .maybeSingle()
           : p.campaign_name
-          ? await supabaseAdmin
-              .from("lists")
-              .select("id, sdr_agent_id")
-              .eq("user_id", account.user_id)
-              .eq("name", p.campaign_name.replace(/ — NexusAi$/, ""))
-              .maybeSingle()
-          : { data: null };
+            ? await supabaseAdmin
+                .from("lists")
+                .select("id, sdr_agent_id")
+                .eq("user_id", account.user_id)
+                .eq("name", p.campaign_name.replace(/ — NexusAi$/, ""))
+                .maybeSingle()
+            : { data: null };
 
         if (existing) {
           conversationId = existing.id as string;
@@ -208,22 +220,26 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         }
 
         // 6) Append the inbound message (Instantly payload kept in `raw`).
-        const { data: inboundMessage, error: mErr } = await supabaseAdmin.from("sdr_messages").insert({
-          conversation_id: conversationId,
-          user_id: account.user_id,
-          direction: "inbound",
-          from_email: leadEmail,
-          to_emails: [mailbox],
-          subject: p.reply_subject ?? null,
-          body_text: bodyText,
-          body_html: p.reply_html ?? null,
-          snippet,
-          message_id: providerMessageId,
-          received_at: receivedAt,
-          status: "received",
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          raw: p as any,
-        }).select("id").single();
+        const { data: inboundMessage, error: mErr } = await supabaseAdmin
+          .from("sdr_messages")
+          .insert({
+            conversation_id: conversationId,
+            user_id: account.user_id,
+            direction: "inbound",
+            from_email: leadEmail,
+            to_emails: [mailbox],
+            subject: p.reply_subject ?? null,
+            body_text: bodyText,
+            body_html: p.reply_html ?? null,
+            snippet,
+            message_id: providerMessageId,
+            received_at: receivedAt,
+            status: "received",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            raw: p as any,
+          })
+          .select("id")
+          .single();
         if (mErr) return new Response(mErr.message, { status: 500 });
 
         // 7) Bump the conversation if it already existed.
@@ -243,7 +259,6 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
         const cls = await classifyIntent({
           text: bodyText ?? snippet,
           subject: p.reply_subject ?? null,
-          apiKey: process.env.LOVABLE_API_KEY ?? "",
         });
         if (cls) {
           await supabaseAdmin
@@ -252,10 +267,15 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
             .eq("id", conversationId);
           // A reply asking to opt out counts as an unsubscribe too.
           if (cls.intent === "unsubscribe") {
-            await recordUnsubscribe(supabaseAdmin, account.user_id, leadEmail, mailbox, p.campaign_name);
+            await recordUnsubscribe(
+              supabaseAdmin,
+              account.user_id,
+              leadEmail,
+              mailbox,
+              p.campaign_name,
+            );
           }
         }
-
 
         const agentId = existing?.agent_id ?? matchedList?.sdr_agent_id ?? null;
         const { data: unsubscribed } = agentId
@@ -279,7 +299,9 @@ export const Route = createFileRoute("/api/public/instantly/webhook")({
                 conversation_id: conversationId,
                 inbound_message_id: inboundMessage.id,
                 agent_id: agentId,
-                scheduled_for: new Date(Date.now() + replyDelayMs(agent.response_speed)).toISOString(),
+                scheduled_for: new Date(
+                  Date.now() + replyDelayMs(agent.response_speed),
+                ).toISOString(),
                 status: "pending",
               },
               { onConflict: "inbound_message_id", ignoreDuplicates: true },

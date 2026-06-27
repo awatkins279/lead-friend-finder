@@ -92,7 +92,6 @@ export const Route = createFileRoute("/api/public/inbox/ingest")({
             .eq("id", conversationId);
         }
 
-
         const { error: mErr } = await supabaseAdmin.from("sdr_messages").insert({
           conversation_id: conversationId,
           user_id: account.user_id,

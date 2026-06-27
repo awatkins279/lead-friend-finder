@@ -24,12 +24,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -72,7 +67,9 @@ function CalendarPage() {
   const [openMeetingId, setOpenMeetingId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [gcal, setGcal] = useState<{ connected: boolean; email?: string | null }>({ connected: false });
+  const [gcal, setGcal] = useState<{ connected: boolean; email?: string | null }>({
+    connected: false,
+  });
 
   const load = async () => {
     setLoading(true);
@@ -119,7 +116,8 @@ function CalendarPage() {
             <CalendarIcon className="h-6 w-6" /> Calendar
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every scheduled call & demo. AI uses your availability here to pitch real open slots in real time.
+            Every scheduled call & demo. AI uses your availability here to pitch real open slots in
+            real time.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -185,7 +183,9 @@ function CalendarPage() {
           </div>
           <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="py-1">{d}</div>
+              <div key={d} className="py-1">
+                {d}
+              </div>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
@@ -206,7 +206,9 @@ function CalendarPage() {
                 >
                   <div
                     className={`text-xs ${
-                      today ? "inline-grid h-5 w-5 place-items-center rounded-full bg-[var(--gradient-aurora)] font-semibold text-white" : ""
+                      today
+                        ? "inline-grid h-5 w-5 place-items-center rounded-full bg-[var(--gradient-aurora)] font-semibold text-white"
+                        : ""
                     }`}
                   >
                     {d.getDate()}
@@ -222,7 +224,9 @@ function CalendarPage() {
                       </div>
                     ))}
                     {items.length > 2 && (
-                      <div className="text-[10px] text-muted-foreground">+{items.length - 2} more</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        +{items.length - 2} more
+                      </div>
                     )}
                   </div>
                 </button>
@@ -262,12 +266,16 @@ function CalendarPage() {
                         {[m.prospect_name, m.prospect_company].filter(Boolean).join(" · ")}
                       </div>
                     </div>
-                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${SOURCE_COLORS[m.source]}`}>
+                    <span
+                      className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${SOURCE_COLORS[m.source]}`}
+                    >
                       {m.source.replace("_", " ")}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                    <span>{formatTime(m.starts_at)} – {formatTime(m.ends_at)}</span>
+                    <span>
+                      {formatTime(m.starts_at)} – {formatTime(m.ends_at)}
+                    </span>
                     {m.meet_link && (
                       <span className="inline-flex items-center gap-1 text-emerald-300">
                         <Video className="h-3 w-3" /> Meet link
@@ -415,50 +423,86 @@ function NewMeetingDialog({
         <div className="space-y-3">
           <div>
             <Label>Title</Label>
-            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <Input
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Prospect name</Label>
-              <Input value={form.prospect_name} onChange={(e) => setForm({ ...form, prospect_name: e.target.value })} />
+              <Input
+                value={form.prospect_name}
+                onChange={(e) => setForm({ ...form, prospect_name: e.target.value })}
+              />
             </div>
             <div>
               <Label>Company</Label>
-              <Input value={form.prospect_company} onChange={(e) => setForm({ ...form, prospect_company: e.target.value })} />
+              <Input
+                value={form.prospect_company}
+                onChange={(e) => setForm({ ...form, prospect_company: e.target.value })}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Email</Label>
-              <Input type="email" value={form.prospect_email} onChange={(e) => setForm({ ...form, prospect_email: e.target.value })} />
+              <Input
+                type="email"
+                value={form.prospect_email}
+                onChange={(e) => setForm({ ...form, prospect_email: e.target.value })}
+              />
             </div>
             <div>
               <Label>Phone</Label>
-              <Input value={form.prospect_phone} onChange={(e) => setForm({ ...form, prospect_phone: e.target.value })} />
+              <Input
+                value={form.prospect_phone}
+                onChange={(e) => setForm({ ...form, prospect_phone: e.target.value })}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Starts</Label>
-              <Input type="datetime-local" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
+              <Input
+                type="datetime-local"
+                value={form.starts_at}
+                onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
+              />
             </div>
             <div>
               <Label>Ends</Label>
-              <Input type="datetime-local" value={form.ends_at} onChange={(e) => setForm({ ...form, ends_at: e.target.value })} />
+              <Input
+                type="datetime-local"
+                value={form.ends_at}
+                onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+              />
             </div>
           </div>
           <div>
             <Label>Meet link (optional)</Label>
-            <Input placeholder="https://meet.google.com/..." value={form.meet_link} onChange={(e) => setForm({ ...form, meet_link: e.target.value })} />
+            <Input
+              placeholder="https://meet.google.com/..."
+              value={form.meet_link}
+              onChange={(e) => setForm({ ...form, meet_link: e.target.value })}
+            />
           </div>
           <div>
             <Label>Notes</Label>
-            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <Textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={busy} onClick={submit}>{busy ? "Saving…" : "Create meeting"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={busy} onClick={submit}>
+            {busy ? "Saving…" : "Create meeting"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -477,7 +521,10 @@ function MeetingDetailSheet({
 }) {
   const fetchOne = useServerFn(getMeeting);
   const cancel = useServerFn(cancelMeeting);
-  const [data, setData] = useState<{ meeting: Meeting | null; lead: any | null }>({ meeting: null, lead: null });
+  const [data, setData] = useState<{ meeting: Meeting | null; lead: any | null }>({
+    meeting: null,
+    lead: null,
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -522,12 +569,16 @@ function MeetingDetailSheet({
 
             {(m.prospect_name || lead) && (
               <div className="space-y-2">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">Prospect</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Prospect
+                </div>
                 <div className="space-y-1.5 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
-                  {(m.prospect_name || (lead && `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim())) && (
+                  {(m.prospect_name ||
+                    (lead && `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim())) && (
                     <div className="flex items-center gap-2">
                       <UserIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                      {m.prospect_name || `${lead?.first_name ?? ""} ${lead?.last_name ?? ""}`.trim()}
+                      {m.prospect_name ||
+                        `${lead?.first_name ?? ""} ${lead?.last_name ?? ""}`.trim()}
                       {lead?.title && <span className="text-muted-foreground">· {lead.title}</span>}
                     </div>
                   )}
@@ -535,7 +586,9 @@ function MeetingDetailSheet({
                     <div className="flex items-center gap-2">
                       <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                       {m.prospect_company || lead?.org_name}
-                      {lead?.org_industry && <span className="text-muted-foreground">· {lead.org_industry}</span>}
+                      {lead?.org_industry && (
+                        <span className="text-muted-foreground">· {lead.org_industry}</span>
+                      )}
                     </div>
                   )}
                   {(m.prospect_email || lead?.email) && (
@@ -684,7 +737,8 @@ function SettingsDialog({
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
-                Connect your Google Calendar so meetings auto-create Google Meet links and sync both ways.
+                Connect your Google Calendar so meetings auto-create Google Meet links and sync both
+                ways.
               </p>
               <Button
                 size="sm"
@@ -706,11 +760,16 @@ function SettingsDialog({
         {/* Scheduling prefs */}
         {prefs && (
           <div className="space-y-3">
-            <div className="text-sm font-medium">Working hours (used by the AI when pitching slots)</div>
+            <div className="text-sm font-medium">
+              Working hours (used by the AI when pitching slots)
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Timezone</Label>
-                <Input value={prefs.timezone} onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })} />
+                <Input
+                  value={prefs.timezone}
+                  onChange={(e) => setPrefs({ ...prefs, timezone: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Meeting length (min)</Label>
@@ -718,7 +777,10 @@ function SettingsDialog({
                   type="number"
                   value={prefs.meeting_duration_minutes}
                   onChange={(e) =>
-                    setPrefs({ ...prefs, meeting_duration_minutes: parseInt(e.target.value || "30", 10) })
+                    setPrefs({
+                      ...prefs,
+                      meeting_duration_minutes: parseInt(e.target.value || "30", 10),
+                    })
                   }
                 />
               </div>
@@ -727,7 +789,9 @@ function SettingsDialog({
                 <Input
                   type="time"
                   value={toHHMM(prefs.workday_start_minute)}
-                  onChange={(e) => setPrefs({ ...prefs, workday_start_minute: toMinutes(e.target.value) })}
+                  onChange={(e) =>
+                    setPrefs({ ...prefs, workday_start_minute: toMinutes(e.target.value) })
+                  }
                 />
               </div>
               <div>
@@ -735,7 +799,9 @@ function SettingsDialog({
                 <Input
                   type="time"
                   value={toHHMM(prefs.workday_end_minute)}
-                  onChange={(e) => setPrefs({ ...prefs, workday_end_minute: toMinutes(e.target.value) })}
+                  onChange={(e) =>
+                    setPrefs({ ...prefs, workday_end_minute: toMinutes(e.target.value) })
+                  }
                 />
               </div>
               <div>
@@ -743,7 +809,9 @@ function SettingsDialog({
                 <Input
                   type="number"
                   value={prefs.buffer_minutes}
-                  onChange={(e) => setPrefs({ ...prefs, buffer_minutes: parseInt(e.target.value || "0", 10) })}
+                  onChange={(e) =>
+                    setPrefs({ ...prefs, buffer_minutes: parseInt(e.target.value || "0", 10) })
+                  }
                 />
               </div>
             </div>
@@ -779,8 +847,12 @@ function SettingsDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button disabled={saving || !prefs} onClick={submit}>{saving ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          <Button disabled={saving || !prefs} onClick={submit}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

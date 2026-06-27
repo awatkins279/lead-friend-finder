@@ -139,9 +139,8 @@ export function EmailAccountDialog({
         <DialogHeader>
           <DialogTitle>{existing ? "Edit email account" : "Add email account"}</DialogTitle>
           <DialogDescription>
-            Register the inbox your AI SDR will reply through. Credentials &amp; OAuth get
-            connected after this — for now we save the address so you can already assign
-            it to an agent.
+            Register the inbox your AI SDR will reply through. Credentials &amp; OAuth get connected
+            after this — for now we save the address so you can already assign it to an agent.
           </DialogDescription>
         </DialogHeader>
 
@@ -236,9 +235,9 @@ export function EmailAccountDialog({
           </div>
 
           <div className="rounded-md border border-amber-500/30 bg-amber-50/30 p-3 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-400">
-            Status will stay <strong>Pending</strong> until the OAuth/SMTP credential
-            flow is connected. Your AI SDR can already be configured to use this address
-            and will start sending automatically the moment credentials are in.
+            Status will stay <strong>Pending</strong> until the OAuth/SMTP credential flow is
+            connected. Your AI SDR can already be configured to use this address and will start
+            sending automatically the moment credentials are in.
           </div>
         </div>
 

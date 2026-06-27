@@ -85,7 +85,8 @@ export const getRingCentralAuthUrl = createServerFn({ method: "POST" })
     if (acc.provider !== "ringcentral") throw new Error("Not a RingCentral account");
 
     const creds = (acc.credentials ?? {}) as RCCreds;
-    if (!creds.client_id) throw new Error("Save your Client ID and Client Secret first, then sign in.");
+    if (!creds.client_id)
+      throw new Error("Save your Client ID and Client Secret first, then sign in.");
 
     const serverUrl = getServerUrl(creds);
     const redirectUri = getRedirectUri();
@@ -122,7 +123,9 @@ export const getRingCentralWebPhoneCreds = createServerFn({ method: "POST" })
 
     let creds = (acc.credentials ?? {}) as RCCreds;
     if (!creds.refresh_token) {
-      throw new Error("RingCentral not connected — click 'Sign in with RingCentral' in Sending Accounts.");
+      throw new Error(
+        "RingCentral not connected — click 'Sign in with RingCentral' in Sending Accounts.",
+      );
     }
     creds = await ensureFreshToken(creds);
 

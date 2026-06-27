@@ -34,7 +34,9 @@ export const Route = createFileRoute("/api/public/hooks/sdr-reply-tick")({
                 status: finalAttempt ? "failed" : "retry",
                 error: message,
                 locked_at: null,
-                scheduled_for: new Date(Date.now() + 60_000 * Math.max(1, Number(job.attempts))).toISOString(),
+                scheduled_for: new Date(
+                  Date.now() + 60_000 * Math.max(1, Number(job.attempts)),
+                ).toISOString(),
                 ...(finalAttempt ? { completed_at: new Date().toISOString() } : {}),
               })
               .eq("id", job.id);

@@ -108,8 +108,8 @@ function Landing() {
           </h1>
 
           <p className="mb-10 max-w-2xl text-lg leading-relaxed text-zinc-500 md:text-xl">
-            A B2B sales tool to pull leads from your database, filter by job title and company,
-            and reach them by email or LinkedIn — without juggling tabs.
+            A B2B sales tool to pull leads from your database, filter by job title and company, and
+            reach them by email or LinkedIn — without juggling tabs.
           </p>
 
           <Link

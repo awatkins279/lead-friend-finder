@@ -69,8 +69,9 @@ function ProductInfoPage() {
             <Package className="h-6 w-6 text-primary" /> Product Info
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Tell the AI everything it needs to know about what you sell. This is the base context used during every live call,
-            so the teleprompter knows what to tell the rep — even for objections and questions you didn't script.
+            Tell the AI everything it needs to know about what you sell. This is the base context
+            used during every live call, so the teleprompter knows what to tell the rep — even for
+            objections and questions you didn't script.
           </p>
         </div>
         <Button onClick={save} disabled={saving || isLoading} className="shrink-0">
@@ -81,10 +82,18 @@ function ProductInfoPage() {
       <div className="grid gap-5 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="grid gap-5 md:grid-cols-2">
           <Field label="Company name" hint="Your company.">
-            <Input value={form.company_name ?? ""} onChange={(e) => upd("company_name", e.target.value)} placeholder="Acme Inc." />
+            <Input
+              value={form.company_name ?? ""}
+              onChange={(e) => upd("company_name", e.target.value)}
+              placeholder="Acme Inc."
+            />
           </Field>
           <Field label="Product / service name">
-            <Input value={form.product_name ?? ""} onChange={(e) => upd("product_name", e.target.value)} placeholder="Acme Sales OS" />
+            <Input
+              value={form.product_name ?? ""}
+              onChange={(e) => upd("product_name", e.target.value)}
+              placeholder="Acme Sales OS"
+            />
           </Field>
         </div>
 
@@ -161,7 +170,10 @@ function ProductInfoPage() {
           </Field>
         </div>
 
-        <Field label="Default call-to-action" hint="The thing the rep is trying to close on every call.">
+        <Field
+          label="Default call-to-action"
+          hint="The thing the rep is trying to close on every call."
+        >
           <Input
             value={form.call_to_action ?? ""}
             onChange={(e) => upd("call_to_action", e.target.value)}
@@ -179,7 +191,15 @@ function ProductInfoPage() {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <Label className="text-sm font-medium">{label}</Label>

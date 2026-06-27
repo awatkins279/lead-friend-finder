@@ -49,11 +49,17 @@ export function useLiveCoaching({ listId, leadId, callId, enabled, getRemoteStre
   turnsRef.current = turns;
 
   const stop = useCallback(() => {
-    try { wsRef.current?.close(); } catch {}
+    try {
+      wsRef.current?.close();
+    } catch {}
     wsRef.current = null;
-    try { procRef.current?.disconnect(); } catch {}
+    try {
+      procRef.current?.disconnect();
+    } catch {}
     procRef.current = null;
-    try { ctxRef.current?.close(); } catch {}
+    try {
+      ctxRef.current?.close();
+    } catch {}
     ctxRef.current = null;
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
@@ -77,7 +83,9 @@ export function useLiveCoaching({ listId, leadId, callId, enabled, getRemoteStre
       const dual = !!remote;
 
       // 3) build audio graph @ 16kHz, mix mic→ch0, remote→ch1 (or mono if no remote)
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 16000,
+      });
       ctxRef.current = ctx;
       const merger = ctx.createChannelMerger(dual ? 2 : 1);
       const micSrc = ctx.createMediaStreamSource(mic);
@@ -104,7 +112,10 @@ export function useLiveCoaching({ listId, leadId, callId, enabled, getRemoteStre
         punctuate: "true",
         endpointing: "300",
       });
-      const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, ["token", key]);
+      const ws = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [
+        "token",
+        key,
+      ]);
       ws.binaryType = "arraybuffer";
       wsRef.current = ws;
 

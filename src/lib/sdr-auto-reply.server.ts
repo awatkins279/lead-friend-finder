@@ -1,10 +1,14 @@
 import { SDR_REPLY_SYSTEM_PROMPT, buildKnowledgeBlock } from "./sdr-reply-prompt";
 import { instantlyListEmails, instantlySendReply } from "./instantly.functions";
+import { chatCompletion } from "@/lib/ai-client";
 
 type AdminClient = any;
 
 function parseReply(raw: string) {
-  const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const cleaned = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
@@ -31,7 +35,9 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     await Promise.all([
       supabase
         .from("sdr_conversations")
-        .select("id, user_id, list_id, intent, lead_email, lead_name, company, subject, email_account_id, email_accounts(email_address)")
+        .select(
+          "id, user_id, list_id, intent, lead_email, lead_name, company, subject, email_account_id, email_accounts(email_address)",
+        )
         .eq("id", job.conversation_id)
         .maybeSingle(),
       supabase.from("sdr_agents").select("*").eq("id", job.agent_id).maybeSingle(),
@@ -62,7 +68,11 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
   if (newerInbound) {
     await supabase
       .from("sdr_reply_jobs")
-      .update({ status: "cancelled", completed_at: new Date().toISOString(), error: "Superseded by a newer inbound reply" })
+      .update({
+        status: "cancelled",
+        completed_at: new Date().toISOString(),
+        error: "Superseded by a newer inbound reply",
+      })
       .eq("id", job.id);
     return { status: "cancelled" as const };
   }
@@ -87,34 +97,32 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     agent.signature ? `Signature to end with:\n${agent.signature}` : "",
   ].filter(Boolean);
   const thread = (messages ?? [])
-    .map((message: any) => `${message.direction === "inbound" ? "PROSPECT" : `US (${sdrName})`}:\n${String(message.body_text ?? "").slice(0, 4000)}`)
+    .map(
+      (message: any) =>
+        `${message.direction === "inbound" ? "PROSPECT" : `US (${sdrName})`}:\n${String(message.body_text ?? "").slice(0, 4000)}`,
+    )
     .join("\n\n---\n\n");
   const prompt = `SELLER PROFILE:\n${profile.join("\n")}\n\nKNOWLEDGE BASE${truncated ? " (partial; lower confidence if needed facts may be missing)" : ""}:\n${knowledge || "(none provided — do not invent product facts)"}\n\nPROSPECT CONTEXT:\nName: ${conversation.lead_name ?? "unknown"}\nCompany: ${conversation.company ?? "unknown"}\nSubject: ${conversation.subject ?? "(none)"}\n\nTHREAD:\n${thread}\n\n${flagged.length ? `SYSTEM FLAG: Handoff trigger(s) matched: ${flagged.join(", ")}. A human handoff is required.` : ""}\n\nWrite the reply now as JSON.`;
 
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("AI is not configured");
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 2000,
-    }),
+  const content = await chatCompletion({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
+      { role: "user", content: prompt },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 2000,
   });
-  if (!response.ok) throw new Error(`AI reply generation failed (${response.status})`);
-  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  const parsed = parseReply(payload.choices?.[0]?.message?.content ?? "");
+
+  const parsed = parseReply(content);
   if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
     throw new Error("AI returned an unreadable reply");
   }
 
   let confidence = Number(parsed.confidence);
-  confidence = Number.isFinite(confidence) ? Math.max(0, Math.min(100, Math.round(confidence))) : 50;
+  confidence = Number.isFinite(confidence)
+    ? Math.max(0, Math.min(100, Math.round(confidence)))
+    : 50;
   const needsHandoff = parsed.needs_handoff === true || flagged.length > 0;
   if (needsHandoff) confidence = Math.min(confidence, 40);
   const reply = parsed.reply.slice(0, 20000);
@@ -140,23 +148,38 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
       ai_generated: true,
       agent_id: agent.id,
       status: "draft",
-      raw: { confidence, needs_handoff: needsHandoff, handoff_reason: parsed.handoff_reason ?? "", auto_reply_job_id: job.id },
+      raw: {
+        confidence,
+        needs_handoff: needsHandoff,
+        handoff_reason: parsed.handoff_reason ?? "",
+        auto_reply_job_id: job.id,
+      },
     })
     .select("id")
     .single();
   if (draftError) throw new Error(draftError.message);
 
-  await supabase
-    .from("sdr_reply_jobs")
-    .update({ draft_message_id: draft.id })
-    .eq("id", job.id);
+  await supabase.from("sdr_reply_jobs").update({ draft_message_id: draft.id }).eq("id", job.id);
 
-  const canAutoSend = agent.mode === "auto" && !needsHandoff && confidence >= Number(agent.confidence_threshold ?? 80);
+  const canAutoSend =
+    agent.mode === "auto" &&
+    !needsHandoff &&
+    confidence >= Number(agent.confidence_threshold ?? 80);
   if (!canAutoSend) {
     await Promise.all([
       supabase.from("sdr_messages").update({ status: "draft" }).eq("id", draft.id),
-      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
-      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", draft_message_id: draft.id, completed_at: new Date().toISOString() }).eq("id", job.id),
+      supabase
+        .from("sdr_conversations")
+        .update({ status: "needs_approval" })
+        .eq("id", conversation.id),
+      supabase
+        .from("sdr_reply_jobs")
+        .update({
+          status: "needs_approval",
+          draft_message_id: draft.id,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id),
     ]);
     await sendPositiveReplyAlert(supabase, {
       job,
@@ -175,8 +198,18 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
     .maybeSingle();
   if (!connection?.api_key) {
     await Promise.all([
-      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
-      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", error: "Instantly is not connected", completed_at: new Date().toISOString() }).eq("id", job.id),
+      supabase
+        .from("sdr_conversations")
+        .update({ status: "needs_approval" })
+        .eq("id", conversation.id),
+      supabase
+        .from("sdr_reply_jobs")
+        .update({
+          status: "needs_approval",
+          error: "Instantly is not connected",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id),
     ]);
     return { status: "needs_approval" as const };
   }
@@ -194,26 +227,61 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
   }
   if (!replyToUuid) {
     await Promise.all([
-      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
-      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", error: "Original Instantly email could not be found for threading", completed_at: new Date().toISOString() }).eq("id", job.id),
+      supabase
+        .from("sdr_conversations")
+        .update({ status: "needs_approval" })
+        .eq("id", conversation.id),
+      supabase
+        .from("sdr_reply_jobs")
+        .update({
+          status: "needs_approval",
+          error: "Original Instantly email could not be found for threading",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id),
     ]);
     return { status: "needs_approval" as const };
   }
 
   try {
-    await instantlySendReply({ apiKey: connection.api_key, eaccount: from, replyToUuid, subject, text: reply });
+    await instantlySendReply({
+      apiKey: connection.api_key,
+      eaccount: from,
+      replyToUuid,
+      subject,
+      text: reply,
+    });
   } catch (error) {
     await Promise.all([
-      supabase.from("sdr_conversations").update({ status: "needs_approval" }).eq("id", conversation.id),
-      supabase.from("sdr_reply_jobs").update({ status: "needs_approval", error: String((error as Error).message ?? error).slice(0, 500), completed_at: new Date().toISOString() }).eq("id", job.id),
+      supabase
+        .from("sdr_conversations")
+        .update({ status: "needs_approval" })
+        .eq("id", conversation.id),
+      supabase
+        .from("sdr_reply_jobs")
+        .update({
+          status: "needs_approval",
+          error: String((error as Error).message ?? error).slice(0, 500),
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id),
     ]);
     return { status: "needs_approval" as const };
   }
   const completedAt = new Date().toISOString();
   await Promise.all([
-    supabase.from("sdr_messages").update({ status: "sent", sent_at: completedAt }).eq("id", draft.id),
-    supabase.from("sdr_conversations").update({ status: "open", last_direction: "outbound", last_message_at: completedAt }).eq("id", conversation.id),
-    supabase.from("sdr_reply_jobs").update({ status: "completed", draft_message_id: draft.id, completed_at: completedAt }).eq("id", job.id),
+    supabase
+      .from("sdr_messages")
+      .update({ status: "sent", sent_at: completedAt })
+      .eq("id", draft.id),
+    supabase
+      .from("sdr_conversations")
+      .update({ status: "open", last_direction: "outbound", last_message_at: completedAt })
+      .eq("id", conversation.id),
+    supabase
+      .from("sdr_reply_jobs")
+      .update({ status: "completed", draft_message_id: draft.id, completed_at: completedAt })
+      .eq("id", job.id),
   ]);
   await sendPositiveReplyAlert(supabase, {
     job,
@@ -227,9 +295,19 @@ export async function processSdrReplyJob(supabase: AdminClient, job: Record<stri
 
 async function sendPositiveReplyAlert(
   supabase: AdminClient,
-  opts: { job: Record<string, any>; conversation: Record<string, any>; inboundText: string; aiReply: string; from: string },
+  opts: {
+    job: Record<string, any>;
+    conversation: Record<string, any>;
+    inboundText: string;
+    aiReply: string;
+    from: string;
+  },
 ) {
-  if (!opts.conversation.list_id || !["interested", "meeting_booked"].includes(String(opts.conversation.intent))) return;
+  if (
+    !opts.conversation.list_id ||
+    !["interested", "meeting_booked"].includes(String(opts.conversation.intent))
+  )
+    return;
   if (opts.job.positive_alert_sent_at) return;
 
   const [{ data: list }, { data: profile }, { data: connection }] = await Promise.all([
@@ -240,7 +318,11 @@ async function sendPositiveReplyAlert(
       .eq("user_id", opts.conversation.user_id)
       .maybeSingle(),
     supabase.from("profiles").select("email").eq("id", opts.conversation.user_id).maybeSingle(),
-    supabase.from("instantly_connections").select("api_key").eq("user_id", opts.conversation.user_id).maybeSingle(),
+    supabase
+      .from("instantly_connections")
+      .select("api_key")
+      .eq("user_id", opts.conversation.user_id)
+      .maybeSingle(),
   ]);
   if (!list?.positive_reply_alerts_enabled || !connection?.api_key) return;
   const recipient = String(list.positive_reply_alert_email || profile?.email || "").trim();
@@ -258,7 +340,9 @@ async function sendPositiveReplyAlert(
     "",
     "AI SDR REPLY:",
     opts.aiReply,
-  ].join("\n").slice(0, 45000);
+  ]
+    .join("\n")
+    .slice(0, 45000);
 
   const response = await fetch("https://api.instantly.ai/api/v2/emails/test", {
     method: "POST",
@@ -267,16 +351,30 @@ async function sendPositiveReplyAlert(
       eaccount: opts.from,
       to_address_email_list: recipient,
       subject,
-      body: { text, html: `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif">${escapeHtml(text)}</pre>` },
+      body: {
+        text,
+        html: `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif">${escapeHtml(text)}</pre>`,
+      },
     }),
   });
   if (!response.ok) {
-    console.error("Positive reply alert failed", response.status, (await response.text()).slice(0, 300));
+    console.error(
+      "Positive reply alert failed",
+      response.status,
+      (await response.text()).slice(0, 300),
+    );
     return;
   }
-  await supabase.from("sdr_reply_jobs").update({ positive_alert_sent_at: new Date().toISOString() }).eq("id", opts.job.id);
+  await supabase
+    .from("sdr_reply_jobs")
+    .update({ positive_alert_sent_at: new Date().toISOString() })
+    .eq("id", opts.job.id);
 }
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char] ?? char);
+  return value.replace(
+    /[&<>"']/g,
+    (char) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char] ?? char,
+  );
 }

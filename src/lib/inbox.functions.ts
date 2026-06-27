@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { SDR_REPLY_SYSTEM_PROMPT, buildKnowledgeBlock } from "./sdr-reply-prompt";
 import { instantlyListEmails, instantlySendReply } from "./instantly.functions";
+import { chatCompletion } from "@/lib/ai-client";
 
 const filtersSchema = z.object({
   status: z.enum(["all", "open", "needs_approval", "archived", "snoozed", "closed"]).optional(),
@@ -16,9 +17,6 @@ const filtersSchema = z.object({
 });
 
 export type InboxFilters = z.infer<typeof filtersSchema>;
-
-
-
 
 export const listConversations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -41,14 +39,10 @@ export const listConversations = createServerFn({ method: "POST" })
     if (data.date_to) q = q.lte("last_message_at", data.date_to);
     if (data.search) {
       const s = `%${data.search}%`;
-      q = q.or(
-        `subject.ilike.${s},lead_email.ilike.${s},lead_name.ilike.${s},company.ilike.${s}`,
-      );
+      q = q.or(`subject.ilike.${s},lead_email.ilike.${s},lead_name.ilike.${s},company.ilike.${s}`);
     }
 
-    const { data: rows, error } = await q
-      .order("last_message_at", { ascending: false })
-      .limit(200);
+    const { data: rows, error } = await q.order("last_message_at", { ascending: false }).limit(200);
     if (error) throw new Error(error.message);
     return { conversations: rows ?? [] };
   });
@@ -77,10 +71,7 @@ export const getConversation = createServerFn({ method: "POST" })
     if (!convo) throw new Error("Conversation not found");
     // Mark as read
     if ((convo as { unread_count: number }).unread_count > 0) {
-      await supabase
-        .from("sdr_conversations")
-        .update({ unread_count: 0 })
-        .eq("id", data.id);
+      await supabase.from("sdr_conversations").update({ unread_count: 0 }).eq("id", data.id);
     }
     return { conversation: convo, messages: msgs ?? [] };
   });
@@ -142,8 +133,9 @@ export const saveDraftReply = createServerFn({ method: "POST" })
       .maybeSingle();
     if (cErr) throw new Error(cErr.message);
     if (!convo) throw new Error("Conversation not found");
-    const from = (convo as { email_accounts: { email_address: string } | null }).email_accounts
-      ?.email_address ?? "pending@inbox";
+    const from =
+      (convo as { email_accounts: { email_address: string } | null }).email_accounts
+        ?.email_address ?? "pending@inbox";
     const { data: inserted, error } = await supabase
       .from("sdr_messages")
       .insert({
@@ -179,9 +171,7 @@ function extractInstantlyUuid(raw: unknown): string | null {
 
 export const approveAndSend = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ message_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ message_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -217,10 +207,7 @@ export const approveAndSend = createServerFn({ method: "POST" })
 
     // Not connected → keep the reply safe as "queued" and tell the user.
     if (!conn?.api_key) {
-      await supabase
-        .from("sdr_messages")
-        .update({ status: "queued" })
-        .eq("id", data.message_id);
+      await supabase.from("sdr_messages").update({ status: "queued" }).eq("id", data.message_id);
       throw new Error(
         "Connect your Instantly account (Sending accounts) to actually send — your reply is saved as queued for now.",
       );
@@ -249,10 +236,7 @@ export const approveAndSend = createServerFn({ method: "POST" })
       replyToUuid = (match?.id as string) ?? null;
     }
     if (!replyToUuid) {
-      await supabase
-        .from("sdr_messages")
-        .update({ status: "queued" })
-        .eq("id", data.message_id);
+      await supabase.from("sdr_messages").update({ status: "queued" }).eq("id", data.message_id);
       throw new Error(
         "Couldn't find the original email in Instantly to reply to. (It may not have synced yet — your reply is saved as queued.)",
       );
@@ -271,10 +255,7 @@ export const approveAndSend = createServerFn({ method: "POST" })
         html: m.body_html ?? undefined,
       });
     } catch (e) {
-      await supabase
-        .from("sdr_messages")
-        .update({ status: "queued" })
-        .eq("id", data.message_id);
+      await supabase.from("sdr_messages").update({ status: "queued" }).eq("id", data.message_id);
       throw e;
     }
 
@@ -295,7 +276,10 @@ export const approveAndSend = createServerFn({ method: "POST" })
 // any handoff flag in the message's `raw` column for the UI to surface.
 
 function tryParseJson(raw: string): Record<string, unknown> | null {
-  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  let s = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = s.search(/[{[]/);
   const end = Math.max(s.lastIndexOf("}"), s.lastIndexOf("]"));
   if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
@@ -304,9 +288,7 @@ function tryParseJson(raw: string): Record<string, unknown> | null {
   } catch {
     /* fall through */
   }
-  const repaired = s
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
-    .replace(/,\s*([}\]])/g, "$1");
+  const repaired = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/,\s*([}\]])/g, "$1");
   try {
     return JSON.parse(repaired);
   } catch {
@@ -316,8 +298,16 @@ function tryParseJson(raw: string): Record<string, unknown> | null {
 
 // --- Tier 2 live web research: best-effort summary of the prospect's own site ---
 const GENERIC_EMAIL_DOMAINS = new Set([
-  "gmail.com", "outlook.com", "hotmail.com", "yahoo.com", "icloud.com",
-  "aol.com", "proton.me", "protonmail.com", "live.com", "msn.com",
+  "gmail.com",
+  "outlook.com",
+  "hotmail.com",
+  "yahoo.com",
+  "icloud.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "live.com",
+  "msn.com",
 ]);
 
 // Resolve a safe https origin for the prospect's company from CRM data or their
@@ -352,8 +342,7 @@ function prospectWebsiteUrl(orgWebsite: string | null | undefined, email: string
   return null;
 }
 
-async function researchProspectWebsite(url: string, apiKey: string): Promise<string | null> {
-  if (!apiKey) return null;
+async function researchProspectWebsite(url: string): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
@@ -374,25 +363,18 @@ async function researchProspectWebsite(url: string, apiKey: string): Promise<str
       .slice(0, 6000);
     if (text.length < 80) return null;
 
-    const res2 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You summarize a company's website for a salesperson. Use ONLY the provided page text — invent nothing. Give 4-6 short factual bullets: what they do, who they serve, size/stage if stated, any notable recent fact. If the text is uninformative or just navigation/boilerplate, reply exactly 'NONE'.",
-          },
-          { role: "user", content: `Company page text:\n${text}` },
-        ],
-        max_tokens: 400,
-      }),
+    const summary = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You summarize a company's website for a salesperson. Use ONLY the provided page text — invent nothing. Give 4-6 short factual bullets: what they do, who they serve, size/stage if stated, any notable recent fact. If the text is uninformative or just navigation/boilerplate, reply exactly 'NONE'.",
+        },
+        { role: "user", content: `Company page text:\n${text}` },
+      ],
+      max_tokens: 400,
     });
-    if (!res2.ok) return null;
-    const payload = await res2.json();
-    const summary = String(payload.choices?.[0]?.message?.content ?? "").trim();
     if (!summary || summary.toUpperCase().includes("NONE")) return null;
     return summary.slice(0, 1500);
   } catch {
@@ -402,9 +384,7 @@ async function researchProspectWebsite(url: string, apiKey: string): Promise<str
 
 export const generateAgentReply = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ conversation_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ conversation_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
@@ -493,7 +473,7 @@ export const generateAgentReply = createServerFn({ method: "POST" })
     let webResearch = "";
     const siteUrl = prospectWebsiteUrl(lead?.org_website_url ?? null, convo.lead_email);
     if (siteUrl) {
-      const summary = await researchProspectWebsite(siteUrl, process.env.LOVABLE_API_KEY ?? "");
+      const summary = await researchProspectWebsite(siteUrl);
       if (summary) webResearch = summary;
     }
 
@@ -555,30 +535,16 @@ ${flagged.length ? `SYSTEM FLAG: This message hit handoff trigger(s): ${flagged.
 
 Write the reply now as JSON.`;
 
-    // 5. Call the AI gateway.
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 2000,
-      }),
+    // 5. Call the AI client.
+    const content = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 2000,
     });
-    if (res.status === 429) throw new Error("AI rate limit — try again in a moment");
-    if (res.status === 402)
-      throw new Error("AI credits exhausted — add credits in Workspace settings");
-    if (!res.ok) throw new Error(`AI error ${res.status}`);
-
-    const payload = await res.json();
-    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
     const parsed = tryParseJson(content);
     if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
       throw new Error("The AI returned an unreadable reply — try again");
@@ -589,8 +555,7 @@ Write the reply now as JSON.`;
     confidence = Math.max(0, Math.min(100, Math.round(confidence)));
     const needsHandoff = parsed.needs_handoff === true || flagged.length > 0;
     if (needsHandoff) confidence = Math.min(confidence, 40);
-    const handoffReason =
-      typeof parsed.handoff_reason === "string" ? parsed.handoff_reason : "";
+    const handoffReason = typeof parsed.handoff_reason === "string" ? parsed.handoff_reason : "";
     const replyBody = String(parsed.reply).slice(0, 20000);
 
     // 6. Save as a DRAFT (never send). Stash metadata in `raw`.
@@ -687,9 +652,7 @@ export const getInboxAnalytics = createServerFn({ method: "POST" })
     let unsubscribes = 0;
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let uq = (supabase as any)
-        .from("unsubscribes")
-        .select("id", { count: "exact", head: true });
+      let uq = (supabase as any).from("unsubscribes").select("id", { count: "exact", head: true });
       if (data.date_from) uq = uq.gte("unsubscribed_at", data.date_from);
       if (data.date_to) uq = uq.lte("unsubscribed_at", data.date_to);
       const { count } = await uq;

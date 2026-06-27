@@ -42,9 +42,7 @@ async function fetchInstantlyAccounts(apiKey: string): Promise<InstantlyMailbox[
       const email = it?.email ?? it?.eaccount ?? it?.email_address;
       if (!email) continue;
       const name =
-        [it?.first_name, it?.last_name].filter(Boolean).join(" ") ||
-        it?.display_name ||
-        null;
+        [it?.first_name, it?.last_name].filter(Boolean).join(" ") || it?.display_name || null;
       out.push({ email: String(email).trim().toLowerCase(), display_name: name });
     }
 
@@ -81,7 +79,8 @@ async function importMailboxes(
 }
 
 const tableMissing = (msg: string) =>
-  /instantly_connections/i.test(msg) && /(does not exist|relation|schema cache|not find)/i.test(msg);
+  /instantly_connections/i.test(msg) &&
+  /(does not exist|relation|schema cache|not find)/i.test(msg);
 
 // ---------- Outbound: send a threaded reply through Instantly ----------
 
@@ -144,7 +143,10 @@ export async function instantlyAddAccount(
     });
     if (!res.ok) {
       const t = await res.text().catch(() => "");
-      return { ok: false, error: `Instantly add-account failed (${res.status})${t ? `: ${t.slice(0, 200)}` : ""}` };
+      return {
+        ok: false,
+        error: `Instantly add-account failed (${res.status})${t ? `: ${t.slice(0, 200)}` : ""}`,
+      };
     }
     // Best-effort: kick off warmup (don't fail the whole add if warmup errors).
     try {
@@ -182,7 +184,9 @@ export async function instantlySendReply(opts: {
     }),
   });
   if (res.status === 401 || res.status === 403) {
-    throw new Error("Instantly rejected the send — check your API key and that it has email send scope.");
+    throw new Error(
+      "Instantly rejected the send — check your API key and that it has email send scope.",
+    );
   }
   if (!res.ok) {
     const t = await res.text().catch(() => "");
@@ -276,10 +280,7 @@ export const disconnectInstantly = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const sb = context.supabase as any;
-    const { error } = await sb
-      .from("instantly_connections")
-      .delete()
-      .eq("user_id", context.userId);
+    const { error } = await sb.from("instantly_connections").delete().eq("user_id", context.userId);
     if (error && !tableMissing(error.message)) throw new Error(error.message);
     return { ok: true };
   });

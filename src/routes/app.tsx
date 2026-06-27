@@ -86,10 +86,7 @@ function AppShell() {
     ...(isAdmin ? [{ to: "/app/admin", icon: Shield, label: "Admin" }] : []),
   ];
 
-  const initials = (email ?? "U")
-    .split("@")[0]
-    .slice(0, 2)
-    .toUpperCase();
+  const initials = (email ?? "U").split("@")[0].slice(0, 2).toUpperCase();
 
   // Derive company name from email domain (e.g. "user@ttmusa.net" → "TTMUSA")
   const companyName = (() => {
@@ -169,9 +166,7 @@ function AppShell() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs font-medium">{companyName}</div>
-                <div className="truncate text-[10px] text-muted-foreground">
-                  {email}
-                </div>
+                <div className="truncate text-[10px] text-muted-foreground">{email}</div>
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>

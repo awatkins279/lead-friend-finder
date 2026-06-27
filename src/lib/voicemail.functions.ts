@@ -115,9 +115,7 @@ export const cloneVoice = createServerFn({ method: "POST" })
 // ---------------------------------------------------------------------------
 export const synthesizeVoicemail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z.object({ script: z.string().min(1).max(4000) }).parse(i),
-  )
+  .inputValidator((i: unknown) => z.object({ script: z.string().min(1).max(4000) }).parse(i))
   .handler(async ({ data, context }): Promise<{ audioBase64: string; voiceId: string }> => {
     const { supabase, userId } = context;
     const apiKey = process.env.ELEVENLABS_API_KEY;

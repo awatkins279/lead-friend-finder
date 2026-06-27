@@ -13,7 +13,8 @@ export function StripeEmbeddedCheckout({ priceId, returnUrl }: Props) {
       data: {
         priceId,
         environment: getStripeEnvironment(),
-        returnUrl: returnUrl || `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+        returnUrl:
+          returnUrl || `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
       },
     });
     if ("error" in result) throw new Error(result.error);

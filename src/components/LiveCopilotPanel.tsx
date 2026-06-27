@@ -40,7 +40,6 @@ export function LiveCopilotPanel({
   const { listening, error, turns, suggestion, suggesting, start, stop, requestSuggestion } =
     sharedCoaching ?? localCoaching;
 
-
   // auto-start when call is in progress (only when we own the mic)
   const startedRef = useRef(false);
   useEffect(() => {
@@ -56,12 +55,13 @@ export function LiveCopilotPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, callId, sharedCoaching]);
 
-
   // Flatten script into searchable sections for auto-highlight.
   const sections = useMemo(() => {
     const out: { key: string; heading: string; body: string }[] = [];
     out.push({ key: "opener", heading: "Opener", body: script.opener });
-    script.talk_track?.forEach((s, i) => out.push({ key: `tt-${i}`, heading: s.heading, body: s.body }));
+    script.talk_track?.forEach((s, i) =>
+      out.push({ key: `tt-${i}`, heading: s.heading, body: s.body }),
+    );
     script.problem_questions?.forEach((q, i) =>
       out.push({ key: `pq-${i}`, heading: "Problem question", body: q }),
     );
@@ -175,9 +175,13 @@ export function LiveCopilotPanel({
       <div className="px-4 pb-3">
         {suggestion ? (
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-            <div className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${intentColor(suggestion.intent)}`} />
+            <div
+              className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${intentColor(suggestion.intent)}`}
+            />
             <div className="mb-2 flex items-center justify-between">
-              <span className={`rounded-full bg-gradient-to-r ${intentColor(suggestion.intent)} px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white`}>
+              <span
+                className={`rounded-full bg-gradient-to-r ${intentColor(suggestion.intent)} px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white`}
+              >
                 {suggestion.intent}
               </span>
               {suggesting && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
@@ -187,7 +191,9 @@ export function LiveCopilotPanel({
                 "{suggestion.prospect_quote}"
               </p>
             )}
-            <p className="text-base font-medium leading-relaxed text-white">{suggestion.suggestion}</p>
+            <p className="text-base font-medium leading-relaxed text-white">
+              {suggestion.suggestion}
+            </p>
             {suggestion.why && (
               <p className="mt-2 text-[11px] text-muted-foreground">{suggestion.why}</p>
             )}
@@ -195,7 +201,9 @@ export function LiveCopilotPanel({
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-center text-xs text-muted-foreground">
             {suggesting ? (
-              <span className="inline-flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Thinking…</span>
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
+              </span>
             ) : (
               "Suggestions appear here when the prospect speaks."
             )}
@@ -205,12 +213,22 @@ export function LiveCopilotPanel({
 
       {/* Live transcript */}
       <div className="mx-4 mb-2 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Live transcript</span>
-        <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => requestSuggestion()}>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+          Live transcript
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[11px]"
+          onClick={() => requestSuggestion()}
+        >
           <Sparkles className="mr-1 h-3 w-3" /> Ask now
         </Button>
       </div>
-      <div ref={scrollRef} className="mx-4 mb-4 flex-1 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-black/30 p-3 text-sm">
+      <div
+        ref={scrollRef}
+        className="mx-4 mb-4 flex-1 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-black/30 p-3 text-sm"
+      >
         {turns.length === 0 ? (
           <p className="text-center text-xs text-muted-foreground">Waiting for audio…</p>
         ) : (
@@ -225,7 +243,9 @@ export function LiveCopilotPanel({
               >
                 {t.role}
               </span>
-              <span className={t.final ? "text-foreground" : "text-muted-foreground italic"}>{t.text}</span>
+              <span className={t.final ? "text-foreground" : "text-muted-foreground italic"}>
+                {t.text}
+              </span>
             </div>
           ))
         )}

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { enrichLead } from "@/lib/enrich.functions";
+import { enrichLead, enrichLeadsBatch } from "@/lib/enrich.functions";
 import { verifyLeadEmail } from "@/lib/verify.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,14 +18,37 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ArrowLeft, Sparkles, Loader2, Mail, Link2 as Linkedin, Phone, Copy, Settings2, AlertCircle, X, PhoneCall, Headphones, Maximize2, Rocket, PauseCircle, CalendarClock } from "lucide-react";
+import {
+  ArrowLeft,
+  Sparkles,
+  Loader2,
+  Mail,
+  Link2 as Linkedin,
+  Phone,
+  Copy,
+  Settings2,
+  AlertCircle,
+  X,
+  PhoneCall,
+  Headphones,
+  Maximize2,
+  Rocket,
+  PauseCircle,
+  CalendarClock,
+  TrendingUp,
+} from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { CampaignConfigDialog, type CampaignConfig } from "@/components/CampaignConfigDialog";
 import { VoicemailRecorder } from "@/components/VoicemailRecorder";
+import { CampaignReportCard } from "@/components/CampaignReportCard";
 import { getVoicemailProfile } from "@/lib/voicemail.functions";
 
-import { CallingConfigDialog, DEFAULT_CALLING_CONFIG, type CallingConfig } from "@/components/CallingConfigDialog";
+import {
+  CallingConfigDialog,
+  DEFAULT_CALLING_CONFIG,
+  type CallingConfig,
+} from "@/components/CallingConfigDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -37,11 +60,39 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { generateCallScript, getTwilioToken, startCall, endCall, type CallScript } from "@/lib/calls.functions";
-import { getRingCentralWebPhoneCreds, startRingCentralBrowserCall } from "@/lib/ringcentral.functions";
-import { Phone as PhoneIcon, PhoneOff, MicOff, Mic, Bot, Play, Pause, Minus, Plus, RotateCcw, Voicemail, MessageSquare } from "lucide-react";
+import {
+  generateCallScript,
+  getTwilioToken,
+  startCall,
+  endCall,
+  type CallScript,
+} from "@/lib/calls.functions";
+import {
+  getRingCentralWebPhoneCreds,
+  startRingCentralBrowserCall,
+} from "@/lib/ringcentral.functions";
+import {
+  Phone as PhoneIcon,
+  PhoneOff,
+  MicOff,
+  Mic,
+  Bot,
+  Play,
+  Pause,
+  Minus,
+  Plus,
+  RotateCcw,
+  Voicemail,
+  MessageSquare,
+} from "lucide-react";
 import { PROVIDER_SPECS } from "@/components/ProviderAccountDialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { listSdrAgents, assignAgentToList } from "@/lib/sdr.functions";
 import { LiveCopilotPanel } from "@/components/LiveCopilotPanel";
 import { FollowAlongTeleprompter } from "@/components/FollowAlongTeleprompter";
@@ -102,20 +153,30 @@ type Row = {
 function effectiveEmails(r: Row): EmailInSequence[] {
   if (r.emails && r.emails.length > 0) return r.emails;
   if (r.email_subject || r.email_body) {
-    return [{
-      step: 1,
-      subject: r.email_subject ?? "",
-      body: r.email_body ?? "",
-      cta: "",
-      send_after_days: 0,
-    }];
+    return [
+      {
+        step: 1,
+        subject: r.email_subject ?? "",
+        body: r.email_body ?? "",
+        cta: "",
+        send_after_days: 0,
+      },
+    ];
   }
   return [];
 }
 
-type ListRow = CampaignConfig & { id: string; sdr_agent_id: string | null; voicemail_audio_url: string | null; ai_copilot_enabled: boolean | null; campaign_status: "draft" | "active" | "paused" | "completed"; instantly_campaign_id: string | null };
+type ListRow = CampaignConfig & {
+  id: string;
+  sdr_agent_id: string | null;
+  voicemail_audio_url: string | null;
+  ai_copilot_enabled: boolean | null;
+  campaign_status: "draft" | "active" | "paused" | "completed";
+  instantly_campaign_id: string | null;
+};
 
-const TWILIO_VOICE_SDK_URL = "https://media.twiliocdn.com/sdk/js/voice/releases/2.18.3/twilio.min.js";
+const TWILIO_VOICE_SDK_URL =
+  "https://media.twiliocdn.com/sdk/js/voice/releases/2.18.3/twilio.min.js";
 
 let twilioVoiceSdkPromise: Promise<any> | null = null;
 
@@ -129,7 +190,9 @@ async function loadTwilioVoiceSdk() {
 
   if (!twilioVoiceSdkPromise) {
     twilioVoiceSdkPromise = new Promise((resolve, reject) => {
-      const existingScript = document.querySelector<HTMLScriptElement>('script[data-twilio-voice-sdk="true"]');
+      const existingScript = document.querySelector<HTMLScriptElement>(
+        'script[data-twilio-voice-sdk="true"]',
+      );
 
       const handleReady = () => {
         const twilio = (window as any).Twilio;
@@ -139,7 +202,11 @@ async function loadTwilioVoiceSdk() {
 
       if (existingScript) {
         existingScript.addEventListener("load", handleReady, { once: true });
-        existingScript.addEventListener("error", () => reject(new Error("Failed to load Twilio Voice SDK.")), { once: true });
+        existingScript.addEventListener(
+          "error",
+          () => reject(new Error("Failed to load Twilio Voice SDK.")),
+          { once: true },
+        );
         return;
       }
 
@@ -148,7 +215,11 @@ async function loadTwilioVoiceSdk() {
       script.async = true;
       script.dataset.twilioVoiceSdk = "true";
       script.addEventListener("load", handleReady, { once: true });
-      script.addEventListener("error", () => reject(new Error("Failed to load Twilio Voice SDK.")), { once: true });
+      script.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Twilio Voice SDK.")),
+        { once: true },
+      );
       document.head.appendChild(script);
     });
   }
@@ -160,12 +231,15 @@ function ListDetailPage() {
   const { listId } = Route.useParams();
   const qc = useQueryClient();
   const enrichFn = useServerFn(enrichLead);
+  const enrichBatchFn = useServerFn(enrichLeadsBatch);
   const verifyFn = useServerFn(verifyLeadEmail);
   const genScriptBulkFn = useServerFn(generateCallScript);
   const launchCampaignFn = useServerFn(launchCampaign);
   const pauseCampaignFn = useServerFn(pauseCampaign);
   const [busy, setBusy] = useState<Set<string>>(new Set());
-  const [verifyFilter, setVerifyFilter] = useState<"all" | "deliverable" | "risky" | "invalid" | "unverified">("all");
+  const [verifyFilter, setVerifyFilter] = useState<
+    "all" | "deliverable" | "risky" | "invalid" | "unverified"
+  >("all");
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
@@ -199,7 +273,11 @@ function ListDetailPage() {
     },
   });
 
-  const { data: rows, refetch, isLoading } = useQuery({
+  const {
+    data: rows,
+    refetch,
+    isLoading,
+  } = useQuery({
     queryKey: ["list-leads", listId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -244,8 +322,9 @@ function ListDetailPage() {
       });
     }
   };
-  useEffect(() => { loadCallCfg(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [listId]);
-
+  useEffect(() => {
+    loadCallCfg(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [listId]);
 
   const runOne = async (leadId: string) => {
     if (!isConfigured) {
@@ -277,44 +356,68 @@ function ListDetailPage() {
     const target = list?.num_emails ?? 4;
     const pending = force
       ? (rows ?? [])
-      : (rows ?? []).filter(
-          (r) => r.status !== "enriched" || effectiveEmails(r).length < target,
-        );
+      : (rows ?? []).filter((r) => r.status !== "enriched" || effectiveEmails(r).length < target);
     if (pending.length === 0) return toast.info("All prospects already have full sequences");
 
-    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    const state = {
+      total: pending.length,
+      done: 0,
+      startedAt: Date.now(),
+      currentName: "Batching...",
+      cancel: false,
+    };
     setProgress({ ...state });
 
-    const CONCURRENCY = 5;
+    // Chunk into batches of 50 leads for ~50x speedup
+    const BATCH_SIZE = 50;
+    const batches: string[][] = [];
+    for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+      batches.push(pending.slice(i, i + BATCH_SIZE).map((r) => r.lead_id));
+    }
+
+    const CONCURRENCY = 3; // 3 parallel batch calls
     let cursor = 0;
 
     const worker = async () => {
       while (true) {
         if (state.cancel) return;
         const i = cursor++;
-        if (i >= pending.length) return;
-        const r = pending[i];
-        const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "lead";
-        state.currentName = name;
+        if (i >= batches.length) return;
+        const batch = batches[i];
+        state.currentName = `Batch ${i + 1}/${batches.length} (${batch.length} leads)`;
         setProgress({ ...state });
         try {
-          await enrichFn({ data: { listId, leadId: r.lead_id } });
+          const res = await enrichBatchFn({ data: { listId, leadIds: batch } });
+          state.done += (res as any)?.enriched ?? batch.length;
         } catch (e: any) {
-          console.error("enrich failed", r.lead_id, e);
+          console.error("batch enrich failed", e);
+          // Fallback: process one-by-one if batch fails
+          state.currentName = `Fallback single (batch ${i + 1})`;
+          for (const leadId of batch) {
+            if (state.cancel) return;
+            try {
+              await enrichFn({ data: { listId, leadId } });
+              state.done += 1;
+            } catch (e2: any) {
+              console.error("enrich failed", leadId, e2);
+            }
+            setProgress({ ...state });
+          }
         }
-        state.done += 1;
         setProgress({ ...state });
         qc.invalidateQueries({ queryKey: ["list-leads", listId] });
       }
     };
 
     await Promise.all(
-      Array.from({ length: Math.min(CONCURRENCY, pending.length) }, () => worker()),
+      Array.from({ length: Math.min(CONCURRENCY, batches.length) }, () => worker()),
     );
 
     setProgress((p) => (p?.cancel ? null : p));
     if (!state.cancel) {
-      toast.success(`${force ? "Regenerated" : "Generated"} sequences for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      toast.success(
+        `${force ? "Regenerated" : "Generated"} sequences for ${state.done} prospect${state.done === 1 ? "" : "s"}`,
+      );
       setTimeout(() => setProgress(null), 1500);
     } else {
       toast.info(`Stopped after ${state.done} of ${state.total}`);
@@ -331,12 +434,17 @@ function ListDetailPage() {
   };
 
   const runVerifyAll = async () => {
-    const pending = (rows ?? []).filter(
-      (r) => !!r.lead?.email && !r.verification_status,
-    );
-    if (pending.length === 0) return toast.info("Nothing to verify — every lead with an email is already verified");
+    const pending = (rows ?? []).filter((r) => !!r.lead?.email && !r.verification_status);
+    if (pending.length === 0)
+      return toast.info("Nothing to verify — every lead with an email is already verified");
 
-    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    const state = {
+      total: pending.length,
+      done: 0,
+      startedAt: Date.now(),
+      currentName: "",
+      cancel: false,
+    };
     setProgress({ ...state });
 
     const CONCURRENCY = 10;
@@ -372,14 +480,14 @@ function ListDetailPage() {
     qc.invalidateQueries({ queryKey: ["list-leads", listId] });
     setProgress((p) => (p?.cancel ? null : p));
     if (!state.cancel) {
-      toast.success(`Verified ${state.done - errors} email${state.done - errors === 1 ? "" : "s"}${errors ? ` · ${errors} failed` : ""}`);
+      toast.success(
+        `Verified ${state.done - errors} email${state.done - errors === 1 ? "" : "s"}${errors ? ` · ${errors} failed` : ""}`,
+      );
       setTimeout(() => setProgress(null), 1500);
     } else {
       toast.info(`Stopped after ${state.done} of ${state.total}`);
     }
   };
-
-
 
   const requestRunAllScripts = async () => {
     const callCfgRow = await supabase
@@ -401,8 +509,13 @@ function ListDetailPage() {
     const pending = rows ?? [];
     if (pending.length === 0) return;
 
-
-    const state = { total: pending.length, done: 0, startedAt: Date.now(), currentName: "", cancel: false };
+    const state = {
+      total: pending.length,
+      done: 0,
+      startedAt: Date.now(),
+      currentName: "",
+      cancel: false,
+    };
     setProgress({ ...state });
 
     const CONCURRENCY = 4;
@@ -434,7 +547,9 @@ function ListDetailPage() {
 
     setProgress((p) => (p?.cancel ? null : p));
     if (!state.cancel) {
-      toast.success(`Generated call scripts for ${state.done} prospect${state.done === 1 ? "" : "s"}`);
+      toast.success(
+        `Generated call scripts for ${state.done} prospect${state.done === 1 ? "" : "s"}`,
+      );
       setTimeout(() => setProgress(null), 1500);
     } else {
       toast.info(`Stopped after ${state.done} of ${state.total}`);
@@ -460,7 +575,11 @@ function ListDetailPage() {
     setLaunchBusy(true);
     try {
       const result = await launchCampaignFn({ data: { listId } });
-      toast.success(result.resumed ? "Campaign resumed" : `Campaign launched for ${result.prospects ?? 0} prospect${result.prospects === 1 ? "" : "s"}`);
+      toast.success(
+        result.resumed
+          ? "Campaign resumed"
+          : `Campaign launched for ${result.prospects ?? 0} prospect${result.prospects === 1 ? "" : "s"}`,
+      );
       await refetchList();
     } catch (error) {
       toast.error((error as Error).message || "Campaign could not be launched");
@@ -544,8 +663,12 @@ function ListDetailPage() {
   return (
     <div className="flex h-screen flex-col bg-[oklch(0.13_0.02_265)]">
       <header className="border-b border-white/5 bg-[oklch(0.13_0.02_265)] px-8 py-6">
-        <Link to="/app/lists" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" /> Campaigns / <span className="truncate">{list?.name ?? "…"}</span>
+        <Link
+          to="/app/lists"
+          className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Campaigns /{" "}
+          <span className="truncate">{list?.name ?? "…"}</span>
         </Link>
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
           <div className="min-w-0 flex-1">
@@ -554,8 +677,16 @@ function ListDetailPage() {
                 {list?.name ?? "Loading…"}
               </h1>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                <span className={`h-1.5 w-1.5 rounded-full ${campaignStatus === "active" ? "bg-primary" : "bg-muted-foreground"}`} />
-                {campaignStatus === "active" ? "Sending" : campaignStatus === "paused" ? "Paused" : campaignStatus === "completed" ? "Completed" : "Draft"}
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${campaignStatus === "active" ? "bg-primary" : "bg-muted-foreground"}`}
+                />
+                {campaignStatus === "active"
+                  ? "Sending"
+                  : campaignStatus === "paused"
+                    ? "Paused"
+                    : campaignStatus === "completed"
+                      ? "Completed"
+                      : "Draft"}
               </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -568,12 +699,24 @@ function ListDetailPage() {
             </Button>
             {campaignStatus === "active" ? (
               <Button size="sm" variant="outline" onClick={handlePause} disabled={launchBusy}>
-                {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <PauseCircle className="mr-2 h-3.5 w-3.5" />}
+                {launchBusy ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <PauseCircle className="mr-2 h-3.5 w-3.5" />
+                )}
                 Pause campaign
               </Button>
             ) : (
-              <Button size="sm" onClick={() => setConfirmLaunch(true)} disabled={launchBusy || !rows?.length}>
-                {launchBusy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Rocket className="mr-2 h-3.5 w-3.5" />}
+              <Button
+                size="sm"
+                onClick={() => setConfirmLaunch(true)}
+                disabled={launchBusy || !rows?.length}
+              >
+                {launchBusy ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Rocket className="mr-2 h-3.5 w-3.5" />
+                )}
                 {campaignStatus === "paused" ? "Resume campaign" : "Launch campaign"}
               </Button>
             )}
@@ -597,9 +740,15 @@ function ListDetailPage() {
             <Button
               size="sm"
               onClick={activeTab === "calling" ? requestRunAllScripts : requestRunAllEmails}
-              disabled={!rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning}
+              disabled={
+                !rows || rows.length === 0 || (activeTab === "email" && !isConfigured) || isRunning
+              }
             >
-              {isRunning ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
+              {isRunning ? (
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-3.5 w-3.5" />
+              )}
               {isRunning
                 ? "Generating…"
                 : activeTab === "calling"
@@ -612,9 +761,17 @@ function ListDetailPage() {
         </div>
       </header>
 
-      <SdrAssignBar listId={listId} currentAgentId={list?.sdr_agent_id ?? null} onChanged={() => refetchList()} />
+      <SdrAssignBar
+        listId={listId}
+        currentAgentId={list?.sdr_agent_id ?? null}
+        onChanged={() => refetchList()}
+      />
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "overview" | "email" | "calling")} className="flex flex-1 flex-col overflow-hidden">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "overview" | "email" | "calling" | "reports")}
+        className="flex flex-1 flex-col overflow-hidden"
+      >
         <div className="border-b bg-background px-8">
           <TabsList className="h-11 bg-transparent p-0">
             <TabsTrigger
@@ -635,13 +792,22 @@ function ListDetailPage() {
             >
               <PhoneCall className="mr-2 h-4 w-4" /> Cold calling
             </TabsTrigger>
+            <TabsTrigger
+              value="reports"
+              className="rounded-none border-b-2 border-transparent px-4 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <TrendingUp className="mr-2 h-4 w-4" /> Reports
+            </TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="overview" className="m-0 flex-1 overflow-y-auto p-8">
-          <CampaignStatStrip listId={listId} totalProspects={(rows ?? []).length} enrichedCount={enrichedCount} />
+          <CampaignStatStrip
+            listId={listId}
+            totalProspects={(rows ?? []).length}
+            enrichedCount={enrichedCount}
+          />
         </TabsContent>
-
 
         <TabsContent value="email" className="m-0 flex-1 overflow-y-auto p-8">
           {!isConfigured && list && (
@@ -653,7 +819,9 @@ function ListDetailPage() {
                   Set up sender info + what you're selling so the AI knows what to write.
                 </p>
               </div>
-              <Button size="sm" onClick={() => setConfigOpen(true)}>Configure</Button>
+              <Button size="sm" onClick={() => setConfigOpen(true)}>
+                Configure
+              </Button>
             </Card>
           )}
 
@@ -665,16 +833,15 @@ function ListDetailPage() {
             <Card className="p-12 text-center">
               <p className="text-sm text-muted-foreground">
                 No prospects yet. Add some from{" "}
-                <Link to="/app/people" className="underline">People Search</Link>.
+                <Link to="/app/people" className="underline">
+                  People Search
+                </Link>
+                .
               </p>
             </Card>
           ) : (
             <>
-              <VerificationFilterBar
-                rows={rows}
-                value={verifyFilter}
-                onChange={setVerifyFilter}
-              />
+              <VerificationFilterBar rows={rows} value={verifyFilter} onChange={setVerifyFilter} />
               <ProspectTable
                 listId={listId}
                 rows={filterRowsByVerification(rows, verifyFilter)}
@@ -704,17 +871,21 @@ function ListDetailPage() {
             onVoicemailChanged={() => refetchList()}
             aiCopilotEnabled={!!list?.ai_copilot_enabled}
           />
+        </TabsContent>
 
+        <TabsContent value="reports" className="m-0 flex-1 overflow-y-auto p-8">
+          <CampaignReportCard listId={listId} />
         </TabsContent>
       </Tabs>
-
 
       <AlertDialog open={confirmScripts} onOpenChange={setConfirmScripts}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Regenerate all call scripts?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will rewrite the existing call scripts for all {rows?.length ?? 0} prospects in this campaign using your current Calling config. Any edits made to individual scripts will be lost.
+              This will rewrite the existing call scripts for all {rows?.length ?? 0} prospects in
+              this campaign using your current Calling config. Any edits made to individual scripts
+              will be lost.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -729,12 +900,18 @@ function ListDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Regenerate all email sequences?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will rewrite the existing emails for all {rows?.length ?? 0} prospects using your current Campaign setup. Any edits made to individual email drafts will be replaced.
+              This will rewrite the existing emails for all {rows?.length ?? 0} prospects using your
+              current Campaign setup. Any edits made to individual email drafts will be replaced.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setConfirmEmails(false); void runAll(true); }}>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmEmails(false);
+                void runAll(true);
+              }}
+            >
               Rewrite all emails
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -744,7 +921,9 @@ function ListDetailPage() {
       <AlertDialog open={confirmLaunch} onOpenChange={setConfirmLaunch}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{campaignStatus === "paused" ? "Resume this campaign?" : "Launch this campaign?"}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {campaignStatus === "paused" ? "Resume this campaign?" : "Launch this campaign?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {campaignStatus === "paused"
                 ? "Sending will continue through your assigned mailboxes using the existing schedule."
@@ -816,7 +995,6 @@ function LeadDrawer({
     setEmails(row ? effectiveEmails(row) : []);
     setActiveStep("1");
     setScript(row?.call_script ?? null);
-    
   }, [row?.lead_id, row?.emails, row?.email_subject, row?.email_body, row?.call_script]);
 
   const genScript = async (force = false) => {
@@ -833,7 +1011,6 @@ function LeadDrawer({
       setScriptBusy(false);
     }
   };
-
 
   const updateEmail = (idx: number, patch: Partial<EmailInSequence>) => {
     setEmails((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
@@ -870,24 +1047,34 @@ function LeadDrawer({
                 {[row.lead?.first_name, row.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
               </SheetTitle>
               <SheetDescription>
-                {row.lead?.title}{row.lead?.org_name ? ` · ${row.lead.org_name}` : ""}
+                {row.lead?.title}
+                {row.lead?.org_name ? ` · ${row.lead.org_name}` : ""}
               </SheetDescription>
             </SheetHeader>
 
             <div className="mt-6 space-y-6 px-4 pb-8 text-sm">
               <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {row.lead?.email && (
-                  <a className="inline-flex items-center gap-1 hover:underline" href={`mailto:${row.lead.email}`}>
+                  <a
+                    className="inline-flex items-center gap-1 hover:underline"
+                    href={`mailto:${row.lead.email}`}
+                  >
                     <Mail className="h-3 w-3" /> {row.lead.email}
                   </a>
                 )}
                 {row.lead?.phone && (
-                  <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {row.lead.phone}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Phone className="h-3 w-3" /> {row.lead.phone}
+                  </span>
                 )}
                 {row.lead?.linkedin_url && (
                   <a
                     className="inline-flex items-center gap-1 hover:underline"
-                    href={row.lead.linkedin_url.startsWith("http") ? row.lead.linkedin_url : `https://${row.lead.linkedin_url}`}
+                    href={
+                      row.lead.linkedin_url.startsWith("http")
+                        ? row.lead.linkedin_url
+                        : `https://${row.lead.linkedin_url}`
+                    }
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -907,12 +1094,12 @@ function LeadDrawer({
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
-                  Not scored yet — click <strong>Generate</strong> to run AI research and IPP analysis.
+                  Not scored yet — click <strong>Generate</strong> to run AI research and IPP
+                  analysis.
                 </div>
               )}
 
               <IppBreakdownPanel research={row.research} scored={row.score != null} />
-
 
               {row.research?.pain_points && row.research.pain_points.length > 0 && (
                 <div>
@@ -933,7 +1120,9 @@ function LeadDrawer({
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Email sequence ({emails.length})
                     </div>
-                    <Button size="sm" onClick={saveEmails}>Save changes</Button>
+                    <Button size="sm" onClick={saveEmails}>
+                      Save changes
+                    </Button>
                   </div>
 
                   <Tabs value={activeStep} onValueChange={setActiveStep}>
@@ -984,7 +1173,8 @@ function LeadDrawer({
                 </div>
               ) : (
                 <Card className="p-4 text-center text-sm text-muted-foreground">
-                  Click <strong>Generate</strong> to research this prospect and create a personalized email sequence.
+                  Click <strong>Generate</strong> to research this prospect and create a
+                  personalized email sequence.
                 </Card>
               )}
 
@@ -1028,8 +1218,17 @@ function CallScriptSection({
               <Maximize2 className="mr-1.5 h-3.5 w-3.5" /> Open in call mode
             </Button>
           )}
-          <Button size="sm" variant={script ? "outline" : "default"} onClick={script ? onRegenerate : onGenerate} disabled={busy}>
-            {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PhoneCall className="mr-1.5 h-3.5 w-3.5" />}
+          <Button
+            size="sm"
+            variant={script ? "outline" : "default"}
+            onClick={script ? onRegenerate : onGenerate}
+            disabled={busy}
+          >
+            {busy ? (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
+            )}
             {script ? "Regenerate script" : "Generate script"}
           </Button>
         </div>
@@ -1051,7 +1250,9 @@ function CallScriptSection({
           <ScriptBlock title="Close" body={script.close} />
           {script.objection_map.length > 0 && (
             <div className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Objection handling</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Objection handling
+              </div>
               <div className="space-y-1.5">
                 {script.objection_map.map((o, i) => (
                   <div key={i} className="rounded-md border p-2.5">
@@ -1072,8 +1273,12 @@ function ScriptBlock({ title, body }: { title: string; body: string }) {
   if (!body) return null;
   return (
     <div>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-      <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 leading-relaxed">{body}</p>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
+      <p className="whitespace-pre-wrap rounded-md border bg-muted/30 p-3 leading-relaxed">
+        {body}
+      </p>
     </div>
   );
 }
@@ -1082,10 +1287,14 @@ function ScriptList({ title, items }: { title: string; items: string[] }) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
       <ul className="space-y-1.5">
         {items.map((q, i) => (
-          <li key={i} className="rounded-md border bg-muted/30 p-3 leading-relaxed">{q}</li>
+          <li key={i} className="rounded-md border bg-muted/30 p-3 leading-relaxed">
+            {q}
+          </li>
         ))}
       </ul>
     </div>
@@ -1155,7 +1364,9 @@ function CallModeView({
               {script.objection_map.map((o, i) => (
                 <Card key={i} className="p-3">
                   <div className="text-sm font-semibold">{o.objection}</div>
-                  <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
+                  <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                    {o.response}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -1166,13 +1377,25 @@ function CallModeView({
   );
 }
 
-function CallSection({ title, tone, children }: { title: string; tone?: "primary"; children: React.ReactNode }) {
+function CallSection({
+  title,
+  tone,
+  children,
+}: {
+  title: string;
+  tone?: "primary";
+  children: React.ReactNode;
+}) {
   return (
     <section>
-      <h3 className={`mb-2 text-xs font-semibold uppercase tracking-wide ${tone === "primary" ? "text-primary" : "text-muted-foreground"}`}>
+      <h3
+        className={`mb-2 text-xs font-semibold uppercase tracking-wide ${tone === "primary" ? "text-primary" : "text-muted-foreground"}`}
+      >
         {title}
       </h3>
-      <div className={`rounded-lg border p-4 ${tone === "primary" ? "border-primary/40 bg-primary/5" : "bg-card"}`}>
+      <div
+        className={`rounded-lg border p-4 ${tone === "primary" ? "border-primary/40 bg-primary/5" : "bg-card"}`}
+      >
         {children}
       </div>
     </section>
@@ -1207,7 +1430,13 @@ function GenerationProgress({
   progress,
   onCancel,
 }: {
-  progress: { total: number; done: number; startedAt: number; currentName: string; cancel: boolean };
+  progress: {
+    total: number;
+    done: number;
+    startedAt: number;
+    currentName: string;
+    cancel: boolean;
+  };
   onCancel: () => void;
 }) {
   const { total, done, startedAt, currentName, cancel } = progress;
@@ -1256,7 +1485,8 @@ function GenerationProgress({
           {done} / {total} prospects
         </span>
         <span className="text-3xl font-bold tabular-nums tracking-tight text-primary">
-          {pct}<span className="text-xl">%</span>
+          {pct}
+          <span className="text-xl">%</span>
         </span>
       </div>
 
@@ -1281,12 +1511,13 @@ function GenerationProgress({
   );
 }
 
-
 type IppSignal = NonNullable<NonNullable<Row["research"]>["ipp_breakdown"]>[number];
 
 const verdictStyles: Record<IppSignal["verdict"], string> = {
-  strong: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
-  partial: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
+  strong:
+    "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
+  partial:
+    "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
   weak: "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-900",
   unknown: "bg-muted text-muted-foreground border-border",
 };
@@ -1338,7 +1569,9 @@ function IppBreakdownPanel({ research, scored }: { research: Row["research"]; sc
           <div key={i} className="rounded-md border p-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{s.label}</span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${verdictStyles[s.verdict]}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${verdictStyles[s.verdict]}`}
+              >
                 <span className={`h-1.5 w-1.5 rounded-full ${verdictDot[s.verdict]}`} />
                 {s.verdict}
               </span>
@@ -1376,7 +1609,6 @@ function CallWorkstation({
   onVoicemailChanged: () => void;
   aiCopilotEnabled: boolean;
 }) {
-
   const genScriptFn = useServerFn(generateCallScript);
   const getTokenFn = useServerFn(getTwilioToken);
   const startCallFn = useServerFn(startCall);
@@ -1406,7 +1638,9 @@ function CallWorkstation({
   // ---- In-call state ----
   const [device, setDevice] = useState<any>(null);
   const [connection, setConnection] = useState<any>(null);
-  const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "ringing" | "in_progress" | "ending">("idle");
+  const [callStatus, setCallStatus] = useState<
+    "idle" | "connecting" | "ringing" | "in_progress" | "ending"
+  >("idle");
   const [callId, setCallId] = useState<string | null>(null);
   const [callStart, setCallStart] = useState<number | null>(null);
   const [muted, setMuted] = useState(false);
@@ -1428,15 +1662,14 @@ function CallWorkstation({
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
 
-
-
-
   // Load all phone accounts, keep only the "ready" ones (same rule as Sending Accounts)
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("user_phone_accounts")
-        .select("id,label,provider,from_number,credentials,twilio_twiml_app_sid,is_default,created_at")
+        .select(
+          "id,label,provider,from_number,credentials,twilio_twiml_app_sid,is_default,created_at",
+        )
         .order("is_default", { ascending: false })
         .order("created_at", { ascending: true });
       const ready = (data ?? []).filter((a: any) => {
@@ -1461,8 +1694,12 @@ function CallWorkstation({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      try { connection?.disconnect?.(); } catch {}
-      try { device?.destroy?.(); } catch {}
+      try {
+        connection?.disconnect?.();
+      } catch {}
+      try {
+        device?.destroy?.();
+      } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1472,7 +1709,10 @@ function CallWorkstation({
     if (device) return device;
     const { token } = await getTokenFn({ data: { phoneAccountId: phoneAccount.id } });
     const { Device } = await loadTwilioVoiceSdk();
-    const d = new Device(token, { codecPreferences: ["opus" as any, "pcmu" as any], logLevel: 1 } as any);
+    const d = new Device(token, {
+      codecPreferences: ["opus" as any, "pcmu" as any],
+      logLevel: 1,
+    } as any);
     await d.register();
     setDevice(d);
     return d;
@@ -1480,11 +1720,11 @@ function CallWorkstation({
 
   const startInAppCall = async () => {
     if (!active?.lead?.phone) return toast.error("No phone number on this lead");
-    if (!phoneAccount) return toast.error("No ready phone account — finish setup in Sending Accounts");
+    if (!phoneAccount)
+      return toast.error("No ready phone account — finish setup in Sending Accounts");
     try {
       setCallStatus("connecting");
       setFocusMode(true);
-
 
       if (phoneAccount.provider === "ringcentral") {
         // RingCentral browser WebRTC via ringcentral-web-phone
@@ -1512,11 +1752,13 @@ function CallWorkstation({
         const callerId = (phoneAccount.from_number || "").replace(/[^\d+]/g, "");
         const session = await wp.call(callee, callerId || undefined);
         setRcSession(session);
-        session.once("answered", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
+        session.once("answered", () => {
+          setCallStatus("in_progress");
+          setCallStart(Date.now());
+        });
         session.once("disposed", () => finishCall(newCallId));
         return;
       }
-
 
       // Twilio (browser WebRTC)
       const d = await ensureTwilioDevice();
@@ -1532,10 +1774,16 @@ function CallWorkstation({
       const conn = await d.connect({ params: { To: active.lead.phone, callId: newCallId } });
       setConnection(conn);
       setCallStatus("ringing");
-      conn.on("accept", () => { setCallStatus("in_progress"); setCallStart(Date.now()); });
+      conn.on("accept", () => {
+        setCallStatus("in_progress");
+        setCallStart(Date.now());
+      });
       conn.on("disconnect", () => finishCall(newCallId));
       conn.on("cancel", () => finishCall(newCallId));
-      conn.on("error", (e: any) => { toast.error(e?.message ?? "Call error"); finishCall(newCallId); });
+      conn.on("error", (e: any) => {
+        toast.error(e?.message ?? "Call error");
+        finishCall(newCallId);
+      });
     } catch (e: any) {
       toast.error(e.message ?? "Failed to start call");
       setCallStatus("idle");
@@ -1547,25 +1795,35 @@ function CallWorkstation({
     setCallStatus("ending");
     const duration = callStart ? Math.round((Date.now() - callStart) / 1000) : undefined;
     // Twilio
-    try { connection?.disconnect?.(); } catch {}
+    try {
+      connection?.disconnect?.();
+    } catch {}
     // RingCentral — hang up the SIP session and tear down the web phone
-    try { await rcSession?.hangup?.(); } catch {}
-    try { await rcSession?.dispose?.(); } catch {}
-    try { await rcWebPhone?.dispose?.(); } catch {}
+    try {
+      await rcSession?.hangup?.();
+    } catch {}
+    try {
+      await rcSession?.dispose?.();
+    } catch {}
+    try {
+      await rcWebPhone?.dispose?.();
+    } catch {}
     setConnection(null);
     setRcSession(null);
     setRcWebPhone(null);
     setMuted(false);
     if (cid) {
-      try { await endCallFn({ data: { callId: cid, durationSec: duration, notes: notes || undefined } }); } catch {}
+      try {
+        await endCallFn({
+          data: { callId: cid, durationSec: duration, notes: notes || undefined },
+        });
+      } catch {}
     }
     setCallId(null);
     setCallStart(null);
     setCallStatus("idle");
     setFocusMode(false);
   };
-
-
 
   const toggleMute = () => {
     const next = !muted;
@@ -1675,8 +1933,12 @@ function CallWorkstation({
       await sender.replaceTrack(vmTrack);
 
       audio.onended = async () => {
-        try { await sender.replaceTrack(vmOriginalTrackRef.current); } catch {}
-        try { await ctx.close(); } catch {}
+        try {
+          await sender.replaceTrack(vmOriginalTrackRef.current);
+        } catch {}
+        try {
+          await ctx.close();
+        } catch {}
         vmAudioRef.current = null;
         vmCtxRef.current = null;
         vmOriginalTrackRef.current = null;
@@ -1697,12 +1959,6 @@ function CallWorkstation({
       setVoicemailDropping(false);
     }
   };
-
-
-
-
-
-
 
   const generate = async (force = false) => {
     if (!active) return;
@@ -1736,7 +1992,6 @@ function CallWorkstation({
       setNotes("");
       setFocusMode(false);
       goTo(1);
-
     } catch (e: any) {
       toast.error(e.message ?? "Failed to log call");
     } finally {
@@ -1749,7 +2004,10 @@ function CallWorkstation({
       <div className="p-8">
         <Card className="p-12 text-center text-sm text-muted-foreground">
           No prospects yet. Add some from{" "}
-          <Link to="/app/people" className="underline">People Search</Link>.
+          <Link to="/app/people" className="underline">
+            People Search
+          </Link>
+          .
         </Card>
       </div>
     );
@@ -1760,307 +2018,366 @@ function CallWorkstation({
 
   return (
     <>
-    <div className="flex h-full overflow-hidden">
-
-      <aside className="flex w-80 shrink-0 flex-col border-r bg-muted/20">
-        <div className="border-b px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-semibold">Call queue</div>
-              <div className="text-[11px] text-muted-foreground">
-                {withPhone.length}/{rows.length} have phone · {scriptedCount} scripted
+      <div className="flex h-full overflow-hidden">
+        <aside className="flex w-80 shrink-0 flex-col border-r bg-muted/20">
+          <div className="border-b px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold">Call queue</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {withPhone.length}/{rows.length} have phone · {scriptedCount} scripted
+                </div>
               </div>
+              <Button size="sm" variant="ghost" onClick={onOpenConfig}>
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
-            <Button size="sm" variant="ghost" onClick={onOpenConfig}>
-              <Settings2 className="h-3.5 w-3.5" />
-            </Button>
           </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {rows.map((r) => {
-            const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
-            const isActive = r.lead_id === activeId;
-            const hasScript = !!(r.call_script || localScripts[r.lead_id]);
-            const hasPhone = !!r.lead?.phone;
-            return (
-              <button
-                key={r.lead_id}
-                onClick={() => setActiveId(r.lead_id)}
-                className={`mb-1 w-full rounded-md border px-3 py-2 text-left transition ${
-                  isActive
-                    ? "border-primary bg-primary/10"
-                    : "border-transparent hover:border-border hover:bg-background"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
-                      r.score == null
-                        ? "bg-muted text-muted-foreground"
-                        : r.score >= 75
-                          ? "bg-emerald-100 text-emerald-700"
-                          : r.score >= 50
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-rose-100 text-rose-700"
-                    }`}
+          <div className="flex-1 overflow-y-auto p-2">
+            {rows.map((r) => {
+              const name = [r.lead?.first_name, r.lead?.last_name].filter(Boolean).join(" ") || "—";
+              const isActive = r.lead_id === activeId;
+              const hasScript = !!(r.call_script || localScripts[r.lead_id]);
+              const hasPhone = !!r.lead?.phone;
+              return (
+                <button
+                  key={r.lead_id}
+                  onClick={() => setActiveId(r.lead_id)}
+                  className={`mb-1 w-full rounded-md border px-3 py-2 text-left transition ${
+                    isActive
+                      ? "border-primary bg-primary/10"
+                      : "border-transparent hover:border-border hover:bg-background"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                        r.score == null
+                          ? "bg-muted text-muted-foreground"
+                          : r.score >= 75
+                            ? "bg-emerald-100 text-emerald-700"
+                            : r.score >= 50
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {r.score ?? "—"}
+                    </span>
+                    <span className="flex-1 truncate text-sm font-medium">{name}</span>
+                    {hasScript && <Sparkles className="h-3 w-3 text-primary" />}
+                  </div>
+                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {r.lead?.title || "—"}
+                    {r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
+                  </div>
+                  <div
+                    className={`mt-0.5 truncate text-[11px] ${hasPhone ? "text-foreground" : "text-muted-foreground/60"}`}
                   >
-                    {r.score ?? "—"}
-                  </span>
-                  <span className="flex-1 truncate text-sm font-medium">{name}</span>
-                  {hasScript && <Sparkles className="h-3 w-3 text-primary" />}
-                </div>
-                <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                  {r.lead?.title || "—"}{r.lead?.org_name ? ` · ${r.lead.org_name}` : ""}
-                </div>
-                <div className={`mt-0.5 truncate text-[11px] ${hasPhone ? "text-foreground" : "text-muted-foreground/60"}`}>
-                  {hasPhone ? `☎ ${r.lead?.phone}` : "no phone"}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
+                    {hasPhone ? `☎ ${r.lead?.phone}` : "no phone"}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {active ? (
-          <>
-            <div className="flex items-center justify-between gap-4 border-b bg-background px-6 py-4">
-              <div className="min-w-0">
-                <div className="flex items-baseline gap-3">
-                  <h2 className="truncate text-xl font-semibold tracking-tight">
-                    {[active.lead?.first_name, active.lead?.last_name].filter(Boolean).join(" ") || "Lead"}
-                  </h2>
-                  <span className="truncate text-sm text-muted-foreground">
-                    {active.lead?.title}{active.lead?.org_name ? ` · ${active.lead.org_name}` : ""}
-                  </span>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {active ? (
+            <>
+              <div className="flex items-center justify-between gap-4 border-b bg-background px-6 py-4">
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-3">
+                    <h2 className="truncate text-xl font-semibold tracking-tight">
+                      {[active.lead?.first_name, active.lead?.last_name]
+                        .filter(Boolean)
+                        .join(" ") || "Lead"}
+                    </h2>
+                    <span className="truncate text-sm text-muted-foreground">
+                      {active.lead?.title}
+                      {active.lead?.org_name ? ` · ${active.lead.org_name}` : ""}
+                    </span>
+                  </div>
+                  {active.research?.reasoning && (
+                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                      {active.research.reasoning}
+                    </p>
+                  )}
                 </div>
-                {active.research?.reasoning && (
-                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{active.research.reasoning}</p>
-                )}
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => goTo(-1)} disabled={activeIndex <= 0}>
-                  ← Prev
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => goTo(1)} disabled={activeIndex >= rows.length - 1}>
-                  Next →
-                </Button>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => goTo(-1)}
+                    disabled={activeIndex <= 0}
+                  >
+                    ← Prev
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => goTo(1)}
+                    disabled={activeIndex >= rows.length - 1}
+                  >
+                    Next →
+                  </Button>
 
-                {readyAccounts.length > 1 && callStatus === "idle" && (
-                  <Select value={phoneAccountId ?? undefined} onValueChange={setPhoneAccountId}>
-                    <SelectTrigger className="h-9 w-[180px] text-xs">
-                      <SelectValue placeholder="Choose phone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {readyAccounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id} className="text-xs">
-                          {a.label} · {a.provider}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                  {readyAccounts.length > 1 && callStatus === "idle" && (
+                    <Select value={phoneAccountId ?? undefined} onValueChange={setPhoneAccountId}>
+                      <SelectTrigger className="h-9 w-[180px] text-xs">
+                        <SelectValue placeholder="Choose phone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {readyAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id} className="text-xs">
+                            {a.label} · {a.provider}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
-                {active.lead?.phone ? (
-                  callStatus === "idle" ? (
-                    readyAccounts.length === 0 ? (
-                      <Link
-                        to="/app/accounts"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
-                      >
-                        <AlertCircle className="h-3.5 w-3.5" /> Finish phone setup to call
-                      </Link>
+                  {active.lead?.phone ? (
+                    callStatus === "idle" ? (
+                      readyAccounts.length === 0 ? (
+                        <Link
+                          to="/app/accounts"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                        >
+                          <AlertCircle className="h-3.5 w-3.5" /> Finish phone setup to call
+                        </Link>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={startInAppCall}
+                          title={`Call using ${phoneAccount?.label ?? "phone"}`}
+                        >
+                          <PhoneIcon className="mr-1.5 h-4 w-4" /> Call {active.lead.phone}
+                        </Button>
+                      )
                     ) : (
-                      <Button
-                        size="sm"
-                        onClick={startInAppCall}
-                        title={`Call using ${phoneAccount?.label ?? "phone"}`}
-                      >
-                        <PhoneIcon className="mr-1.5 h-4 w-4" /> Call {active.lead.phone}
-                      </Button>
+                      <div className="flex items-center gap-2 rounded-md border bg-emerald-50 px-2 py-1">
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                        </span>
+                        <span className="text-xs font-medium text-emerald-900">
+                          {callStatus === "connecting" && "Connecting…"}
+                          {callStatus === "ringing" && "Ringing…"}
+                          {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
+                          {callStatus === "ending" && "Ending…"}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={toggleMute}
+                          disabled={!connection}
+                        >
+                          {muted ? (
+                            <MicOff className="h-3.5 w-3.5" />
+                          ) : (
+                            <Mic className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-7 px-2"
+                          onClick={() => finishCall()}
+                        >
+                          <PhoneOff className="mr-1 h-3.5 w-3.5" /> Hang up
+                        </Button>
+                      </div>
                     )
                   ) : (
-                    <div className="flex items-center gap-2 rounded-md border bg-emerald-50 px-2 py-1">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="text-xs text-muted-foreground">No phone on file</span>
+                  )}
+                </div>
+              </div>
+
+              {userId && (
+                <details className="group border-b bg-muted/20">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-2.5 text-xs hover:bg-muted/30">
+                    <span className="flex items-center gap-2 font-medium text-muted-foreground">
+                      <Voicemail className="h-3.5 w-3.5" />
+                      Voicemail drop
+                      <span className="text-[10px] text-muted-foreground/70">
+                        {voicemailAudioPath ? "· prerecorded ready" : "· not configured"}
                       </span>
-                      <span className="text-xs font-medium text-emerald-900">
-                        {callStatus === "connecting" && "Connecting…"}
-                        {callStatus === "ringing" && "Ringing…"}
-                        {callStatus === "in_progress" && <CallTimer startedAt={callStart} />}
-                        {callStatus === "ending" && "Ending…"}
-                      </span>
-                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={toggleMute} disabled={!connection}>
-                        {muted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground transition group-open:rotate-180">
+                      ▾
+                    </span>
+                  </summary>
+                  <div className="space-y-3 px-6 pb-4 pt-1">
+                    <AiVoicemailStatusBadge userId={userId} />
+                    <VoicemailRecorder
+                      listId={listId}
+                      userId={userId}
+                      currentPath={voicemailAudioPath}
+                      onChange={() => onVoicemailChanged()}
+                    />
+                  </div>
+                </details>
+              )}
+
+              <div className="flex-1 overflow-y-auto">
+                {!activeScript ? (
+                  <div className="flex h-full items-center justify-center p-12">
+                    <Card className="max-w-md p-8 text-center">
+                      <PhoneCall className="mx-auto mb-3 h-8 w-8 text-primary" />
+                      <div className="mb-1 text-base font-semibold">No script yet</div>
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        Generate a NEPQ-style script personalized to this prospect using your
+                        Calling config.
+                      </p>
+                      <Button onClick={() => generate(false)} disabled={scriptBusy}>
+                        {scriptBusy ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-2 h-4 w-4" />
+                        )}
+                        Generate script
                       </Button>
-                      <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => finishCall()}>
-                        <PhoneOff className="mr-1 h-3.5 w-3.5" /> Hang up
-                      </Button>
-                    </div>
-                  )
+                    </Card>
+                  </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">No phone on file</span>
+                  <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
+                    <div className="space-y-5 lg:col-span-2">
+                      <CallSection title="Opener" tone="primary">
+                        <p className="whitespace-pre-wrap text-lg leading-relaxed">
+                          {activeScript.opener}
+                        </p>
+                      </CallSection>
+                      {activeScript.talk_track?.map((s, i) => (
+                        <CallSection key={i} title={s.heading}>
+                          <p className="whitespace-pre-wrap text-lg leading-relaxed">{s.body}</p>
+                        </CallSection>
+                      ))}
+                      <CallSection title="Problem questions">
+                        <BigList items={activeScript.problem_questions} />
+                      </CallSection>
+                      <CallSection title="Solution questions">
+                        <BigList items={activeScript.solution_questions} />
+                      </CallSection>
+                      <CallSection title="Consequence questions">
+                        <BigList items={activeScript.consequence_questions} />
+                      </CallSection>
+                      <CallSection title="Qualifying questions">
+                        <BigList items={activeScript.qualifying_questions} />
+                      </CallSection>
+                      <CallSection title="Close" tone="primary">
+                        <p className="text-lg leading-relaxed">{activeScript.close}</p>
+                      </CallSection>
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => generate(true)}
+                          disabled={scriptBusy}
+                        >
+                          {scriptBusy ? (
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                          )}
+                          Regenerate
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+                      <div>
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Objection cheat-sheet
+                        </div>
+                        <div className="space-y-2">
+                          {activeScript.objection_map.map((o, i) => (
+                            <Card key={i} className="p-3">
+                              <div className="text-sm font-semibold">{o.objection}</div>
+                              <div className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                                {o.response}
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
+            </>
+          ) : (
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              Select a prospect from the queue
             </div>
-
-            {userId && (
-              <details className="group border-b bg-muted/20">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-2.5 text-xs hover:bg-muted/30">
-                  <span className="flex items-center gap-2 font-medium text-muted-foreground">
-                    <Voicemail className="h-3.5 w-3.5" />
-                    Voicemail drop
-                    <span className="text-[10px] text-muted-foreground/70">
-                      {voicemailAudioPath ? "· prerecorded ready" : "· not configured"}
-                    </span>
-                  </span>
-                  <span className="text-[10px] text-muted-foreground transition group-open:rotate-180">▾</span>
-                </summary>
-                <div className="space-y-3 px-6 pb-4 pt-1">
-                  <AiVoicemailStatusBadge userId={userId} />
-                  <VoicemailRecorder
-                    listId={listId}
-                    userId={userId}
-                    currentPath={voicemailAudioPath}
-                    onChange={() => onVoicemailChanged()}
-                  />
-                </div>
-              </details>
-            )}
-
-
-
-            <div className="flex-1 overflow-y-auto">
-
-              {!activeScript ? (
-                <div className="flex h-full items-center justify-center p-12">
-                  <Card className="max-w-md p-8 text-center">
-                    <PhoneCall className="mx-auto mb-3 h-8 w-8 text-primary" />
-                    <div className="mb-1 text-base font-semibold">No script yet</div>
-                    <p className="mb-4 text-sm text-muted-foreground">
-                      Generate a NEPQ-style script personalized to this prospect using your Calling config.
-                    </p>
-                    <Button onClick={() => generate(false)} disabled={scriptBusy}>
-                      {scriptBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                      Generate script
-                    </Button>
-                  </Card>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
-                  <div className="space-y-5 lg:col-span-2">
-                    <CallSection title="Opener" tone="primary">
-                      <p className="whitespace-pre-wrap text-lg leading-relaxed">{activeScript.opener}</p>
-                    </CallSection>
-                    {activeScript.talk_track?.map((s, i) => (
-                      <CallSection key={i} title={s.heading}>
-                        <p className="whitespace-pre-wrap text-lg leading-relaxed">{s.body}</p>
-                      </CallSection>
-                    ))}
-                    <CallSection title="Problem questions">
-                      <BigList items={activeScript.problem_questions} />
-                    </CallSection>
-                    <CallSection title="Solution questions">
-                      <BigList items={activeScript.solution_questions} />
-                    </CallSection>
-                    <CallSection title="Consequence questions">
-                      <BigList items={activeScript.consequence_questions} />
-                    </CallSection>
-                    <CallSection title="Qualifying questions">
-                      <BigList items={activeScript.qualifying_questions} />
-                    </CallSection>
-                    <CallSection title="Close" tone="primary">
-                      <p className="text-lg leading-relaxed">{activeScript.close}</p>
-                    </CallSection>
-                    <div className="flex justify-end">
-                      <Button size="sm" variant="outline" onClick={() => generate(true)} disabled={scriptBusy}>
-                        {scriptBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                        Regenerate
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-                    <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Objection cheat-sheet
-                      </div>
-                      <div className="space-y-2">
-                        {activeScript.objection_map.map((o, i) => (
-                          <Card key={i} className="p-3">
-                            <div className="text-sm font-semibold">{o.objection}</div>
-                            <div className="mt-1 text-sm leading-relaxed text-muted-foreground">{o.response}</div>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Select a prospect from the queue
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-    {focusMode && active && activeScript ? (
-      <FocusCallView
-        listId={listId}
-        leadId={active.lead_id}
-        callId={callId}
-        aiCopilotEnabled={aiCopilotEnabled}
-        getRemoteStream={() => {
-          try {
-            const rcPc: RTCPeerConnection | undefined =
-              (window as any).__rcWebPhone?.userAgent?.sessionManager?.sessions?.values?.()?.next?.()?.value
-                ?.sessionDescriptionHandler?.peerConnection;
-            if (rcPc) {
-              const tracks = rcPc.getReceivers().map((r) => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
-              if (tracks.length) return new MediaStream(tracks);
-            }
-          } catch {}
-          try {
-            const twPc: RTCPeerConnection | undefined =
-              connection?._mediaHandler?.version?.pc ??
-              connection?.mediaStream?.version?.pc ??
-              connection?._mediaHandler?.pc;
-            if (twPc) {
-              const tracks = twPc.getReceivers().map((r) => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
-              if (tracks.length) return new MediaStream(tracks);
-            }
-          } catch {}
-          return null;
-        }}
-        leadName={`${active.lead?.first_name ?? ""} ${active.lead?.last_name ?? ""}`.trim() || "Lead"}
-        leadSub={`${active.lead?.title ?? ""}${active.lead?.title && active.lead?.org_name ? " · " : ""}${active.lead?.org_name ?? ""}`}
-        phone={active.lead?.phone ?? null}
-        script={activeScript}
-        notes={notes}
-        onNotesChange={setNotes}
-        callStatus={callStatus}
-        callStart={callStart}
-        muted={muted}
-        canMute={!!connection}
-        onToggleMute={toggleMute}
-        onHangUp={() => finishCall()}
-        onExit={async () => { await finishCall(); }}
-        onNext={hangupAndNext}
-        hasNext={activeIndex >= 0 && activeIndex < rows.length - 1}
-        canDropVoicemail={!!voicemailAudioPath && callStatus === "in_progress" && !voicemailDropping}
-        onDropVoicemail={dropVoicemailAndNext}
-        voicemailDropping={voicemailDropping}
-        outcomeBusy={outcomeBusy}
-        onLogOutcome={logOutcome}
-      />
-
-
-    ) : null}
-
+      {focusMode && active && activeScript ? (
+        <FocusCallView
+          listId={listId}
+          leadId={active.lead_id}
+          callId={callId}
+          aiCopilotEnabled={aiCopilotEnabled}
+          getRemoteStream={() => {
+            try {
+              const rcPc: RTCPeerConnection | undefined = (
+                window as any
+              ).__rcWebPhone?.userAgent?.sessionManager?.sessions
+                ?.values?.()
+                ?.next?.()?.value?.sessionDescriptionHandler?.peerConnection;
+              if (rcPc) {
+                const tracks = rcPc
+                  .getReceivers()
+                  .map((r) => r.track)
+                  .filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
+                if (tracks.length) return new MediaStream(tracks);
+              }
+            } catch {}
+            try {
+              const twPc: RTCPeerConnection | undefined =
+                connection?._mediaHandler?.version?.pc ??
+                connection?.mediaStream?.version?.pc ??
+                connection?._mediaHandler?.pc;
+              if (twPc) {
+                const tracks = twPc
+                  .getReceivers()
+                  .map((r) => r.track)
+                  .filter((t): t is MediaStreamTrack => !!t && t.kind === "audio");
+                if (tracks.length) return new MediaStream(tracks);
+              }
+            } catch {}
+            return null;
+          }}
+          leadName={
+            `${active.lead?.first_name ?? ""} ${active.lead?.last_name ?? ""}`.trim() || "Lead"
+          }
+          leadSub={`${active.lead?.title ?? ""}${active.lead?.title && active.lead?.org_name ? " · " : ""}${active.lead?.org_name ?? ""}`}
+          phone={active.lead?.phone ?? null}
+          script={activeScript}
+          notes={notes}
+          onNotesChange={setNotes}
+          callStatus={callStatus}
+          callStart={callStart}
+          muted={muted}
+          canMute={!!connection}
+          onToggleMute={toggleMute}
+          onHangUp={() => finishCall()}
+          onExit={async () => {
+            await finishCall();
+          }}
+          onNext={hangupAndNext}
+          hasNext={activeIndex >= 0 && activeIndex < rows.length - 1}
+          canDropVoicemail={
+            !!voicemailAudioPath && callStatus === "in_progress" && !voicemailDropping
+          }
+          onDropVoicemail={dropVoicemailAndNext}
+          voicemailDropping={voicemailDropping}
+          outcomeBusy={outcomeBusy}
+          onLogOutcome={logOutcome}
+        />
+      ) : null}
     </>
   );
 }
@@ -2118,7 +2435,6 @@ function FocusCallView({
   outcomeBusy: boolean;
   onLogOutcome: (outcome: string) => void;
 }) {
-
   // Single shared live-coaching session — drives both the mic-driven teleprompter
   // (left) and the co-pilot panel (right). One mic, one Deepgram socket.
   const coaching = useLiveCoaching({
@@ -2144,9 +2460,6 @@ function FocusCallView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callId, aiCopilotEnabled]);
 
-
-
-
   const outcomes = [
     { v: "booked", label: "✓ Booked", c: "bg-emerald-600 hover:bg-emerald-700 text-white" },
     { v: "interested", label: "Interested", c: "" },
@@ -2159,10 +2472,15 @@ function FocusCallView({
   ];
 
   const statusLabel =
-    callStatus === "connecting" ? "CONNECTING" :
-    callStatus === "ringing" ? "RINGING" :
-    callStatus === "in_progress" ? "IN CALL" :
-    callStatus === "ending" ? "ENDING" : "IDLE";
+    callStatus === "connecting"
+      ? "CONNECTING"
+      : callStatus === "ringing"
+        ? "RINGING"
+        : callStatus === "in_progress"
+          ? "IN CALL"
+          : callStatus === "ending"
+            ? "ENDING"
+            : "IDLE";
 
   return (
     <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-[oklch(0.12_0.04_270)] text-foreground">
@@ -2211,7 +2529,9 @@ function FocusCallView({
                 </span>
               </div>
             ) : (
-              <span className="pr-1 font-mono text-2xl font-semibold tabular-nums text-muted-foreground/60">00:00</span>
+              <span className="pr-1 font-mono text-2xl font-semibold tabular-nums text-muted-foreground/60">
+                00:00
+              </span>
             )}
             <Button
               size="sm"
@@ -2221,7 +2541,11 @@ function FocusCallView({
               className="h-10 w-10 rounded-xl border border-white/10 bg-white/[0.04] p-0 text-foreground hover:bg-white/[0.08]"
               title={canDropVoicemail ? "Drop prerecorded voicemail" : "Record a voicemail first"}
             >
-              {voicemailDropping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Voicemail className="h-4 w-4" />}
+              {voicemailDropping ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Voicemail className="h-4 w-4" />
+              )}
             </Button>
             <Button
               size="sm"
@@ -2253,7 +2577,12 @@ function FocusCallView({
             >
               <Sparkles className="mr-1.5 h-4 w-4" /> Next call
             </Button>
-            <Button size="sm" variant="ghost" onClick={onExit} className="h-10 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onExit}
+              className="h-10 text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+            >
               <X className="mr-1 h-4 w-4" /> Exit
             </Button>
           </div>
@@ -2283,12 +2612,13 @@ function FocusCallView({
               getRemoteStream={getRemoteStream}
               coaching={coaching}
             />
-
           ) : (
             <>
               <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
                 <div className="rounded-xl bg-gradient-to-r from-[oklch(0.55_0.18_200)] to-[oklch(0.62_0.15_185)] px-4 py-2 shadow-[0_0_24px_-6px_oklch(0.78_0.16_210/0.8)]">
-                  <span className="text-xs font-bold uppercase tracking-[0.25em] text-white">Objection answers</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.25em] text-white">
+                    Objection answers
+                  </span>
                 </div>
               </div>
               <div className="flex-1 space-y-2.5 overflow-y-auto px-4 pb-4">
@@ -2309,12 +2639,18 @@ function FocusCallView({
                         key={i}
                         className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 transition hover:border-[oklch(0.78_0.16_210/0.5)] hover:bg-white/[0.06]"
                       >
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${grad} shadow-[0_0_14px_-4px_oklch(0.70_0.18_290/0.7)]`}>
+                        <div
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${grad} shadow-[0_0_14px_-4px_oklch(0.70_0.18_290/0.7)]`}
+                        >
                           <MessageSquare className="h-4 w-4 text-white" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold text-foreground">{o.objection}</div>
-                          <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{o.response}</div>
+                          <div className="truncate text-sm font-semibold text-foreground">
+                            {o.objection}
+                          </div>
+                          <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                            {o.response}
+                          </div>
                         </div>
                       </div>
                     );
@@ -2402,7 +2738,8 @@ function Teleprompter({ script }: { script: CallScript }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
-      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable))
+        return;
       if (e.code === "Space") {
         e.preventDefault();
         setPlaying((p) => !p);
@@ -2464,7 +2801,11 @@ function Teleprompter({ script }: { script: CallScript }) {
             className="ml-1 h-8 border-0 bg-gradient-to-r from-[oklch(0.70_0.18_290)] to-[oklch(0.78_0.16_210)] px-3 text-white shadow-[0_0_18px_-4px_oklch(0.70_0.18_290/0.9)] hover:opacity-95"
             title="Play/Pause (Space)"
           >
-            {playing ? <Pause className="mr-1 h-3.5 w-3.5" /> : <Play className="mr-1 h-3.5 w-3.5" />}
+            {playing ? (
+              <Pause className="mr-1 h-3.5 w-3.5" />
+            ) : (
+              <Play className="mr-1 h-3.5 w-3.5" />
+            )}
             {playing ? "Pause" : "Play"}
           </Button>
           <Button
@@ -2485,7 +2826,9 @@ function Teleprompter({ script }: { script: CallScript }) {
         {/* Reading line at ~40% from top */}
         <div className="pointer-events-none absolute inset-x-0 top-[40%] z-10 flex h-0 items-center">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210/0.7)] to-transparent shadow-[0_0_18px_oklch(0.78_0.16_210/0.7)]" />
-          <span className="mx-2 font-mono text-[9px] uppercase tracking-[0.3em] text-[oklch(0.85_0.10_210)]">read here</span>
+          <span className="mx-2 font-mono text-[9px] uppercase tracking-[0.3em] text-[oklch(0.85_0.10_210)]">
+            read here
+          </span>
           <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[oklch(0.78_0.16_210/0.7)] to-transparent shadow-[0_0_18px_oklch(0.78_0.16_210/0.7)]" />
         </div>
         {/* Fade bottom */}
@@ -2498,9 +2841,13 @@ function Teleprompter({ script }: { script: CallScript }) {
           className="h-full overflow-y-auto px-10 py-[40vh] [scrollbar-width:thin]"
         >
           <div className="mx-auto max-w-3xl space-y-8 text-balance text-[1.5rem] leading-[1.65] tracking-tight text-foreground">
-            <TpSection label="Opener" highlight>{script.opener}</TpSection>
+            <TpSection label="Opener" highlight>
+              {script.opener}
+            </TpSection>
             {script.talk_track?.map((s, i) => (
-              <TpSection key={i} label={s.heading}>{s.body}</TpSection>
+              <TpSection key={i} label={s.heading}>
+                {s.body}
+              </TpSection>
             ))}
             {script.problem_questions?.length > 0 && (
               <TpQuestions label="Problem questions" items={script.problem_questions} />
@@ -2514,7 +2861,9 @@ function Teleprompter({ script }: { script: CallScript }) {
             {script.qualifying_questions?.length > 0 && (
               <TpQuestions label="Qualifying questions" items={script.qualifying_questions} />
             )}
-            <TpSection label="Close" highlight>{script.close}</TpSection>
+            <TpSection label="Close" highlight>
+              {script.close}
+            </TpSection>
             <div className="pt-8 text-center font-mono text-xs uppercase tracking-[0.3em] text-muted-foreground">
               — end of script —
             </div>
@@ -2530,7 +2879,15 @@ function Teleprompter({ script }: { script: CallScript }) {
   );
 }
 
-function TpSection({ label, highlight, children }: { label: string; highlight?: boolean; children: React.ReactNode }) {
+function TpSection({
+  label,
+  highlight,
+  children,
+}: {
+  label: string;
+  highlight?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="mb-3 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground">
@@ -2570,8 +2927,6 @@ function TpQuestions({ label, items }: { label: string; items: string[] }) {
     </div>
   );
 }
-
-
 
 function FocusQList({ title, items }: { title: string; items: string[] }) {
   return (
@@ -2613,13 +2968,14 @@ function StatBox({
       <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <div className={`mt-0.5 text-xl font-semibold leading-tight ${capitalize ? "capitalize" : ""} ${accent ?? "text-foreground"}`}>
+      <div
+        className={`mt-0.5 text-xl font-semibold leading-tight ${capitalize ? "capitalize" : ""} ${accent ?? "text-foreground"}`}
+      >
         {value}
       </div>
     </div>
   );
 }
-
 
 function CallTimer({ startedAt }: { startedAt: number | null }) {
   const [now, setNow] = useState(Date.now());
@@ -2631,7 +2987,11 @@ function CallTimer({ startedAt }: { startedAt: number | null }) {
   const s = Math.max(0, Math.floor((now - startedAt) / 1000));
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");
-  return <>{mm}:{ss}</>;
+  return (
+    <>
+      {mm}:{ss}
+    </>
+  );
 }
 
 function SdrAssignBar({
@@ -2645,11 +3005,15 @@ function SdrAssignBar({
 }) {
   const listFn = useServerFn(listSdrAgents);
   const assignFn = useServerFn(assignAgentToList);
-  const [agents, setAgents] = useState<Array<{ id: string; name: string; inbox_email: string | null }>>([]);
+  const [agents, setAgents] = useState<
+    Array<{ id: string; name: string; inbox_email: string | null }>
+  >([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    listFn({}).then((r) => setAgents(r.agents as typeof agents)).catch(() => {});
+    listFn({})
+      .then((r) => setAgents(r.agents as typeof agents))
+      .catch(() => {});
   }, []);
 
   const handleChange = async (v: string) => {
@@ -2680,7 +3044,8 @@ function SdrAssignBar({
           <SelectItem value="none">— None (replies disabled) —</SelectItem>
           {agents.map((a) => (
             <SelectItem key={a.id} value={a.id}>
-              {a.name}{a.inbox_email ? ` · ${a.inbox_email}` : ""}
+              {a.name}
+              {a.inbox_email ? ` · ${a.inbox_email}` : ""}
             </SelectItem>
           ))}
         </SelectContent>
@@ -2694,7 +3059,9 @@ function SdrAssignBar({
           Create an agent →
         </Link>
       ) : (
-        <span className="text-xs text-muted-foreground">No agent assigned. Pick one to enable auto-reply.</span>
+        <span className="text-xs text-muted-foreground">
+          No agent assigned. Pick one to enable auto-reply.
+        </span>
       )}
     </div>
   );
@@ -2706,19 +3073,29 @@ function AiVoicemailStatusBadge({ userId: _userId }: { userId: string }) {
   useEffect(() => {
     let alive = true;
     getProfileFn()
-      .then((p: any) => { if (alive) setOn(Boolean(p?.voice_id)); })
-      .catch(() => { if (alive) setOn(false); });
-    return () => { alive = false; };
+      .then((p: any) => {
+        if (alive) setOn(Boolean(p?.voice_id));
+      })
+      .catch(() => {
+        if (alive) setOn(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, [getProfileFn]);
   return (
     <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
       <div className="flex items-center gap-2 text-sm">
         <Sparkles className="h-4 w-4 text-primary" />
         <span className="font-medium">AI Voicemail Agent</span>
-        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-          on ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"
-        }`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+            on ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-muted-foreground/50"}`}
+          />
           {on === null ? "…" : on ? "On" : "Off"}
         </span>
       </div>
@@ -2780,16 +3157,15 @@ function aggregateByLead(
   const m = new Map<string, CallAgg>();
   if (!calls) return m;
   for (const c of calls) {
-    const cur =
-      m.get(c.lead_id) ?? {
-        attempts: 0,
-        connects: 0,
-        meetings: 0,
-        lastStartedAt: null as string | null,
-        lastStatus: null as string | null,
-        lastOutcome: null as string | null,
-        lastDurationSec: null as number | null,
-      };
+    const cur = m.get(c.lead_id) ?? {
+      attempts: 0,
+      connects: 0,
+      meetings: 0,
+      lastStartedAt: null as string | null,
+      lastStatus: null as string | null,
+      lastOutcome: null as string | null,
+      lastDurationSec: null as number | null,
+    };
     cur.attempts += 1;
     const connected = c.status === "completed" && (c.duration_sec ?? 0) >= 20;
     if (connected) cur.connects += 1;
@@ -2860,7 +3236,14 @@ function Sparkline({ points, stroke }: { points: number[]; stroke: string }) {
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${gradId})`} />
-      <path d={path} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={path}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -2937,10 +3320,21 @@ function CampaignStatStrip({
     (c) => c.outcome === "meeting_booked" || c.outcome === "meeting",
   );
 
-  const sparkProspects = new Array(14).fill(0).map((_, i) => Math.max(1, totalProspects - (13 - i)));
-  const sparkCalls = bucketByDay((calls ?? []).map((c) => c.started_at), 14);
-  const sparkConnected = bucketByDay(connected.map((c) => c.started_at), 14);
-  const sparkMeetings = bucketByDay(meetings.map((c) => c.started_at), 14);
+  const sparkProspects = new Array(14)
+    .fill(0)
+    .map((_, i) => Math.max(1, totalProspects - (13 - i)));
+  const sparkCalls = bucketByDay(
+    (calls ?? []).map((c) => c.started_at),
+    14,
+  );
+  const sparkConnected = bucketByDay(
+    connected.map((c) => c.started_at),
+    14,
+  );
+  const sparkMeetings = bucketByDay(
+    meetings.map((c) => c.started_at),
+    14,
+  );
 
   return (
     <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -2949,7 +3343,13 @@ function CampaignStatStrip({
         value={totalProspects.toLocaleString()}
         sub={enrichedCount > 0 ? `${enrichedCount} researched` : undefined}
         icon={
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="9" cy="8" r="3.5" />
             <circle cx="17" cy="10" r="2.5" />
             <path d="M3 19c0-3 2.5-5 6-5s6 2 6 5" />
@@ -2970,7 +3370,13 @@ function CampaignStatStrip({
         value={connectedTodayCount}
         sub={calledTodayCount > 0 ? `(${connectRate.toFixed(1)}%)` : undefined}
         icon={
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M5 4h4l2 5-3 2c1 3 3 5 6 6l2-3 5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
           </svg>
         }
@@ -2981,7 +3387,13 @@ function CampaignStatStrip({
         label="Meetings booked"
         value={meetings.length}
         icon={
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <rect x="3" y="5" width="18" height="16" rx="2" />
             <path d="M3 9h18M8 3v4M16 3v4" />
           </svg>
@@ -3078,7 +3490,8 @@ function ProspectAvatar({ first, last }: { first: string | null; last: string | 
 
 function LastTouchCell({ agg, row }: { agg: CallAgg | undefined; row: Row }) {
   if (agg && agg.lastStartedAt) {
-    const outcome = agg.lastOutcome || (agg.lastStatus === "completed" ? "completed" : agg.lastStatus);
+    const outcome =
+      agg.lastOutcome || (agg.lastStatus === "completed" ? "completed" : agg.lastStatus);
     return (
       <div className="flex items-center gap-1.5">
         <PhoneIcon className="h-3 w-3 text-muted-foreground" />
@@ -3136,7 +3549,9 @@ function ProspectTable({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02]">
-      <div className={`grid ${cols} items-center gap-3 border-b border-white/5 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground`}>
+      <div
+        className={`grid ${cols} items-center gap-3 border-b border-white/5 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground`}
+      >
         <div>
           <input
             type="checkbox"
@@ -3249,7 +3664,11 @@ function ProspectRowMenu({
         className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-white/5 hover:text-foreground"
         aria-label="Row actions"
       >
-        {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="text-base leading-none">⋯</span>}
+        {isBusy ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <span className="text-base leading-none">⋯</span>
+        )}
       </button>
       {open && (
         <div
@@ -3293,8 +3712,14 @@ function filterRowsByVerification(rows: Row[], filter: VerifyFilter): Row[] {
   if (filter === "all") return rows;
   if (filter === "unverified") return rows.filter((r) => !r.verification_status);
   if (filter === "deliverable") return rows.filter((r) => r.verification_status === "deliverable");
-  if (filter === "risky") return rows.filter((r) => r.verification_status === "risky" || r.verification_status === "unknown");
-  if (filter === "invalid") return rows.filter((r) => r.verification_status === "invalid" || r.verification_status === "disposable");
+  if (filter === "risky")
+    return rows.filter(
+      (r) => r.verification_status === "risky" || r.verification_status === "unknown",
+    );
+  if (filter === "invalid")
+    return rows.filter(
+      (r) => r.verification_status === "invalid" || r.verification_status === "disposable",
+    );
   return rows;
 }
 
@@ -3328,8 +3753,12 @@ function VerificationFilterBar({
   const counts = {
     all: rows.length,
     deliverable: rows.filter((r) => r.verification_status === "deliverable").length,
-    risky: rows.filter((r) => r.verification_status === "risky" || r.verification_status === "unknown").length,
-    invalid: rows.filter((r) => r.verification_status === "invalid" || r.verification_status === "disposable").length,
+    risky: rows.filter(
+      (r) => r.verification_status === "risky" || r.verification_status === "unknown",
+    ).length,
+    invalid: rows.filter(
+      (r) => r.verification_status === "invalid" || r.verification_status === "disposable",
+    ).length,
     unverified: rows.filter((r) => !r.verification_status).length,
   };
   const anyVerified = counts.deliverable + counts.risky + counts.invalid > 0;
@@ -3345,7 +3774,9 @@ function VerificationFilterBar({
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-[11px] uppercase tracking-wider text-muted-foreground">Email:</span>
+      <span className="mr-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+        Email:
+      </span>
       {chips.map((c) => {
         const active = value === c.key;
         return (

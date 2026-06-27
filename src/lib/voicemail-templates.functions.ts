@@ -26,7 +26,11 @@ const TOKEN_FIELD: Record<VoicemailToken, string> = {
 };
 
 const segmentSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("recorded"), storage_path: z.string().min(1), label: z.string().max(80).optional() }),
+  z.object({
+    type: z.literal("recorded"),
+    storage_path: z.string().min(1),
+    label: z.string().max(80).optional(),
+  }),
   z.object({ type: z.literal("variable"), token: z.enum(VOICEMAIL_TOKENS) }),
   z.object({ type: z.literal("silence"), ms: z.number().int().min(0).max(5000) }),
 ]);
@@ -44,7 +48,14 @@ export const listVoicemailTemplates = createServerFn({ method: "GET" })
       .select("id, name, segments, updated_at")
       .order("updated_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { templates: (data ?? []) as { id: string; name: string; segments: VoicemailSegment[]; updated_at: string }[] };
+    return {
+      templates: (data ?? []) as {
+        id: string;
+        name: string;
+        segments: VoicemailSegment[];
+        updated_at: string;
+      }[],
+    };
   });
 
 export const getVoicemailTemplate = createServerFn({ method: "POST" })
@@ -120,7 +131,11 @@ async function hashText(text: string): Promise<string> {
     .join("");
 }
 
-async function synthVariableClip(voiceId: string, text: string, apiKey: string): Promise<ArrayBuffer> {
+async function synthVariableClip(
+  voiceId: string,
+  text: string,
+  apiKey: string,
+): Promise<ArrayBuffer> {
   const res = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {

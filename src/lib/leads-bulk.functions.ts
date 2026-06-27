@@ -14,7 +14,12 @@ const PageInput = z.object({
 
 const IdsInput = z.object({
   filters: LEAD_FILTERS_SCHEMA,
-  limit: z.number().int().min(1).max(MAX_BULK + 1).optional(),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_BULK + 1)
+    .optional(),
 });
 
 const CountInput = z.object({ filters: LEAD_FILTERS_SCHEMA });
@@ -31,8 +36,12 @@ const _cache: Map<string, CacheEntry> =
 function cacheGet<T>(key: string): T | null {
   const hit = _cache.get(key);
   if (!hit) return null;
-  if (hit.expires < Date.now()) { _cache.delete(key); return null; }
-  _cache.delete(key); _cache.set(key, hit); // refresh LRU
+  if (hit.expires < Date.now()) {
+    _cache.delete(key);
+    return null;
+  }
+  _cache.delete(key);
+  _cache.set(key, hit); // refresh LRU
   return hit.value as T;
 }
 function cacheSet(key: string, value: unknown) {
@@ -141,7 +150,11 @@ export const fetchMatchingIdsBulk = createServerFn({ method: "POST" })
       }
       throw new Error(error.message);
     }
-    const payload = (res ?? {}) as { rows?: Array<{ id?: unknown }>; totalCount?: number; capped?: boolean };
+    const payload = (res ?? {}) as {
+      rows?: Array<{ id?: unknown }>;
+      totalCount?: number;
+      capped?: boolean;
+    };
     const ids = (payload.rows ?? [])
       .map((r) => r.id)
       .filter((id): id is string => typeof id === "string");

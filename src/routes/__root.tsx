@@ -74,22 +74,45 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "NexusAi" },
-      { name: "description", content: "NexusAi is an all-in-one sales tool for lead generation, email outreach, and LinkedIn engagement." },
+      {
+        name: "description",
+        content:
+          "NexusAi is an all-in-one sales tool for lead generation, email outreach, and LinkedIn engagement.",
+      },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "NexusAi" },
-      { property: "og:description", content: "NexusAi is an all-in-one sales tool for lead generation, email outreach, and LinkedIn engagement." },
+      {
+        property: "og:description",
+        content:
+          "NexusAi is an all-in-one sales tool for lead generation, email outreach, and LinkedIn engagement.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "NexusAi" },
-      { name: "twitter:description", content: "NexusAi is an all-in-one sales tool for lead generation, email outreach, and LinkedIn engagement." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27ed6ce1-2ecd-486e-b4e5-f2e0826c4772/id-preview-68a0f674--fd74efe5-cf58-41a7-bfa9-143b6e768fe0.lovable.app-1779072827161.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27ed6ce1-2ecd-486e-b4e5-f2e0826c4772/id-preview-68a0f674--fd74efe5-cf58-41a7-bfa9-143b6e768fe0.lovable.app-1779072827161.png" },
+      {
+        name: "twitter:description",
+        content:
+          "NexusAi is an all-in-one sales tool for lead generation, email outreach, and LinkedIn engagement.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27ed6ce1-2ecd-486e-b4e5-f2e0826c4772/id-preview-68a0f674--fd74efe5-cf58-41a7-bfa9-143b6e768fe0.lovable.app-1779072827161.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/27ed6ce1-2ecd-486e-b4e5-f2e0826c4772/id-preview-68a0f674--fd74efe5-cf58-41a7-bfa9-143b6e768fe0.lovable.app-1779072827161.png",
+      },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700;800&family=Epilogue:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Urbanist:wght@400;500;600;700;800&family=Epilogue:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap",
+      },
       {
         rel: "stylesheet",
         href: appCss,

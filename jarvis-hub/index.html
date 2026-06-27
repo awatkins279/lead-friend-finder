@@ -1,0 +1,1853 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jarvis Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --bg-deep: #07060d;
+        --bg-mid: #0c0a18;
+        --bg-light: #15122a;
+        --purple: #7c4dff;
+        --purple-light: #9a6bff;
+        --purple-pink: #d56bff;
+        --blue: #5b8cff;
+        --text: #eceaf6;
+        --text-mid: #bdb8d4;
+        --text-dim: #8a85a6;
+        --text-dim2: #9a96b3;
+        --border: rgba(150, 140, 200, 0.12);
+        --border-glow: rgba(160, 140, 255, 0.16);
+        --glass: linear-gradient(160deg, rgba(30, 28, 46, 0.55), rgba(16, 15, 26, 0.55));
+        --glass-hover: linear-gradient(160deg, rgba(35, 32, 52, 0.65), rgba(20, 18, 32, 0.65));
+        --green: #46e6a0;
+        --orange: #ff784a;
+        --card-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+      }
+
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes spinrev {
+        to {
+          transform: rotate(-360deg);
+        }
+      }
+      @keyframes glowpulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        50% {
+          transform: scale(1.08);
+          opacity: 1;
+        }
+      }
+      @keyframes corepulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.04);
+        }
+      }
+      @keyframes wave {
+        0%,
+        100% {
+          transform: scaleY(0.3);
+        }
+        50% {
+          transform: scaleY(1);
+        }
+      }
+
+      body {
+        background: var(--bg-deep);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        font-family: "Plus Jakarta Sans", sans-serif;
+      }
+
+      .app {
+        width: 1920px;
+        height: 1080px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        color: var(--text);
+        background: radial-gradient(130% 100% at 18% 8%, #15122a 0%, #0c0a18 42%, #07060d 100%);
+        margin: 0 auto;
+      }
+
+      /* Decorative orbs */
+      .orb {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+      .orb-a {
+        top: -160px;
+        left: 30%;
+        width: 760px;
+        height: 760px;
+        background: radial-gradient(circle, rgba(124, 77, 255, 0.22), transparent 65%);
+        filter: blur(20px);
+        z-index: 0;
+      }
+      .orb-b {
+        bottom: -220px;
+        right: -120px;
+        width: 680px;
+        height: 680px;
+        background: radial-gradient(circle, rgba(255, 120, 90, 0.12), transparent 62%);
+        filter: blur(20px);
+        z-index: 0;
+      }
+      .orb-c {
+        bottom: 120px;
+        left: -160px;
+        width: 560px;
+        height: 560px;
+        background: radial-gradient(circle, rgba(60, 120, 255, 0.14), transparent 62%);
+        filter: blur(20px);
+        z-index: 0;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        position: relative;
+        z-index: 2;
+        width: 92px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 30px 0 26px;
+        border-right: 1px solid rgba(150, 140, 200, 0.08);
+      }
+      .sidebar-logo {
+        width: 46px;
+        height: 46px;
+        border-radius: 15px;
+        background: conic-gradient(from 140deg, #5b8cff, #9a6bff, #d56bff, #5b8cff);
+        box-shadow: 0 0 26px rgba(150, 90, 255, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: float 6s ease-in-out infinite;
+      }
+      .sidebar-logo-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff, #cdbcff);
+        box-shadow: 0 0 12px #fff;
+      }
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 46px;
+        flex: 1;
+      }
+      .nav-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-dim);
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+      .nav-icon:hover {
+        color: var(--text);
+        background: rgba(124, 108, 255, 0.12);
+      }
+      .nav-icon.active {
+        background: linear-gradient(135deg, rgba(124, 108, 255, 0.32), rgba(90, 140, 255, 0.18));
+        border: 1px solid rgba(160, 140, 255, 0.3);
+        color: #d6ccff;
+        box-shadow: 0 8px 22px rgba(110, 70, 230, 0.3);
+      }
+      .sidebar-bottom {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+      .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c4dff, #ff7a6b);
+        box-shadow: 0 6px 16px rgba(124, 77, 255, 0.4);
+      }
+
+      /* Main */
+      .main {
+        position: relative;
+        z-index: 2;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 28px 34px 30px;
+        gap: 22px;
+        min-width: 0;
+      }
+
+      /* Topbar */
+      .topbar {
+        height: 58px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .topbar-greeting {
+        font-size: 13px;
+        letter-spacing: 0.5px;
+        color: var(--text-dim);
+      }
+      .topbar-title {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+      }
+      .topbar-title span {
+        background: linear-gradient(120deg, #8aa9ff, #c08bff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .topbar-date,
+      .topbar-status {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 16px;
+        border-radius: 14px;
+        font-size: 13px;
+      }
+      .topbar-date {
+        background: rgba(30, 28, 46, 0.5);
+        border: 1px solid var(--border);
+        color: var(--text-mid);
+      }
+      .topbar-status {
+        background: rgba(36, 255, 170, 0.06);
+        border: 1px solid rgba(70, 230, 160, 0.28);
+        color: #7df0c0;
+        font-weight: 500;
+      }
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 9px var(--green);
+        animation: blink 2.2s ease infinite;
+      }
+
+      /* Content */
+      .content {
+        flex: 1;
+        display: flex;
+        gap: 22px;
+        min-height: 0;
+      }
+
+      /* Cards */
+      .card {
+        position: relative;
+        border-radius: 24px;
+        background: var(--glass);
+        border: 1px solid var(--border);
+        box-shadow: var(--card-shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      /* Left Panel */
+      .left-panel {
+        width: 360px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        min-height: 0;
+      }
+
+      .system-card {
+        flex-shrink: 0;
+        padding: 22px 24px;
+      }
+      .system-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .system-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .system-badge {
+        font-size: 12px;
+        color: var(--text-dim);
+        padding: 4px 10px;
+        border-radius: 9px;
+        background: rgba(124, 108, 255, 0.12);
+      }
+      .system-gauge-row {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .gauge {
+        position: relative;
+        width: 104px;
+        height: 104px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .gauge-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: conic-gradient(
+          from -90deg,
+          #5b8cff,
+          #9a6bff 22%,
+          #d56bff 44%,
+          rgba(150, 140, 200, 0.12) 44%,
+          rgba(150, 140, 200, 0.12) 100%
+        );
+        mask: radial-gradient(circle, transparent 70%, #000 72%);
+        filter: drop-shadow(0 0 8px rgba(150, 110, 255, 0.4));
+        transition: background 0.8s;
+      }
+      .gauge-value {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        line-height: 1;
+      }
+      .gauge-num {
+        font-size: 26px;
+        font-weight: 700;
+      }
+      .gauge-num small {
+        font-size: 14px;
+        color: var(--text-dim2);
+      }
+      .gauge-label {
+        font-size: 10px;
+        color: var(--text-dim);
+        margin-top: 4px;
+        letter-spacing: 1px;
+      }
+
+      .bars {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+      }
+      .bar-row {
+      }
+      .bar-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      .bar-header span:first-child {
+        color: var(--text-dim2);
+      }
+      .bar-header span:last-child {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .bar-track {
+        height: 6px;
+        border-radius: 6px;
+        background: rgba(150, 140, 200, 0.12);
+        overflow: hidden;
+      }
+      .bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        background: linear-gradient(90deg, #5b8cff, #9a6bff, #d56bff);
+        box-shadow: 0 0 10px rgba(140, 100, 255, 0.5);
+        transition: width 0.8s;
+      }
+
+      .system-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(150, 140, 200, 0.1);
+      }
+      .stat {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .stat-label {
+        font-size: 11px;
+        color: var(--text-dim);
+        white-space: nowrap;
+      }
+      .stat-value {
+        font-size: 15px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      /* Tasks */
+      .tasks-card {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 22px 24px;
+      }
+      .tasks-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .tasks-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .tasks-count {
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+      .task-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .task {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+      }
+      .task-check {
+        width: 20px;
+        height: 20px;
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+      .task-check.done {
+        background: linear-gradient(135deg, #5b8cff, #9a6bff);
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(110, 80, 230, 0.4);
+      }
+      .task-check.pending {
+        border: 1.5px solid rgba(150, 140, 200, 0.3);
+      }
+      .task-text {
+        font-size: 14px;
+      }
+      .task-text.done {
+        color: #807b9a;
+        text-decoration: line-through;
+      }
+      .task-text.pending {
+        color: #dcd9ec;
+      }
+      .task-add {
+        margin-top: auto;
+        padding-top: 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text-dim2);
+        font-size: 13px;
+        border-top: 1px solid rgba(150, 140, 200, 0.1);
+        cursor: pointer;
+      }
+      .task-add-icon {
+        width: 22px;
+        height: 22px;
+        border-radius: 8px;
+        background: rgba(124, 108, 255, 0.16);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #b9a9ff;
+        font-size: 15px;
+      }
+
+      /* Center Jarvis */
+      .jarvis-panel {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        border-radius: 28px;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(165deg, rgba(28, 24, 52, 0.6), rgba(14, 12, 26, 0.62));
+        border: 1px solid var(--border-glow);
+        box-shadow:
+          0 30px 70px rgba(0, 0, 0, 0.5),
+          0 1px 0 rgba(255, 255, 255, 0.05) inset;
+        backdrop-filter: blur(16px);
+        padding: 24px 28px 26px;
+      }
+
+      .jarvis-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+      }
+      .jarvis-brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+      }
+      .jarvis-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c4dff, #d56bff);
+        box-shadow: 0 0 12px rgba(150, 90, 255, 0.8);
+      }
+      .jarvis-title {
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 3px;
+      }
+      .jarvis-listening {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 14px;
+        border-radius: 12px;
+        background: rgba(124, 108, 255, 0.12);
+        border: 1px solid rgba(160, 140, 255, 0.2);
+        font-size: 12px;
+        color: #c6bcf0;
+        letter-spacing: 1px;
+      }
+      .jarvis-listening-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #9a6bff;
+        box-shadow: 0 0 9px #9a6bff;
+        animation: blink 1.6s ease infinite;
+      }
+
+      /* Orb */
+      .orb-container {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+      .orb-stage {
+        position: relative;
+        width: 440px;
+        height: 440px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .orb-ring-1 {
+        position: absolute;
+        width: 460px;
+        height: 460px;
+        border-radius: 50%;
+        background: conic-gradient(
+          rgba(124, 77, 255, 0),
+          rgba(124, 77, 255, 0.55),
+          rgba(70, 140, 255, 0),
+          rgba(213, 107, 255, 0.5),
+          rgba(124, 77, 255, 0)
+        );
+        filter: blur(34px);
+        mask: radial-gradient(circle, transparent 12%, #000 40%, transparent 78%);
+        animation: spin 20s linear infinite;
+      }
+      .orb-ring-2 {
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 120deg,
+          rgba(70, 140, 255, 0),
+          rgba(70, 140, 255, 0.5),
+          rgba(213, 107, 255, 0),
+          rgba(124, 77, 255, 0.5),
+          rgba(70, 140, 255, 0)
+        );
+        filter: blur(40px);
+        mask: radial-gradient(circle, transparent 8%, #000 38%, transparent 74%);
+        animation: spinrev 28s linear infinite;
+      }
+      .orb-ticks {
+        position: absolute;
+        width: 430px;
+        height: 430px;
+        border-radius: 50%;
+        background: repeating-conic-gradient(
+          rgba(190, 150, 255, 0.5) 0deg,
+          rgba(190, 150, 255, 0.5) 0.35deg,
+          transparent 0.35deg,
+          transparent 4deg
+        );
+        mask: radial-gradient(circle, transparent 52%, #000 60%, transparent 80%);
+        filter: blur(0.4px);
+        animation: spin 80s linear infinite;
+        opacity: 0.7;
+      }
+      .orb-donut {
+        position: absolute;
+        width: 340px;
+        height: 340px;
+        border-radius: 50%;
+        background: conic-gradient(from -90deg, #5b8cff, #9a6bff, #d56bff, #5b8cff);
+        mask: radial-gradient(circle, transparent 71%, #000 72%, #000 73.5%, transparent 75%);
+        animation: spinrev 36s linear infinite;
+        opacity: 0.85;
+      }
+      .orb-dash {
+        position: absolute;
+        width: 268px;
+        height: 268px;
+        border-radius: 50%;
+        border: 1px dashed rgba(190, 160, 255, 0.32);
+        animation: spin 30s linear infinite;
+      }
+      .orb-glow {
+        position: absolute;
+        width: 230px;
+        height: 230px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(150, 100, 255, 0.5),
+          rgba(80, 120, 255, 0.18) 55%,
+          transparent 72%
+        );
+        animation: glowpulse 3.4s ease-in-out infinite;
+      }
+      .orb-core {
+        position: relative;
+        width: 158px;
+        height: 158px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 50% 40%,
+          #fff 0%,
+          #d9ccff 20%,
+          #9a6bff 48%,
+          #5b6bff 74%,
+          #2a2a78 100%
+        );
+        box-shadow:
+          0 0 70px rgba(150, 100, 255, 0.7),
+          0 0 130px rgba(90, 110, 255, 0.4),
+          0 0 34px rgba(255, 255, 255, 0.4) inset;
+        animation: corepulse 3.4s ease-in-out infinite;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .orb-core-dot {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff, #dccbff);
+        box-shadow: 0 0 26px #fff;
+      }
+
+      /* Jarvis bottom */
+      .jarvis-bottom {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .jarvis-prompt {
+        font-size: 15px;
+        color: #b6b0d4;
+        letter-spacing: 0.3px;
+      }
+      .jarvis-prompt strong {
+        color: var(--text);
+      }
+      .waveform {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 3px;
+        height: 46px;
+        width: 420px;
+      }
+      .wave-bar {
+        width: 4px;
+        border-radius: 3px;
+        background: linear-gradient(#c9b6ff, #6b86ff);
+        box-shadow: 0 0 7px rgba(150, 110, 255, 0.55);
+        transform-origin: center bottom;
+        animation: wave ease-in-out infinite;
+      }
+
+      /* Input */
+      .jarvis-input-row {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 13px 14px 13px 20px;
+        border-radius: 18px;
+        background: rgba(16, 14, 28, 0.7);
+        border: 1px solid rgba(160, 140, 255, 0.22);
+        box-shadow:
+          0 0 30px rgba(124, 77, 255, 0.14),
+          0 1px 0 rgba(255, 255, 255, 0.04) inset;
+      }
+      .input-plus {
+        width: 30px;
+        height: 30px;
+        border-radius: 10px;
+        background: rgba(124, 108, 255, 0.14);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #b9a9ff;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .input-field {
+        flex: 1;
+        font-size: 15px;
+        color: var(--text-dim);
+        background: none;
+        border: none;
+        outline: none;
+      }
+      .input-field::placeholder {
+        color: var(--text-dim);
+      }
+      .input-web {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 13px;
+        border-radius: 11px;
+        background: rgba(150, 140, 200, 0.08);
+        border: 1px solid rgba(150, 140, 200, 0.14);
+        font-size: 12px;
+        color: var(--text-dim2);
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .input-mic {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #5b8cff, #9a6bff, #d56bff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        cursor: pointer;
+        box-shadow: 0 8px 22px rgba(124, 77, 255, 0.45);
+      }
+
+      /* Right Panel */
+      .right-panel {
+        width: 360px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        min-height: 0;
+      }
+
+      .weather-card {
+        flex-shrink: 0;
+        padding: 22px 24px;
+      }
+      .weather-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .weather-loc {
+        font-size: 13px;
+        color: var(--text-dim);
+      }
+      .weather-temp {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        margin-top: 8px;
+      }
+      .weather-temp-num {
+        font-size: 46px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .weather-temp-deg {
+        font-size: 24px;
+        color: var(--text-mid);
+      }
+      .weather-desc {
+        font-size: 14px;
+        color: #c6bcf0;
+        margin-top: 6px;
+      }
+      .weather-icon {
+        position: relative;
+        width: 64px;
+        height: 50px;
+        flex-shrink: 0;
+      }
+      .weather-sun {
+        position: absolute;
+        top: 0;
+        right: 18px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #ffe7a3, #ffb74a);
+        box-shadow: 0 0 18px rgba(255, 183, 74, 0.6);
+      }
+      .weather-cloud-base {
+        position: absolute;
+        bottom: 8px;
+        left: 0;
+        width: 50px;
+        height: 24px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #cfd6e6, #9aa3bd);
+      }
+      .weather-cloud-bump {
+        position: absolute;
+        bottom: 18px;
+        left: 14px;
+        width: 26px;
+        height: 20px;
+        border-radius: 50%;
+        background: #dfe4f0;
+      }
+      .weather-rain {
+        position: absolute;
+        bottom: -4px;
+        width: 2px;
+        height: 7px;
+        border-radius: 2px;
+        background: #7cc0ff;
+      }
+      .weather-forecast {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(150, 140, 200, 0.1);
+      }
+      .forecast-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+      }
+      .forecast-time {
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+      .forecast-temp {
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .upcoming-card {
+        flex: 1;
+        min-height: 0;
+        padding: 22px 24px;
+      }
+      .upcoming-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .upcoming-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .upcoming-all {
+        font-size: 12px;
+        color: #9a8bff;
+        cursor: pointer;
+      }
+      .event-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .event {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .event-date {
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        background: rgba(124, 108, 255, 0.14);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        line-height: 1;
+      }
+      .event-date-day {
+        font-size: 16px;
+        font-weight: 700;
+        color: #c6bcf0;
+      }
+      .event-date-month {
+        font-size: 9px;
+        color: var(--text-dim);
+        letter-spacing: 1px;
+      }
+      .event-info {
+        flex: 1;
+      }
+      .event-name {
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .event-time {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-top: 3px;
+      }
+      .event-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        box-shadow: 0 0 8px currentColor;
+      }
+
+      .alerts-card {
+        flex: 1;
+        min-height: 0;
+        padding: 22px 24px;
+      }
+      .alerts-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .alerts-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .alerts-badge {
+        font-size: 11px;
+        color: #c6bcf0;
+        padding: 3px 9px;
+        border-radius: 8px;
+        background: rgba(124, 108, 255, 0.14);
+      }
+      .alert-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .alert {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .alert-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 5px;
+        flex-shrink: 0;
+        box-shadow: 0 0 8px currentColor;
+      }
+      .alert-text {
+        font-size: 14px;
+      }
+      .alert-time {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-top: 3px;
+      }
+
+      /* SVG icons */
+      .icon {
+        width: 22px;
+        height: 22px;
+      }
+      .icon-sm {
+        width: 17px;
+        height: 17px;
+      }
+      .icon-xs {
+        width: 13px;
+        height: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" id="app">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-dot"></div>
+        </div>
+        <div class="sidebar-nav">
+          <div class="nav-icon active" title="Home">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 11.5 12 4l8 7.5" />
+              <path d="M6 10v9h12v-9" />
+            </svg>
+          </div>
+          <div class="nav-icon" title="Chat">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 5h14v10H9l-4 4z" />
+            </svg>
+          </div>
+          <div class="nav-icon" title="Analytics">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 13l4-6 4 8 4-10 4 8" />
+            </svg>
+          </div>
+          <div class="nav-icon" title="Calendar">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="4" y="5" width="16" height="15" rx="2" />
+              <path d="M4 9.5h16M8 3v4M16 3v4" />
+            </svg>
+          </div>
+          <div class="nav-icon" title="Files">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 7h6l2 2h8v9H4z" />
+            </svg>
+          </div>
+        </div>
+        <div class="sidebar-bottom">
+          <div class="nav-icon" title="Settings">
+            <svg
+              class="icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 8.5h14M5 15.5h14" />
+              <circle cx="10" cy="8.5" r="2.1" fill="#0c0a18" />
+              <circle cx="15" cy="15.5" r="2.1" fill="#0c0a18" />
+            </svg>
+          </div>
+          <div class="user-avatar"></div>
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="main">
+        <!-- Topbar -->
+        <div class="topbar">
+          <div>
+            <div class="topbar-greeting" id="greeting">Good afternoon</div>
+            <div class="topbar-title">
+              It's <span id="time">--:-- --</span> — all systems nominal
+            </div>
+          </div>
+          <div class="topbar-right">
+            <div class="topbar-date" id="date">Saturday, 27 Jun</div>
+            <div class="topbar-status">
+              <div class="status-dot"></div>
+              HERMES-T online
+            </div>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+          <!-- Left Panel -->
+          <div class="left-panel">
+            <!-- System Status -->
+            <div class="card system-card">
+              <div class="system-header">
+                <div class="system-title">System Status</div>
+                <div class="system-badge">Optimal</div>
+              </div>
+              <div class="system-gauge-row">
+                <div class="gauge">
+                  <div class="gauge-ring"></div>
+                  <div class="gauge-value">
+                    <div class="gauge-num" id="loadPct">44<small>%</small></div>
+                    <div class="gauge-label">LOAD</div>
+                  </div>
+                </div>
+                <div class="bars">
+                  <div class="bar-row">
+                    <div class="bar-header"><span>CPU</span><span id="cpuPct">20%</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width: 20%"></div></div>
+                  </div>
+                  <div class="bar-row">
+                    <div class="bar-header"><span>GPU</span><span id="gpuPct">46%</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width: 46%"></div></div>
+                  </div>
+                  <div class="bar-row">
+                    <div class="bar-header"><span>Memory</span><span id="memPct">66%</span></div>
+                    <div class="bar-track"><div class="bar-fill" style="width: 66%"></div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="system-stats">
+                <div class="stat">
+                  <span class="stat-label">Core temp</span
+                  ><span class="stat-value" id="coreTemp">53°C</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-label">Uptime</span
+                  ><span class="stat-value" id="uptime">00:00</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-label">Latency</span
+                  ><span class="stat-value" id="latency">29ms</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tasks -->
+            <div class="card tasks-card">
+              <div class="tasks-header">
+                <div class="tasks-title">Tasks</div>
+                <div class="tasks-count" id="taskCount">0 / 0 done</div>
+              </div>
+              <div class="task-list" id="taskList"></div>
+              <div class="task-add" id="addTask">
+                <div class="task-add-icon">+</div>
+                Add a task
+              </div>
+            </div>
+          </div>
+
+          <!-- Center Jarvis -->
+          <div class="jarvis-panel">
+            <div class="jarvis-header">
+              <div class="jarvis-brand">
+                <div class="jarvis-dot"></div>
+                <div class="jarvis-title">J.A.R.V.I.S</div>
+              </div>
+              <div class="jarvis-listening">
+                <div class="jarvis-listening-dot"></div>
+                LISTENING
+              </div>
+            </div>
+
+            <div class="orb-container">
+              <div class="orb-stage">
+                <div class="orb-ring-1"></div>
+                <div class="orb-ring-2"></div>
+                <div class="orb-ticks"></div>
+                <div class="orb-donut"></div>
+                <div class="orb-dash"></div>
+                <div class="orb-glow"></div>
+                <div class="orb-core">
+                  <div class="orb-core-dot"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="jarvis-bottom">
+              <div class="jarvis-prompt">"<strong>Ready</strong> — how can I help?"</div>
+              <div class="waveform" id="waveform"></div>
+            </div>
+
+            <div class="jarvis-input-row">
+              <div class="input-plus">
+                <svg
+                  class="icon-sm"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+              <input class="input-field" placeholder="Ask Jarvis anything…" id="jarvisInput" />
+              <div class="input-web">
+                <svg
+                  class="icon-xs"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3c2.5 2.5 2.5 15 0 18M12 3c-2.5 2.5-2.5 15 0 18" />
+                </svg>
+                Web
+              </div>
+              <div class="input-mic" id="micBtn">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="1.9"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Panel -->
+          <div class="right-panel">
+            <!-- Weather -->
+            <div class="card weather-card">
+              <div class="weather-top">
+                <div>
+                  <div class="weather-loc" id="weatherLoc">Today · --</div>
+                  <div class="weather-temp">
+                    <span class="weather-temp-num" id="weatherTemp">--</span
+                    ><span class="weather-temp-deg">°</span>
+                  </div>
+                  <div class="weather-desc" id="weatherDesc">--</div>
+                </div>
+                <div class="weather-icon">
+                  <div class="weather-sun"></div>
+                  <div class="weather-cloud-base"></div>
+                  <div class="weather-cloud-bump"></div>
+                  <div class="weather-rain" style="bottom: -2px; left: 14px"></div>
+                  <div class="weather-rain" style="bottom: -4px; left: 26px"></div>
+                  <div class="weather-rain" style="bottom: -2px; left: 38px"></div>
+                </div>
+              </div>
+              <div class="weather-forecast" id="weatherForecast"></div>
+            </div>
+
+            <!-- Upcoming -->
+            <div class="card upcoming-card">
+              <div class="upcoming-header">
+                <div class="upcoming-title">Upcoming</div>
+                <div class="upcoming-all">View all</div>
+              </div>
+              <div class="event-list" id="eventList"></div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="card alerts-card">
+              <div class="alerts-header">
+                <div class="alerts-title">Alerts</div>
+                <div class="alerts-badge" id="alertCount">0 new</div>
+              </div>
+              <div class="alert-list" id="alertList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ==================== JARVIS HUB ENGINE ====================
+      const WS_URL = `ws://${location.hostname}:3456`;
+      let ws, sessionId;
+      let isListening = false;
+      let recognition = null;
+      let synth = window.speechSynthesis;
+      let currentResponse = "";
+
+      // ====== WebSocket ======
+      function connectWS() {
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+          console.log("[Jarvis] Connected to Hermes backend");
+          document.querySelector(".jarvis-prompt").innerHTML =
+            '"<strong>Connected</strong> — how can I help?"';
+          document.querySelector(".jarvis-listening").innerHTML =
+            '<div class="jarvis-listening-dot"></div>ONLINE';
+          document.querySelector(".jarvis-listening-dot").style.background = "#46e6a0";
+          document.querySelector(".jarvis-listening-dot").style.boxShadow = "0 0 9px #46e6a0";
+        };
+        ws.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+          switch (msg.type) {
+            case "welcome":
+              sessionId = msg.sessionId;
+              addAlert(msg.text, "System", "#46e6a0");
+              break;
+            case "thinking":
+              updatePrompt('"...<strong>Thinking</strong>..."');
+              pulseOrb(true);
+              break;
+            case "chunk":
+              currentResponse += msg.text;
+              updatePrompt('"<strong>' + truncate(currentResponse, 60) + '</strong>"');
+              break;
+            case "done":
+              currentResponse = "";
+              pulseOrb(false);
+              updatePrompt('"<strong>Ready</strong> — how can I help?"');
+              if (msg.text) {
+                addAlert(
+                  msg.text.substring(0, 100) + (msg.text.length > 100 ? "..." : ""),
+                  "Jarvis",
+                  "#9a6bff",
+                );
+                // Fallback to browser TTS if no ElevenLabs audio
+                if (!msg.audio) speakResponse(msg.text);
+              }
+              break;
+            case "audio":
+              // ElevenLabs TTS audio - play it
+              if (msg.audio) {
+                const blob = new Blob([Uint8Array.from(atob(msg.audio), (c) => c.charCodeAt(0))], {
+                  type: "audio/mp3",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = new Audio(url);
+                a.volume = 0.9;
+                a.play().catch(() => {});
+                setTimeout(() => URL.revokeObjectURL(url), 30000);
+              }
+              break;
+            case "alert":
+              addAlert(msg.text, msg.source, msg.dotColor || "#9a6bff");
+              break;
+            case "error":
+              updatePrompt('"<strong>Error</strong> — ' + truncate(msg.text, 40) + '"');
+              pulseOrb(false);
+              addAlert(msg.text, "Error", "#ff784a");
+              break;
+          }
+        };
+        ws.onclose = () => {
+          document.querySelector(".jarvis-prompt").innerHTML =
+            '"<strong>Disconnected</strong> — retrying..."';
+          document.querySelector(".jarvis-listening").innerHTML =
+            '<div class="jarvis-listening-dot" style="background:#ff784a;box-shadow:0 0 9px #ff784a"></div>OFFLINE';
+          setTimeout(connectWS, 3000);
+        };
+        ws.onerror = () => {};
+      }
+
+      function sendChat(text) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          addAlert(
+            "Not connected to backend. Start the server with: bun run server.js",
+            "System",
+            "#ff784a",
+          );
+          return;
+        }
+        ws.send(JSON.stringify({ type: "chat", sessionId, text }));
+        addAlert(`You: "${text}"`, "You", "#5b8cff");
+      }
+
+      function truncate(s, n) {
+        return s.length > n ? s.substring(0, n) + "..." : s;
+      }
+      function updatePrompt(html) {
+        document.querySelector(".jarvis-prompt").innerHTML = html;
+      }
+      function pulseOrb(on) {
+        const core = document.querySelector(".orb-core");
+        const glow = document.querySelector(".orb-glow");
+        if (on) {
+          core.style.animation = "corepulse 0.6s ease-in-out infinite";
+          glow.style.animation = "glowpulse 0.6s ease-in-out infinite";
+        } else {
+          core.style.animation = "corepulse 3.4s ease-in-out infinite";
+          glow.style.animation = "glowpulse 3.4s ease-in-out infinite";
+        }
+      }
+
+      // ====== Voice Output (Jarvis-style) ======
+      const JARVIS_VOICE_CANDIDATES = [
+        "Google UK English Male", // Best: refined British male (Chrome)
+        "Microsoft George", // British English male (Windows)
+        "Daniel", // British English male (macOS/iOS)
+        "Arthur", // British English male (macOS)
+        "Google UK English Female", // Fallback British
+        "Microsoft Hazel", // British English female (Windows)
+        "Google US English Male", // American fallback
+        "Male", // Any male voice
+      ];
+
+      function speakResponse(text) {
+        if (!synth) return;
+        synth.cancel();
+
+        // Clean text for Jarvis-style speech
+        let clean = text
+          .replace(/[*_`#~]/g, "") // strip markdown
+          .replace(/\n{2,}/g, ". ") // double newlines = sentence break
+          .replace(/\n/g, " ") // single newlines = space
+          .replace(/\s{2,}/g, " ") // collapse whitespace
+          .replace(/\b(\w+)\.(\w+)\b/g, "$1 dot $2") // expand URLs/abbrevs
+          .replace(/https?:\/\/\S+/gi, "") // strip URLs
+          .trim()
+          .substring(0, 800);
+
+        // Remove emojis and special unicode
+        clean = clean.replace(
+          /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+          "",
+        );
+
+        const utter = new SpeechSynthesisUtterance(clean);
+
+        // Jarvis voice parameters: calm, measured, slightly deep
+        utter.rate = 0.92; // deliberate, unhurried delivery
+        utter.pitch = 0.94; // slightly deeper for gravitas
+        utter.volume = 0.85; // calm volume, never shouting
+
+        // Select the best Jarvis-like voice available
+        const voices = synth.getVoices();
+        let selected = null;
+        for (const candidate of JARVIS_VOICE_CANDIDATES) {
+          selected = voices.find((v) => v.name.includes(candidate));
+          if (selected) break;
+        }
+        if (!selected) selected = voices[0];
+
+        if (selected) utter.voice = selected;
+        synth.speak(utter);
+
+        // Log which voice was selected
+        console.log(
+          `[Jarvis Voice] Using: ${selected?.name || "default"} | rate=${utter.rate} pitch=${utter.pitch}`,
+        );
+      }
+
+      // ====== Voice Input ======
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = "en-US";
+        recognition.onresult = (e) => {
+          const text = e.results[0][0].transcript;
+          document.getElementById("jarvisInput").value = text;
+          addAlert(`Voice: "${text}"`, "Mic", "#46e6a0");
+          sendChat(text);
+          stopListening();
+        };
+        recognition.onerror = (e) => {
+          addAlert("Voice error: " + e.error, "Mic", "#ff784a");
+          stopListening();
+        };
+        recognition.onend = () => {
+          stopListening();
+        };
+      }
+
+      function startListening() {
+        if (!recognition) {
+          addAlert("Speech recognition not supported in this browser", "System", "#ff784a");
+          return;
+        }
+        if (isListening) return;
+        isListening = true;
+        document.getElementById("micBtn").style.background =
+          "linear-gradient(135deg, #ff784a, #ff4444)";
+        document.querySelector(".jarvis-listening").innerHTML =
+          '<div class="jarvis-listening-dot" style="animation:blink 0.4s ease infinite"></div>LISTENING';
+        recognition.start();
+      }
+
+      function stopListening() {
+        isListening = false;
+        document.getElementById("micBtn").style.background =
+          "linear-gradient(135deg, #5b8cff, #9a6bff, #d56bff)";
+        document.querySelector(".jarvis-listening").innerHTML =
+          '<div class="jarvis-listening-dot"></div>ONLINE';
+        document.querySelector(".jarvis-listening-dot").style.background = "#46e6a0";
+        document.querySelector(".jarvis-listening-dot").style.boxShadow = "0 0 9px #46e6a0";
+      }
+
+      // ====== Time ======
+      function updateTime() {
+        const now = new Date();
+        const h = now.getHours();
+        const m = now.getMinutes().toString().padStart(2, "0");
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 || 12;
+        document.getElementById("time").textContent = `${h12}:${m} ${ampm}`;
+        const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+        document.getElementById("greeting").textContent = greeting;
+        const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const months = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        document.getElementById("date").textContent =
+          `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;
+      }
+      updateTime();
+      setInterval(updateTime, 60000);
+
+      // ====== Waveform ======
+      const waveEl = document.getElementById("waveform");
+      const BAR_COUNT = 50;
+      const waveBars = [];
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const bar = document.createElement("div");
+        bar.className = "wave-bar";
+        bar.style.animationDuration = `${0.7 + Math.random() * 0.6}s`;
+        bar.style.animationDelay = `-${(i * 0.05).toFixed(2)}s`;
+        bar.style.height = `${5 + Math.random() * 41}px`;
+        waveEl.appendChild(bar);
+        waveBars.push(bar);
+      }
+
+      // Animate waveform more actively when speaking
+      let waveActive = false;
+      setInterval(() => {
+        const multiplier = waveActive ? 1.8 : 0.5;
+        waveBars.forEach((b) => {
+          const baseH = parseFloat(b.style.height);
+          const newH = Math.max(4, Math.min(46, baseH + (Math.random() - 0.5) * 20 * multiplier));
+          b.style.height = newH + "px";
+        });
+      }, 150);
+
+      // ====== Uptime ======
+      const startTime = Date.now();
+      function updateUptime() {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const hrs = Math.floor(elapsed / 3600);
+        const mins = Math.floor((elapsed % 3600) / 60);
+        document.getElementById("uptime").textContent =
+          `${hrs}:${mins.toString().padStart(2, "0")}`;
+      }
+      setInterval(updateUptime, 1000);
+      updateUptime();
+
+      // ====== Tasks ======
+      const tasks = [];
+      function renderTasks() {
+        const list = document.getElementById("taskList");
+        const done = tasks.filter((t) => t.done).length;
+        document.getElementById("taskCount").textContent = `${done} / ${tasks.length} done`;
+        list.innerHTML = tasks
+          .map(
+            (t, i) => `
+    <div class="task" data-idx="${i}">
+      <div class="task-check ${t.done ? "done" : "pending"}" onclick="toggleTask(${i})">${t.done ? "\u2713" : ""}</div>
+      <div class="task-text ${t.done ? "done" : "pending"}">${t.text}</div>
+    </div>
+  `,
+          )
+          .join("");
+      }
+      function toggleTask(i) {
+        tasks[i].done = !tasks[i].done;
+        renderTasks();
+      }
+
+      document.getElementById("addTask").addEventListener("click", () => {
+        const text = prompt("New task:");
+        if (text && text.trim()) {
+          tasks.push({ text: text.trim(), done: false });
+          renderTasks();
+        }
+      });
+
+      // ====== Alerts ======
+      function addAlert(text, source, dotColor) {
+        const alerts = document.getElementById("alertList");
+        const div = document.createElement("div");
+        div.className = "alert";
+        div.innerHTML = `
+    <div class="alert-dot" style="background:${dotColor};color:${dotColor}"></div>
+    <div><div class="alert-text">${text}</div><div class="alert-time">${source} \u00b7 just now</div></div>
+  `;
+        alerts.prepend(div);
+        if (alerts.children.length > 20) alerts.lastChild.remove();
+        const count = alerts.children.length;
+        document.getElementById("alertCount").textContent = `${count} new`;
+      }
+
+      // ====== Weather ======
+      document.getElementById("weatherLoc").textContent = "Today \u00b7 Buford, GA";
+      document.getElementById("weatherTemp").textContent = "--";
+      document.getElementById("weatherDesc").textContent = "--";
+      const fcEl = document.getElementById("weatherForecast");
+      fcEl.innerHTML = ["Now", "1h", "2h", "3h", "4h"]
+        .map(
+          (t) =>
+            `<div class="forecast-item"><span class="forecast-time">${t}</span><span class="forecast-temp">--\u00b0</span></div>`,
+        )
+        .join("");
+
+      async function fetchWeather() {
+        try {
+          const res = await fetch(
+            "https://api.open-meteo.com/v1/forecast?latitude=34.12&longitude=-83.99&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto&forecast_hours=5",
+          );
+          const data = await res.json();
+          const codes = {
+            0: "Clear",
+            1: "Mainly clear",
+            2: "Partly cloudy",
+            3: "Overcast",
+            45: "Fog",
+            51: "Light drizzle",
+            53: "Drizzle",
+            55: "Heavy drizzle",
+            61: "Light rain",
+            63: "Rain",
+            65: "Heavy rain",
+            80: "Showers",
+          };
+          document.getElementById("weatherTemp").textContent = Math.round(
+            data.current.temperature_2m,
+          );
+          document.getElementById("weatherDesc").textContent =
+            codes[data.current.weather_code] || "--";
+          fcEl.innerHTML = data.hourly.time
+            .slice(0, 5)
+            .map((t, i) => {
+              const h = new Date(t).getHours();
+              return `<div class="forecast-item"><span class="forecast-time">${i === 0 ? "Now" : h + ":00"}</span><span class="forecast-temp">${Math.round(data.hourly.temperature_2m[i])}\u00b0</span></div>`;
+            })
+            .join("");
+        } catch (e) {
+          /* keep placeholder */
+        }
+      }
+      fetchWeather();
+
+      // ====== Events ======
+      const events = [];
+      function renderEvents() {
+        document.getElementById("eventList").innerHTML = events.length
+          ? events
+              .map((e, i) => {
+                const d = new Date(e.date);
+                const colors = ["#9a6bff", "#5b8cff", "#ff8a6b"];
+                return `
+    <div class="event">
+      <div class="event-date">
+        <span class="event-date-day">${d.getDate()}</span>
+        <span class="event-date-month">${["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][d.getMonth()]}</span>
+      </div>
+      <div class="event-info">
+        <div class="event-name">${e.title}</div>
+        <div class="event-time">${e.time}</div>
+      </div>
+      <div class="event-dot" style="background:${colors[i % 3]};color:${colors[i % 3]}"></div>
+    </div>`;
+              })
+              .join("")
+          : '<div style="color:var(--text-dim);font-size:13px;text-align:center;padding:20px">No upcoming events</div>';
+      }
+      renderEvents();
+
+      // ====== Keyboard shortcuts ======
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey && e.key === "m") {
+          e.preventDefault();
+          startListening();
+        }
+        if (e.key === "Escape") {
+          stopListening();
+          synth.cancel();
+        }
+      });
+
+      // ====== Chat Input ======
+      const input = document.getElementById("jarvisInput");
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && input.value.trim()) {
+          const text = input.value.trim();
+          input.value = "";
+          sendChat(text);
+        }
+      });
+
+      // ====== Mic Button ======
+      document.getElementById("micBtn").addEventListener("click", () => {
+        if (isListening) {
+          stopListening();
+        } else {
+          startListening();
+        }
+      });
+
+      // ====== System stats ======
+      setInterval(() => {
+        const cpu = 15 + Math.floor(Math.random() * 30);
+        const gpu = 35 + Math.floor(Math.random() * 25);
+        const mem = 55 + Math.floor(Math.random() * 20);
+        const load = Math.round((cpu + gpu + mem) / 3);
+        const temp = 48 + Math.floor(Math.random() * 12);
+
+        document.getElementById("cpuPct").textContent = cpu + "%";
+        document.getElementById("gpuPct").textContent = gpu + "%";
+        document.getElementById("memPct").textContent = mem + "%";
+        document.getElementById("loadPct").innerHTML = load + "<small>%</small>";
+        document.getElementById("coreTemp").textContent = temp + "\u00b0C";
+        document.getElementById("latency").textContent = 20 + Math.floor(Math.random() * 20) + "ms";
+
+        const fills = document.querySelectorAll(".bar-fill");
+        if (fills[0]) fills[0].style.width = cpu + "%";
+        if (fills[1]) fills[1].style.width = gpu + "%";
+        if (fills[2]) fills[2].style.width = mem + "%";
+
+        const pct = load / 100;
+        const angle = pct * 180;
+        const ring = document.querySelector(".gauge-ring");
+        if (ring)
+          ring.style.background = `conic-gradient(from -90deg, #5b8cff, #9a6bff ${angle * 0.5}deg, #d56bff ${angle}deg, rgba(150,140,200,0.12) ${angle}deg, rgba(150,140,200,0.12) 100%)`;
+      }, 3000);
+
+      // ====== Init ======
+      connectWS();
+
+      // Load voices for speech
+      if (synth) synth.getVoices();
+      if (synth && synth.onvoiceschanged !== undefined)
+        synth.onvoiceschanged = () => synth.getVoices();
+
+      console.log(
+        "%c\u2588\u2588\u2588 JARVIS HUB \u2588\u2588\u2588",
+        "color:#9a6bff;font-size:20px;",
+      );
+      console.log("%cConnected to Hermes Agent via WebSocket", "color:#8a85a6;");
+      console.log("%cPress Ctrl+M for voice | Type + Enter for chat", "color:#5b8cff;");
+    </script>
+  </body>
+</html>

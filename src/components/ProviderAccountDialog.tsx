@@ -63,7 +63,8 @@ export function ProviderAccountDialog({
     if (existing) {
       setLabel(existing.label ?? `My ${provider.name}`);
       setFromNumber(existing.from_number ?? "");
-      const creds = ((existing as unknown as { credentials?: Record<string, string> }).credentials) ?? {};
+      const creds =
+        (existing as unknown as { credentials?: Record<string, string> }).credentials ?? {};
       setValues(creds);
     } else {
       setLabel(`My ${provider.name}`);
@@ -113,16 +114,14 @@ export function ProviderAccountDialog({
             {existing ? `Edit ${provider.name}` : `Connect ${provider.name}`}
           </DialogTitle>
           <DialogDescription>
-            Enter your {provider.name} API credentials. They're stored securely and used to place calls from your account.
+            Enter your {provider.name} API credentials. They're stored securely and used to place
+            calls from your account.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2 text-sm">
           {provider.id === "ringcentral" && existing && (
-            <RingCentralAuthStatus
-              phoneAccountId={existing.id}
-              credentials={values}
-            />
+            <RingCentralAuthStatus phoneAccountId={existing.id} credentials={values} />
           )}
 
           {provider.instructions && (
@@ -147,8 +146,7 @@ export function ProviderAccountDialog({
               const isPassword = f.type === "password";
               const isShown = !!shown[f.key];
               const value = values[f.key] ?? "";
-              const setValue = (v: string) =>
-                setValues((prev) => ({ ...prev, [f.key]: v }));
+              const setValue = (v: string) => setValues((prev) => ({ ...prev, [f.key]: v }));
 
               return (
                 <Field
@@ -187,7 +185,9 @@ export function ProviderAccountDialog({
                       placeholder={f.placeholder}
                       onChange={(e) => setValue(e.target.value)}
                       className={`font-mono text-xs ${
-                        isPassword && !isShown ? "[-webkit-text-security:disc] [text-security:disc]" : ""
+                        isPassword && !isShown
+                          ? "[-webkit-text-security:disc] [text-security:disc]"
+                          : ""
                       } break-all`}
                       spellCheck={false}
                       autoCapitalize="off"
@@ -211,7 +211,9 @@ export function ProviderAccountDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button onClick={save} disabled={saving}>
             {saving ? "Saving…" : existing ? "Save changes" : "Save"}
           </Button>
@@ -332,16 +334,46 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
       <>
         <p className="font-semibold">How to connect</p>
         <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-muted-foreground">
-          <li>Go to <a className="underline" href="https://developers.ringcentral.com" target="_blank" rel="noreferrer">developers.ringcentral.com</a> → Console → Apps</li>
-          <li>Create a <em>REST API App</em> → platform <em>Browser-Based / SPA</em>, auth <em>3-legged OAuth</em></li>
-          <li>Add scope <code>VoIP Calling</code> (plus <code>Read Accounts</code>, <code>Read Call Log</code>)</li>
-          <li>Set OAuth redirect URI to <code>https://lead-friend-finder.lovable.app/api/ringcentral/oauth/callback</code></li>
-          <li>Paste the <em>Client ID</em> + <em>Client Secret</em> below, click Save, then click <strong>Sign in with RingCentral</strong>.</li>
+          <li>
+            Go to{" "}
+            <a
+              className="underline"
+              href="https://developers.ringcentral.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              developers.ringcentral.com
+            </a>{" "}
+            → Console → Apps
+          </li>
+          <li>
+            Create a <em>REST API App</em> → platform <em>Browser-Based / SPA</em>, auth{" "}
+            <em>3-legged OAuth</em>
+          </li>
+          <li>
+            Add scope <code>VoIP Calling</code> (plus <code>Read Accounts</code>,{" "}
+            <code>Read Call Log</code>)
+          </li>
+          <li>
+            Set OAuth redirect URI to{" "}
+            <code>https://lead-friend-finder.lovable.app/api/ringcentral/oauth/callback</code>
+          </li>
+          <li>
+            Paste the <em>Client ID</em> + <em>Client Secret</em> below, click Save, then click{" "}
+            <strong>Sign in with RingCentral</strong>.
+          </li>
         </ol>
       </>
     ),
     fields: [
-      { key: "server_url", label: "Server URL", placeholder: "https://platform.ringcentral.com", required: true, helper: "Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox." },
+      {
+        key: "server_url",
+        label: "Server URL",
+        placeholder: "https://platform.ringcentral.com",
+        required: true,
+        helper:
+          "Use platform.ringcentral.com for production, platform.devtest.ringcentral.com for sandbox.",
+      },
       { key: "client_id", label: "Client ID", required: true },
       { key: "client_secret", label: "Client Secret", type: "password", required: true },
     ],
@@ -351,7 +383,14 @@ export const PROVIDER_SPECS: Record<string, ProviderSpec> = {
     name: "Vonage",
     fields: [
       { key: "application_id", label: "Application ID", required: true },
-      { key: "private_key", label: "Private key (PEM)", type: "password", required: true, multiline: true, helper: "Paste the full PEM block including the BEGIN/END lines." },
+      {
+        key: "private_key",
+        label: "Private key (PEM)",
+        type: "password",
+        required: true,
+        multiline: true,
+        helper: "Paste the full PEM block including the BEGIN/END lines.",
+      },
       { key: "api_key", label: "API key", required: true },
       { key: "api_secret", label: "API secret", type: "password", required: true },
     ],

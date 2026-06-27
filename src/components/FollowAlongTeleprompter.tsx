@@ -16,15 +16,94 @@ type Segment = {
 };
 
 const STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "for", "to", "of", "in", "on", "at",
-  "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
-  "do", "does", "did", "will", "would", "should", "could", "can", "may",
-  "this", "that", "these", "those", "i", "you", "he", "she", "we", "they",
-  "it", "my", "your", "our", "their", "if", "then", "so", "with", "from",
-  "by", "as", "about", "into", "out", "up", "down", "what", "when", "where",
-  "why", "how", "okay", "ok", "yeah", "right", "just", "really", "very",
-  "thats", "im", "youre", "ill", "ive", "dont", "doesnt", "isnt", "wasnt",
-  "got", "get", "going", "gonna", "want", "like", "know", "think", "make",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "for",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "should",
+  "could",
+  "can",
+  "may",
+  "this",
+  "that",
+  "these",
+  "those",
+  "i",
+  "you",
+  "he",
+  "she",
+  "we",
+  "they",
+  "it",
+  "my",
+  "your",
+  "our",
+  "their",
+  "if",
+  "then",
+  "so",
+  "with",
+  "from",
+  "by",
+  "as",
+  "about",
+  "into",
+  "out",
+  "up",
+  "down",
+  "what",
+  "when",
+  "where",
+  "why",
+  "how",
+  "okay",
+  "ok",
+  "yeah",
+  "right",
+  "just",
+  "really",
+  "very",
+  "thats",
+  "im",
+  "youre",
+  "ill",
+  "ive",
+  "dont",
+  "doesnt",
+  "isnt",
+  "wasnt",
+  "got",
+  "get",
+  "going",
+  "gonna",
+  "want",
+  "like",
+  "know",
+  "think",
+  "make",
 ]);
 
 function tokenize(s: string): string[] {
@@ -37,7 +116,14 @@ function tokenize(s: string): string[] {
 
 function buildSegments(script: CallScript): Segment[] {
   const out: Segment[] = [];
-  if (script.opener) out.push({ key: "opener", label: "Opener", body: script.opener, tokens: tokenize(script.opener), highlight: true });
+  if (script.opener)
+    out.push({
+      key: "opener",
+      label: "Opener",
+      body: script.opener,
+      tokens: tokenize(script.opener),
+      highlight: true,
+    });
   script.talk_track?.forEach((s, i) =>
     out.push({ key: `tt-${i}`, label: s.heading, body: s.body, tokens: tokenize(s.body) }),
   );
@@ -53,7 +139,14 @@ function buildSegments(script: CallScript): Segment[] {
   script.qualifying_questions?.forEach((q, i) =>
     out.push({ key: `qq-${i}`, label: `Qualifying Q${i + 1}`, body: q, tokens: tokenize(q) }),
   );
-  if (script.close) out.push({ key: "close", label: "Close", body: script.close, tokens: tokenize(script.close), highlight: true });
+  if (script.close)
+    out.push({
+      key: "close",
+      label: "Close",
+      body: script.close,
+      tokens: tokenize(script.close),
+      highlight: true,
+    });
   return out;
 }
 
@@ -74,7 +167,8 @@ export function FollowAlongTeleprompter({
 }) {
   const segments = useMemo(() => buildSegments(script), [script]);
 
-  const { turns, suggestion, suggesting, listening, error, start, stop, requestSuggestion } = coaching;
+  const { turns, suggestion, suggesting, listening, error, start, stop, requestSuggestion } =
+    coaching;
 
   // Track which segments the rep has effectively "said" — needs ≥ 40% token overlap
   // OR ≥ 4 matched significant tokens.
@@ -234,7 +328,11 @@ export function FollowAlongTeleprompter({
                         isCurrent ? "from-[oklch(0.78_0.16_210)]" : "from-[oklch(0.70_0.18_290)]"
                       } to-transparent`}
                     />
-                    <span className={isCurrent ? "text-[oklch(0.88_0.10_210)]" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        isCurrent ? "text-[oklch(0.88_0.10_210)]" : "text-muted-foreground"
+                      }
+                    >
                       {s.label}
                     </span>
                     {isCurrent && !overrideActive && (
@@ -243,7 +341,9 @@ export function FollowAlongTeleprompter({
                       </span>
                     )}
                     {isDone && (
-                      <span className="font-mono text-[9px] tracking-[0.2em] text-emerald-400/70">✓ said</span>
+                      <span className="font-mono text-[9px] tracking-[0.2em] text-emerald-400/70">
+                        ✓ said
+                      </span>
                     )}
                   </div>
 
@@ -314,9 +414,13 @@ function LiveCoachCard({
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-[oklch(0.78_0.16_210/0.55)] bg-gradient-to-br from-[oklch(0.20_0.05_290/0.6)] to-[oklch(0.16_0.04_270/0.6)] p-6 shadow-[0_0_60px_-12px_oklch(0.70_0.18_290/0.7)]">
-      <span className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${intentColor}`} />
+      <span
+        className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${intentColor}`}
+      />
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className={`inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${intentColor} px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white`}>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${intentColor} px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white`}
+        >
           <Sparkles className="h-3 w-3" /> AI Coach · say this
         </span>
         <div className="flex items-center gap-1">
@@ -342,7 +446,9 @@ function LiveCoachCard({
 
       {suggestion.why && (
         <p className="mt-3 text-[11px] text-muted-foreground">
-          <span className="font-semibold uppercase tracking-wider text-[oklch(0.78_0.16_210)]">Why · </span>
+          <span className="font-semibold uppercase tracking-wider text-[oklch(0.78_0.16_210)]">
+            Why ·{" "}
+          </span>
           {suggestion.why}
         </p>
       )}

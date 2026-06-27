@@ -75,7 +75,9 @@ export function CallCoachingDialog({
     if (!open) return;
     setStyleId(initialStyleId);
     setEnabled(initialEnabled);
-    fetchStyles().then((r) => setStyles(r.styles)).catch((e) => toast.error(String(e.message ?? e)));
+    fetchStyles()
+      .then((r) => setStyles(r.styles))
+      .catch((e) => toast.error(String(e.message ?? e)));
     fetchDocs({ data: { list_id: listId } })
       .then((r) => setDocs(r.docs as KnowledgeDoc[]))
       .catch(() => {});
@@ -84,7 +86,9 @@ export function CallCoachingDialog({
   const save = async () => {
     setBusy(true);
     try {
-      await saveCoach({ data: { list_id: listId, coaching_style_id: styleId, ai_copilot_enabled: enabled } });
+      await saveCoach({
+        data: { list_id: listId, coaching_style_id: styleId, ai_copilot_enabled: enabled },
+      });
       toast.success("Coaching settings saved");
       onSaved();
       onOpenChange(false);
@@ -161,7 +165,8 @@ export function CallCoachingDialog({
     }
   };
 
-  const selectedStyle = styles.find((s) => s.id === styleId) ?? styles.find((s) => s.is_default) ?? null;
+  const selectedStyle =
+    styles.find((s) => s.id === styleId) ?? styles.find((s) => s.is_default) ?? null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -171,8 +176,9 @@ export function CallCoachingDialog({
             <Sparkles className="h-4 w-4 text-primary" /> AI Co-Pilot
           </DialogTitle>
           <DialogDescription>
-            During a live call the AI listens to both sides, follows along with the script, and tells the rep what to
-            say next — grounded in the trainer style and the product knowledge below.
+            During a live call the AI listens to both sides, follows along with the script, and
+            tells the rep what to say next — grounded in the trainer style and the product knowledge
+            below.
           </DialogDescription>
         </DialogHeader>
 
@@ -182,8 +188,8 @@ export function CallCoachingDialog({
             <div>
               <div className="font-medium">Enable AI co-pilot for this campaign</div>
               <div className="text-xs text-muted-foreground">
-                When ON, calls in this campaign route through Twilio so the browser can hear both sides for
-                transcription. When OFF, calls behave as they do today.
+                When ON, calls in this campaign route through Twilio so the browser can hear both
+                sides for transcription. When OFF, calls behave as they do today.
               </div>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -217,9 +223,9 @@ export function CallCoachingDialog({
               <Label className="text-sm font-medium">Product knowledge (this campaign)</Label>
             </div>
             <p className="text-xs text-muted-foreground">
-              Paste case studies, battlecards, pricing notes, or any context about what you're selling. The AI pulls
-              the most relevant passages into every live suggestion during the call. (Text only for now — .txt / .md
-              files or paste below. PDF support coming.)
+              Paste case studies, battlecards, pricing notes, or any context about what you're
+              selling. The AI pulls the most relevant passages into every live suggestion during the
+              call. (Text only for now — .txt / .md files or paste below. PDF support coming.)
             </p>
 
             <div className="space-y-2 rounded-xl border border-border/50 p-3">
@@ -270,7 +276,12 @@ export function CallCoachingDialog({
                         {d.chunk_count} chunks · {d.status}
                       </div>
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => remove(d.id)} disabled={busy}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => remove(d.id)}
+                      disabled={busy}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </li>

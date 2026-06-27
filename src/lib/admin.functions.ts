@@ -31,25 +31,30 @@ export const getAdminOverview = createServerFn({ method: "GET" })
     const [{ data: subs }, { data: plans }, { data: ledger }, { count: customerCount }] =
       await Promise.all([
         supabaseAdmin.from("subscriptions").select("plan_id, billing_cycle, status, user_id"),
-        supabaseAdmin.from("plans").select("id, name, annual_price_cents, quarterly_price_cents, monthly_credits"),
+        supabaseAdmin
+          .from("plans")
+          .select("id, name, annual_price_cents, quarterly_price_cents, monthly_credits"),
         supabaseAdmin.from("credit_ledger").select("amount"),
         supabaseAdmin.from("profiles").select("id", { count: "exact", head: true }),
       ]);
 
     const planMap = new Map((plans ?? []).map((p: any) => [p.id, p]));
-    const active = (subs ?? []).filter((s: any) => s.status === "active" || s.status === "trialing");
+    const active = (subs ?? []).filter(
+      (s: any) => s.status === "active" || s.status === "trialing",
+    );
 
     let mrrCents = 0;
-    const byPlanMap = new Map<string, { planId: string; planName: string; count: number; mrrCents: number }>();
+    const byPlanMap = new Map<
+      string,
+      { planId: string; planName: string; count: number; mrrCents: number }
+    >();
     for (const s of active) {
       const plan: any = planMap.get(s.plan_id);
       if (!plan) continue;
       const annual = plan.annual_price_cents ?? 0;
       const quarterly = plan.quarterly_price_cents ?? 0;
       const monthly =
-        s.billing_cycle === "quarterly"
-          ? Math.round(quarterly / 3)
-          : Math.round(annual / 12);
+        s.billing_cycle === "quarterly" ? Math.round(quarterly / 3) : Math.round(annual / 12);
       mrrCents += monthly;
       const entry = byPlanMap.get(plan.id) ?? {
         planId: plan.id,
@@ -133,7 +138,7 @@ export const listAdminCustomers = createServerFn({ method: "GET" })
         fullName: p.full_name,
         createdAt: p.created_at,
         planId: s?.plan_id ?? null,
-        planName: s?.plan_id ? planMap.get(s.plan_id) ?? s.plan_id : null,
+        planName: s?.plan_id ? (planMap.get(s.plan_id) ?? s.plan_id) : null,
         billingCycle: s?.billing_cycle ?? null,
         status: s?.status ?? null,
         currentPeriodEnd: s?.current_period_end ?? null,

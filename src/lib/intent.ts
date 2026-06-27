@@ -3,6 +3,8 @@
 // (uses the AI gateway key). Best-effort: returns null on any failure so it can
 // never block inbound ingestion.
 
+import { chatCompletion } from "@/lib/ai-client";
+
 export const INBOX_INTENTS = [
   "interested",
   "meeting_booked",
@@ -32,30 +34,20 @@ Intents:
 export async function classifyIntent(opts: {
   text: string;
   subject?: string | null;
-  apiKey: string;
 }): Promise<{ intent: InboxIntent; confidence: number } | null> {
   const body = (opts.text ?? "").slice(0, 4000).trim();
-  if (!body || !opts.apiKey) return null;
+  if (!body) return null;
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM },
-          {
-            role: "user",
-            content: `${opts.subject ? `Subject: ${opts.subject}\n\n` : ""}${body}`,
-          },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 60,
-      }),
+    const content = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: `${opts.subject ? `Subject: ${opts.subject}\\n\\n` : ""}${body}` },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 60,
     });
-    if (!res.ok) return null;
-    const payload = await res.json();
-    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
+
     let parsed: { intent?: string; confidence?: number };
     try {
       parsed = JSON.parse(content);

@@ -91,7 +91,13 @@ function SdrAgentsPage() {
     m === "draft" ? "Draft only" : m === "approve" ? "Approve to send" : "Full auto-send";
 
   const speedLabel = (s: string) =>
-    s === "instant" ? "Instant" : s === "fast" ? "5–30 min" : s === "medium" ? "30 min – 2 hr" : "2–8 hr";
+    s === "instant"
+      ? "Instant"
+      : s === "fast"
+        ? "5–30 min"
+        : s === "medium"
+          ? "30 min – 2 hr"
+          : "2–8 hr";
 
   return (
     <div className="p-8">
@@ -130,7 +136,8 @@ function SdrAgentsPage() {
           <p className="text-sm font-medium">No SDR agents yet</p>
           <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
             Click <strong>New SDR agent</strong> to build your first reply bot. You'll set its
-            voice, what it's selling, response speed, and upload any reference docs it should pull from.
+            voice, what it's selling, response speed, and upload any reference docs it should pull
+            from.
           </p>
         </Card>
       ) : (
@@ -182,11 +189,7 @@ function SdrAgentsPage() {
                     <Button variant="outline" size="sm" onClick={() => handleEdit(a.id)}>
                       <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(a.id, a.name)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(a.id, a.name)}>
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </div>

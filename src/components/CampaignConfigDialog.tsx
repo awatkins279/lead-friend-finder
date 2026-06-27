@@ -51,8 +51,12 @@ export type CampaignConfig = {
 };
 
 const SEND_DAYS = [
-  { value: 1, label: "Mon" }, { value: 2, label: "Tue" }, { value: 3, label: "Wed" },
-  { value: 4, label: "Thu" }, { value: 5, label: "Fri" }, { value: 6, label: "Sat" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
   { value: 0, label: "Sun" },
 ];
 
@@ -89,25 +93,31 @@ export function CampaignConfigDialog({
     setMailboxSearch("");
     (async () => {
       const sb = supabase as any;
-      const [{ data: accts }, { data: assigned }, { data: listRow }, { data: authData }] = await Promise.all([
-        supabase
-          .from("email_accounts")
-          .select("id, email_address")
-          .order("email_address", { ascending: true }),
-        sb.from("list_email_accounts").select("email_account_id").eq("list_id", listId),
-        sb
-          .from("lists")
-          .select("unsubscribe_footer_enabled, unsubscribe_footer_text")
-          .eq("id", listId)
-          .maybeSingle(),
-        supabase.auth.getUser(),
-      ]);
+      const [{ data: accts }, { data: assigned }, { data: listRow }, { data: authData }] =
+        await Promise.all([
+          supabase
+            .from("email_accounts")
+            .select("id, email_address")
+            .order("email_address", { ascending: true }),
+          sb.from("list_email_accounts").select("email_account_id").eq("list_id", listId),
+          sb
+            .from("lists")
+            .select("unsubscribe_footer_enabled, unsubscribe_footer_text")
+            .eq("id", listId)
+            .maybeSingle(),
+          supabase.auth.getUser(),
+        ]);
       if (!initial.positive_reply_alert_email && authData.user?.email) {
-        setCfg((current) => ({ ...current, positive_reply_alert_email: authData.user?.email ?? null }));
+        setCfg((current) => ({
+          ...current,
+          positive_reply_alert_email: authData.user?.email ?? null,
+        }));
       }
       setMailboxes((accts ?? []) as { id: string; email_address: string }[]);
       setSelectedMailboxes(
-        new Set(((assigned ?? []) as { email_account_id: string }[]).map((r) => r.email_account_id)),
+        new Set(
+          ((assigned ?? []) as { email_account_id: string }[]).map((r) => r.email_account_id),
+        ),
       );
       if (listRow) {
         setFooterEnabled((listRow as any).unsubscribe_footer_enabled ?? true);
@@ -132,8 +142,10 @@ export function CampaignConfigDialog({
     if (!cfg.sender_name?.trim()) return toast.error("Your name required");
     if (!cfg.what_selling?.trim()) return toast.error("What you're selling required");
     if (!cfg.sending_days.length) return toast.error("Choose at least one sending day");
-    if (cfg.sending_start_time >= cfg.sending_end_time) return toast.error("Sending end time must be after the start time");
-    if (cfg.positive_reply_alerts_enabled && !cfg.positive_reply_alert_email?.trim()) return toast.error("Enter an email for positive reply alerts");
+    if (cfg.sending_start_time >= cfg.sending_end_time)
+      return toast.error("Sending end time must be after the start time");
+    if (cfg.positive_reply_alerts_enabled && !cfg.positive_reply_alert_email?.trim())
+      return toast.error("Enter an email for positive reply alerts");
     setSaving(true);
     const { error } = await supabase
       .from("lists")
@@ -235,7 +247,9 @@ export function CampaignConfigDialog({
           <div className="space-y-4 rounded-lg border border-primary/30 bg-primary/5 p-4">
             <div>
               <p className="text-sm font-semibold">Sending schedule</p>
-              <p className="text-xs text-muted-foreground">Choose exactly when this campaign is allowed to send.</p>
+              <p className="text-xs text-muted-foreground">
+                Choose exactly when this campaign is allowed to send.
+              </p>
             </div>
             <Field label="Sending days">
               <div className="flex flex-wrap gap-2">
@@ -247,7 +261,14 @@ export function CampaignConfigDialog({
                       type="button"
                       size="sm"
                       variant={selected ? "default" : "outline"}
-                      onClick={() => update("sending_days", selected ? cfg.sending_days.filter((value) => value !== day.value) : [...cfg.sending_days, day.value])}
+                      onClick={() =>
+                        update(
+                          "sending_days",
+                          selected
+                            ? cfg.sending_days.filter((value) => value !== day.value)
+                            : [...cfg.sending_days, day.value],
+                        )
+                      }
                     >
                       {day.label}
                     </Button>
@@ -256,11 +277,28 @@ export function CampaignConfigDialog({
               </div>
             </Field>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Start time"><Input type="time" value={cfg.sending_start_time} onChange={(e) => update("sending_start_time", e.target.value)} /></Field>
-              <Field label="End time"><Input type="time" value={cfg.sending_end_time} onChange={(e) => update("sending_end_time", e.target.value)} /></Field>
+              <Field label="Start time">
+                <Input
+                  type="time"
+                  value={cfg.sending_start_time}
+                  onChange={(e) => update("sending_start_time", e.target.value)}
+                />
+              </Field>
+              <Field label="End time">
+                <Input
+                  type="time"
+                  value={cfg.sending_end_time}
+                  onChange={(e) => update("sending_end_time", e.target.value)}
+                />
+              </Field>
               <Field label="Time zone">
-                <Select value={cfg.sending_timezone} onValueChange={(value) => update("sending_timezone", value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={cfg.sending_timezone}
+                  onValueChange={(value) => update("sending_timezone", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="America/Detroit">Eastern</SelectItem>
                     <SelectItem value="America/Chicago">Central</SelectItem>
@@ -274,8 +312,34 @@ export function CampaignConfigDialog({
               </Field>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Days between follow-ups"><Input type="number" min={1} max={30} value={cfg.follow_up_delay_days} onChange={(e) => update("follow_up_delay_days", Math.max(1, Math.min(30, Number(e.target.value) || 1)))} /></Field>
-              <Field label="Minutes between each send"><Input type="number" min={1} max={1440} value={cfg.email_gap_minutes} onChange={(e) => update("email_gap_minutes", Math.max(1, Math.min(1440, Number(e.target.value) || 1)))} /></Field>
+              <Field label="Days between follow-ups">
+                <Input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={cfg.follow_up_delay_days}
+                  onChange={(e) =>
+                    update(
+                      "follow_up_delay_days",
+                      Math.max(1, Math.min(30, Number(e.target.value) || 1)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Minutes between each send">
+                <Input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={cfg.email_gap_minutes}
+                  onChange={(e) =>
+                    update(
+                      "email_gap_minutes",
+                      Math.max(1, Math.min(1440, Number(e.target.value) || 1)),
+                    )
+                  }
+                />
+              </Field>
             </div>
           </div>
 
@@ -319,10 +383,14 @@ export function CampaignConfigDialog({
                 value={String(cfg.num_emails)}
                 onValueChange={(v) => update("num_emails", parseInt(v))}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                    <SelectItem key={n} value={String(n)}>{n} email{n > 1 ? "s" : ""}</SelectItem>
+                    <SelectItem key={n} value={String(n)}>
+                      {n} email{n > 1 ? "s" : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -349,7 +417,9 @@ export function CampaignConfigDialog({
                 value={cfg.personalization_level}
                 onValueChange={(v) => update("personalization_level", v)}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">Low — mostly merge fields</SelectItem>
                   <SelectItem value="medium">Medium — role + industry refs</SelectItem>
@@ -359,7 +429,9 @@ export function CampaignConfigDialog({
             </Field>
             <Field label="CTA type" hint="AI picks the best CTA per email when set to Auto.">
               <Select value={cfg.cta_type} onValueChange={(v) => update("cta_type", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="auto">Let AI choose per email</SelectItem>
                   <SelectItem value="meeting">Always ask for meeting</SelectItem>
@@ -399,12 +471,28 @@ export function CampaignConfigDialog({
             />
           </Field>
 
-          <Field label="Positive reply alerts" hint="When a prospect is interested or books a meeting, send an alert containing their reply and the AI SDR's response. Add this email to your phone's mail app for phone alerts.">
+          <Field
+            label="Positive reply alerts"
+            hint="When a prospect is interested or books a meeting, send an alert containing their reply and the AI SDR's response. Add this email to your phone's mail app for phone alerts."
+          >
             <div className="flex items-center gap-2">
-              <Switch checked={cfg.positive_reply_alerts_enabled} onCheckedChange={(value) => update("positive_reply_alerts_enabled", value)} />
-              <span className="text-sm text-muted-foreground">{cfg.positive_reply_alerts_enabled ? "On" : "Off"}</span>
+              <Switch
+                checked={cfg.positive_reply_alerts_enabled}
+                onCheckedChange={(value) => update("positive_reply_alerts_enabled", value)}
+              />
+              <span className="text-sm text-muted-foreground">
+                {cfg.positive_reply_alerts_enabled ? "On" : "Off"}
+              </span>
             </div>
-            {cfg.positive_reply_alerts_enabled && <Input type="email" value={cfg.positive_reply_alert_email ?? ""} onChange={(e) => update("positive_reply_alert_email", e.target.value)} placeholder="you@company.com" className="mt-2" />}
+            {cfg.positive_reply_alerts_enabled && (
+              <Input
+                type="email"
+                value={cfg.positive_reply_alert_email ?? ""}
+                onChange={(e) => update("positive_reply_alert_email", e.target.value)}
+                placeholder="you@company.com"
+                className="mt-2"
+              />
+            )}
           </Field>
 
           <Field
@@ -487,8 +575,12 @@ export function CampaignConfigDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save campaign"}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save campaign"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

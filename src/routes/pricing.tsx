@@ -65,10 +65,7 @@ function PricingPage() {
           </div>
           <span className="font-semibold">NexusAi</span>
         </Link>
-        <Link
-          to="/login"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
+        <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">
           Sign in
         </Link>
       </header>
@@ -124,9 +121,7 @@ function PricingPage() {
                     Most popular
                   </div>
                 )}
-                <div className="mb-1 text-sm font-medium text-muted-foreground">
-                  {plan.name}
-                </div>
+                <div className="mb-1 text-sm font-medium text-muted-foreground">{plan.name}</div>
                 <div className="mb-1 text-3xl font-semibold tracking-tight">
                   {plan.monthly_credits.toLocaleString()}
                   <span className="ml-1 text-sm font-normal text-muted-foreground">
@@ -139,17 +134,13 @@ function PricingPage() {
                   <span className="text-sm text-muted-foreground">{cadence}</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground line-through">
-                    {dollars(original)}
-                  </span>
+                  <span className="text-muted-foreground line-through">{dollars(original)}</span>
                   <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
                     50% off
                   </span>
                 </div>
                 {!isAnnual && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Billed every 4 months
-                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">Billed every 4 months</div>
                 )}
 
                 <ul className="my-6 space-y-2.5">
@@ -162,10 +153,7 @@ function PricingPage() {
                 </ul>
 
                 <Button asChild className="w-full" variant={featured ? "default" : "outline"}>
-                  <Link
-                    to="/checkout"
-                    search={{ priceId: `${plan.id}_annual` } as any}
-                  >
+                  <Link to="/checkout" search={{ priceId: `${plan.id}_annual` } as any}>
                     {isAnnual ? "Get started" : "Talk to sales"}
                   </Link>
                 </Button>

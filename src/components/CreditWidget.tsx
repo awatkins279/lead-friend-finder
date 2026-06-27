@@ -55,9 +55,7 @@ export function CreditWidget() {
     <div className="glass-panel mb-3 rounded-xl p-3">
       <div className="mb-2 flex items-center justify-between text-xs">
         <span className="font-medium">{data.planName}</span>
-        <span className="text-muted-foreground">
-          {data.remaining.toLocaleString()} left
-        </span>
+        <span className="text-muted-foreground">{data.remaining.toLocaleString()} left</span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
         <div

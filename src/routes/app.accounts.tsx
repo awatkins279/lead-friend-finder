@@ -51,7 +51,12 @@ type PhoneProvider = {
 };
 
 const PHONE_PROVIDERS: PhoneProvider[] = [
-  { id: "twilio", name: "Twilio", description: "Programmable Voice — most popular, pay-as-you-go.", available: true },
+  {
+    id: "twilio",
+    name: "Twilio",
+    description: "Programmable Voice — most popular, pay-as-you-go.",
+    available: true,
+  },
 ];
 
 function AccountsPage() {
@@ -78,10 +83,11 @@ function AccountsPage() {
       setLoading(false);
       return;
     }
-    const [{ data: phones, error: phoneErr }, { data: emails, error: emailErr }] = await Promise.all([
-      supabase.from("user_phone_accounts").select("*").order("created_at", { ascending: false }),
-      supabase.from("email_accounts").select("*").order("created_at", { ascending: false }),
-    ]);
+    const [{ data: phones, error: phoneErr }, { data: emails, error: emailErr }] =
+      await Promise.all([
+        supabase.from("user_phone_accounts").select("*").order("created_at", { ascending: false }),
+        supabase.from("email_accounts").select("*").order("created_at", { ascending: false }),
+      ]);
     if (phoneErr) toast.error(phoneErr.message);
     if (emailErr) toast.error(emailErr.message);
     setAccounts((phones ?? []) as PhoneAccountRow[]);
@@ -150,7 +156,9 @@ function AccountsPage() {
           <TabsTrigger value="phone" className="gap-2">
             <Phone className="h-3.5 w-3.5" /> Phone accounts
             {accountCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{accountCount}</Badge>
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                {accountCount}
+              </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="email" className="gap-2">
@@ -191,16 +199,16 @@ function AccountsPage() {
           ) : (
             <div className="space-y-3">
               {accounts.map((a) => {
-                const prov = ((a as unknown as { provider?: string }).provider ?? "twilio") as string;
+                const prov = ((a as unknown as { provider?: string }).provider ??
+                  "twilio") as string;
                 const isTwilio = prov === "twilio";
                 const needsNumber = !a.from_number || a.from_number === PLACEHOLDER;
                 const needsTwiml = !a.twilio_twiml_app_sid;
-                const creds = ((a as unknown as { credentials?: Record<string, string> }).credentials) ?? {};
+                const creds =
+                  (a as unknown as { credentials?: Record<string, string> }).credentials ?? {};
                 const spec = PROVIDER_SPECS[prov];
                 const missingCustom =
-                  !isTwilio && spec
-                    ? spec.fields.some((f) => f.required && !creds[f.key])
-                    : false;
+                  !isTwilio && spec ? spec.fields.some((f) => f.required && !creds[f.key]) : false;
                 const ready = isTwilio ? !needsNumber && !needsTwiml : !missingCustom;
                 const providerLabel = isTwilio ? "Twilio" : (spec?.name ?? prov);
                 return (
@@ -209,7 +217,9 @@ function AccountsPage() {
                       <div className="flex items-center gap-2">
                         <Phone className="h-4 w-4 text-primary" />
                         <span className="font-medium">{a.label}</span>
-                        <Badge variant="outline" className="text-[10px]">{providerLabel}</Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          {providerLabel}
+                        </Badge>
                         {ready ? (
                           <Badge variant="secondary" className="gap-1">
                             <CheckCircle2 className="h-3 w-3" /> Ready
@@ -223,7 +233,10 @@ function AccountsPage() {
                       <div className="mt-1 text-xs text-muted-foreground">
                         From: {needsNumber ? <em>not set yet</em> : a.from_number}
                         {isTwilio && (
-                          <>{" · "}TwiML App: {needsTwiml ? <em>not set</em> : a.twilio_twiml_app_sid}</>
+                          <>
+                            {" · "}TwiML App:{" "}
+                            {needsTwiml ? <em>not set</em> : a.twilio_twiml_app_sid}
+                          </>
                         )}
                       </div>
                     </div>
@@ -275,7 +288,9 @@ function AccountsPage() {
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-primary" />
                       <span className="font-medium">{a.email_address}</span>
-                      <Badge variant="outline" className="text-[10px] capitalize">{providerLabel(a.provider)}</Badge>
+                      <Badge variant="outline" className="text-[10px] capitalize">
+                        {providerLabel(a.provider)}
+                      </Badge>
                       {a.status === "active" ? (
                         <Badge variant="secondary" className="gap-1">
                           <CheckCircle2 className="h-3 w-3" /> Ready
@@ -304,8 +319,8 @@ function AccountsPage() {
         {/* BUY MORE TAB — order more domains + mailboxes */}
         <TabsContent value="buy" className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Order more done-for-you domains &amp; mailboxes. We set them up and add them
-            straight to your account.
+            Order more done-for-you domains &amp; mailboxes. We set them up and add them straight to
+            your account.
           </p>
           <OrderAccounts showHeader={false} />
         </TabsContent>
@@ -334,9 +349,13 @@ function AccountsPage() {
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{p.name}</span>
                   {p.available ? (
-                    <Badge variant="secondary" className="text-[10px]">Available</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      Available
+                    </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-[10px]">Coming soon</Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      Coming soon
+                    </Badge>
                   )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{p.description}</p>
@@ -366,7 +385,6 @@ function AccountsPage() {
           existing={editing}
         />
       )}
-
     </div>
   );
 }

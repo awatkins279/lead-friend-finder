@@ -90,7 +90,10 @@ export function AdminOrders() {
   const pushFn = useServerFn(pushOrderToInstantly);
   const assignFn = useServerFn(assignOrderToCustomer);
 
-  const load = () => listFn().then((r) => setOrders(r.orders)).catch((e) => toast.error((e as Error).message));
+  const load = () =>
+    listFn()
+      .then((r) => setOrders(r.orders))
+      .catch((e) => toast.error((e as Error).message));
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -155,7 +158,13 @@ export function AdminOrders() {
       await saveFn({ data: { orderId, fulfillment: { mailboxes: toPayload() } } });
       const r = await pushFn({ data: { orderId } });
       if (r.ok) toast.success("All mailboxes added to Instantly + warming up");
-      else toast.error(`Some failed: ${r.results.filter((x) => !x.ok).map((x) => `${x.email} (${x.error})`).join("; ")}`);
+      else
+        toast.error(
+          `Some failed: ${r.results
+            .filter((x) => !x.ok)
+            .map((x) => `${x.email} (${x.error})`)
+            .join("; ")}`,
+        );
       load();
     } catch (e) {
       toast.error((e as Error).message);
@@ -195,7 +204,9 @@ export function AdminOrders() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{o.customer_email ?? o.user_id.slice(0, 8)}</span>
-                  <Badge variant="outline" className={`text-[10px] ${s.cls}`}>{s.label}</Badge>
+                  <Badge variant="outline" className={`text-[10px] ${s.cls}`}>
+                    {s.label}
+                  </Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   {o.domain_count} domain(s) · {o.mailbox_count} mailbox(es) ·{" "}
@@ -205,18 +216,35 @@ export function AdminOrders() {
                 <div className="mt-1 text-xs text-muted-foreground">
                   Requested:{" "}
                   {requested
-                    .map((d) => `${d.mailboxes?.map((m: any) => m.account).join(", ")}@${d.name}.${d.tld}`)
+                    .map(
+                      (d) =>
+                        `${d.mailboxes?.map((m: any) => m.account).join(", ")}@${d.name}.${d.tld}`,
+                    )
                     .join("  ·  ")}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {o.status === "paid" && (
-                  <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => setStatus(o.id, "in_progress")}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === o.id}
+                    onClick={() => setStatus(o.id, "in_progress")}
+                  >
                     Start
                   </Button>
                 )}
-                <Button size="sm" variant={isOpen ? "secondary" : "default"} onClick={() => openFulfill(o)}>
-                  Fulfill {isOpen ? <ChevronUp className="ml-1 h-3.5 w-3.5" /> : <ChevronDown className="ml-1 h-3.5 w-3.5" />}
+                <Button
+                  size="sm"
+                  variant={isOpen ? "secondary" : "default"}
+                  onClick={() => openFulfill(o)}
+                >
+                  Fulfill{" "}
+                  {isOpen ? (
+                    <ChevronUp className="ml-1 h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -224,33 +252,108 @@ export function AdminOrders() {
             {isOpen && (
               <div className="mt-4 space-y-3 border-t pt-4">
                 <p className="text-xs text-muted-foreground">
-                  Enter the <strong>real</strong> mailbox + SMTP/IMAP credentials you created, then push
-                  them to Instantly and assign to the customer. (Passwords are stored on the order only,
-                  never shown to the customer.)
+                  Enter the <strong>real</strong> mailbox + SMTP/IMAP credentials you created, then
+                  push them to Instantly and assign to the customer. (Passwords are stored on the
+                  order only, never shown to the customer.)
                 </p>
                 {form.map((m, i) => (
                   <div key={i} className="rounded-md border p-3">
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      <Field label="Email"><Input value={m.email} onChange={(e) => setMb(i, { email: e.target.value })} /></Field>
-                      <Field label="Display name"><Input value={m.display_name} onChange={(e) => setMb(i, { display_name: e.target.value })} /></Field>
-                      <Field label="Provider code"><Input value={m.provider_code} onChange={(e) => setMb(i, { provider_code: e.target.value })} placeholder="from Instantly" /></Field>
+                      <Field label="Email">
+                        <Input
+                          value={m.email}
+                          onChange={(e) => setMb(i, { email: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Display name">
+                        <Input
+                          value={m.display_name}
+                          onChange={(e) => setMb(i, { display_name: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Provider code">
+                        <Input
+                          value={m.provider_code}
+                          onChange={(e) => setMb(i, { provider_code: e.target.value })}
+                          placeholder="from Instantly"
+                        />
+                      </Field>
                       <div />
-                      <Field label="SMTP host"><Input value={m.smtp_host} onChange={(e) => setMb(i, { smtp_host: e.target.value })} placeholder="smtp.provider.com" /></Field>
-                      <Field label="SMTP port"><Input value={m.smtp_port} onChange={(e) => setMb(i, { smtp_port: e.target.value })} /></Field>
-                      <Field label="SMTP username"><Input value={m.smtp_username} onChange={(e) => setMb(i, { smtp_username: e.target.value })} /></Field>
-                      <Field label="SMTP password"><Input type="password" value={m.smtp_password} onChange={(e) => setMb(i, { smtp_password: e.target.value })} /></Field>
-                      <Field label="IMAP host"><Input value={m.imap_host} onChange={(e) => setMb(i, { imap_host: e.target.value })} placeholder="imap.provider.com" /></Field>
-                      <Field label="IMAP port"><Input value={m.imap_port} onChange={(e) => setMb(i, { imap_port: e.target.value })} /></Field>
-                      <Field label="IMAP username"><Input value={m.imap_username} onChange={(e) => setMb(i, { imap_username: e.target.value })} /></Field>
-                      <Field label="IMAP password"><Input type="password" value={m.imap_password} onChange={(e) => setMb(i, { imap_password: e.target.value })} /></Field>
+                      <Field label="SMTP host">
+                        <Input
+                          value={m.smtp_host}
+                          onChange={(e) => setMb(i, { smtp_host: e.target.value })}
+                          placeholder="smtp.provider.com"
+                        />
+                      </Field>
+                      <Field label="SMTP port">
+                        <Input
+                          value={m.smtp_port}
+                          onChange={(e) => setMb(i, { smtp_port: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="SMTP username">
+                        <Input
+                          value={m.smtp_username}
+                          onChange={(e) => setMb(i, { smtp_username: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="SMTP password">
+                        <Input
+                          type="password"
+                          value={m.smtp_password}
+                          onChange={(e) => setMb(i, { smtp_password: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="IMAP host">
+                        <Input
+                          value={m.imap_host}
+                          onChange={(e) => setMb(i, { imap_host: e.target.value })}
+                          placeholder="imap.provider.com"
+                        />
+                      </Field>
+                      <Field label="IMAP port">
+                        <Input
+                          value={m.imap_port}
+                          onChange={(e) => setMb(i, { imap_port: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="IMAP username">
+                        <Input
+                          value={m.imap_username}
+                          onChange={(e) => setMb(i, { imap_username: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="IMAP password">
+                        <Input
+                          type="password"
+                          value={m.imap_password}
+                          onChange={(e) => setMb(i, { imap_password: e.target.value })}
+                        />
+                      </Field>
                     </div>
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => save(o.id)}>
-                    {busy === o.id ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />} Save
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === o.id}
+                    onClick={() => save(o.id)}
+                  >
+                    {busy === o.id ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="mr-1.5 h-3.5 w-3.5" />
+                    )}{" "}
+                    Save
                   </Button>
-                  <Button size="sm" variant="outline" disabled={busy === o.id} onClick={() => push(o.id)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === o.id}
+                    onClick={() => push(o.id)}
+                  >
                     <Zap className="mr-1.5 h-3.5 w-3.5" /> Push to Instantly
                   </Button>
                   <Button size="sm" disabled={busy === o.id} onClick={() => assign(o.id)}>

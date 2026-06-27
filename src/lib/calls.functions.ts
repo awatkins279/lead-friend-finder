@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { NEPQ_SYSTEM_PROMPT } from "./nepq-prompt";
+import { chatCompletion } from "@/lib/ai-client";
 
 // ---------------------------------------------------------------------------
 // Generate a personalized NEPQ-style call script for a single lead.
@@ -44,16 +45,23 @@ export const generateCallScript = createServerFn({ method: "POST" })
     }
 
     const [{ data: list }, { data: cfg }, { data: lead }] = await Promise.all([
-      supabase.from("lists").select("name, what_selling, key_selling_points, sender_name, sender_company").eq("id", data.listId).maybeSingle(),
+      supabase
+        .from("lists")
+        .select("name, what_selling, key_selling_points, sender_name, sender_company")
+        .eq("id", data.listId)
+        .maybeSingle(),
       supabase.from("list_call_configs").select("*").eq("list_id", data.listId).maybeSingle(),
-      supabase.from("leads").select("first_name,last_name,title,org_name,org_industry,org_description,org_employee_count,city,state,country").eq("id", data.leadId).maybeSingle(),
+      supabase
+        .from("leads")
+        .select(
+          "first_name,last_name,title,org_name,org_industry,org_description,org_employee_count,city,state,country",
+        )
+        .eq("id", data.leadId)
+        .maybeSingle(),
     ]);
 
     if (!lead) throw new Error("Lead not found");
     if (!list?.what_selling) throw new Error("Set up the campaign config first");
-
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
 
     const system = NEPQ_SYSTEM_PROMPT.replace("{{KNOWLEDGE_BASE}}", "");
 
@@ -107,46 +115,49 @@ Return JSON exactly:
 
 Every line should feel like it was written for THIS prospect — reference their title, company, or industry naturally. No corporate jargon. No "I wanted to reach out". No "synergy". Conversational, like a peer-to-peer call. The talk_track sections should be SUBSTANTIAL — this is the actual script, not bullet points.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 12000,
-      }),
+    const content = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 12000,
     });
 
-    if (res.status === 429) throw new Error("AI rate limit — try again in a moment");
-    if (res.status === 402) throw new Error("AI credits exhausted — add credits in Workspace settings");
-    if (!res.ok) throw new Error(`AI error ${res.status}`);
-
-    const payload = await res.json();
-    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
-
     const tryParseJson = (raw: string): any => {
-      let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      let s = raw
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "")
+        .trim();
       const start = s.search(/[\{\[]/);
       const end = Math.max(s.lastIndexOf("}"), s.lastIndexOf("]"));
       if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
-      try { return JSON.parse(s); } catch {}
+      try {
+        return JSON.parse(s);
+      } catch {}
       // Repair: strip control chars, trailing commas
-      const repaired = s
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
-        .replace(/,\s*([}\]])/g, "$1");
-      try { return JSON.parse(repaired); } catch {}
+      const repaired = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/,\s*([}\]])/g, "$1");
+      try {
+        return JSON.parse(repaired);
+      } catch {}
       // Last resort: progressively trim trailing chars until it parses
       for (let i = repaired.length; i > 100; i -= 50) {
         const candidate = repaired
           .slice(0, i)
           .replace(/,\s*$/, "")
           .replace(/[^\}\]]*$/, "");
-        const closed = candidate + "}".repeat(Math.max(0, (candidate.match(/{/g) || []).length - (candidate.match(/}/g) || []).length));
-        try { return JSON.parse(closed); } catch {}
+        const closed =
+          candidate +
+          "}".repeat(
+            Math.max(
+              0,
+              (candidate.match(/{/g) || []).length - (candidate.match(/}/g) || []).length,
+            ),
+          );
+        try {
+          return JSON.parse(closed);
+        } catch {}
       }
       return null;
     };
@@ -156,7 +167,6 @@ Every line should feel like it was written for THIS prospect — reference their
       console.error("AI returned unparseable JSON:", content.slice(0, 500));
       throw new Error("AI returned invalid JSON — try again");
     }
-
 
     const script: CallScript = {
       opener: String(parsed.opener ?? "").slice(0, 800),
@@ -186,19 +196,25 @@ Every line should feel like it was written for THIS prospect — reference their
     };
 
     // Ensure row exists, then cache the script
-    await supabase
-      .from("list_leads")
-      .upsert(
-        { list_id: data.listId, lead_id: data.leadId, call_script: script as any, status: "scripted" },
-        { onConflict: "list_id,lead_id" },
-      );
+    await supabase.from("list_leads").upsert(
+      {
+        list_id: data.listId,
+        lead_id: data.leadId,
+        call_script: script as any,
+        status: "scripted",
+      },
+      { onConflict: "list_id,lead_id" },
+    );
 
     return { script };
   });
 
 function arr(v: unknown, max: number, lim: number): string[] {
   if (!Array.isArray(v)) return [];
-  return v.map((x) => String(x).slice(0, lim)).filter(Boolean).slice(0, max);
+  return v
+    .map((x) => String(x).slice(0, lim))
+    .filter(Boolean)
+    .slice(0, max);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +238,12 @@ export const getTwilioToken = createServerFn({ method: "POST" })
       .maybeSingle();
 
     if (error || !acc) throw new Error("Phone account not found");
-    if (!acc.twilio_twiml_app_sid || !acc.twilio_account_sid || !acc.twilio_api_key_sid || !acc.twilio_api_key_secret) {
+    if (
+      !acc.twilio_twiml_app_sid ||
+      !acc.twilio_account_sid ||
+      !acc.twilio_api_key_sid ||
+      !acc.twilio_api_key_secret
+    ) {
       throw new Error("Twilio account is missing credentials. Edit it in Sending Accounts.");
     }
 
@@ -348,7 +369,9 @@ export const startRingOutCall = createServerFn({ method: "POST" })
 
     const creds = (acc.credentials ?? {}) as Record<string, string>;
     const rawServerUrl = (creds.server_url || "").trim();
-    const serverUrl = (/^https?:\/\//i.test(rawServerUrl) ? rawServerUrl : "https://platform.ringcentral.com").replace(/\/$/, "");
+    const serverUrl = (
+      /^https?:\/\//i.test(rawServerUrl) ? rawServerUrl : "https://platform.ringcentral.com"
+    ).replace(/\/$/, "");
     const clientId = creds.client_id;
     const clientSecret = creds.client_secret;
     const jwt = creds.jwt;
@@ -419,4 +442,3 @@ export const startRingOutCall = createServerFn({ method: "POST" })
 
     return { callId: row.id, ringOutId: String(ringOutJson?.id ?? "") };
   });
-

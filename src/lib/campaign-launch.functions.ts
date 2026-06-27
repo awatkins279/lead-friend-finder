@@ -132,8 +132,10 @@ export const launchCampaign = createServerFn({ method: "POST" })
     const prospects = emailReady;
     if (!prospects.length)
       throw new Error("Generate an email sequence for at least one prospect before launching");
-    if (prospects.length > 1000)
-      throw new Error("Campaign launch currently supports up to 1,000 prospects at a time");
+
+    // BATCH_SIZE: Instantly recommends 500-1000 leads per /leads/add call
+    const BATCH_SIZE = 500;
+    const totalLeads = prospects.length;
 
     const stepCount = Math.max(...prospects.map((row: any) => row.emails.length));
     const sequences = [
@@ -194,8 +196,8 @@ export const launchCampaign = createServerFn({ method: "POST" })
         sequences,
         email_list: mailboxes,
         email_gap: list.email_gap_minutes,
-        daily_limit: 100,
-        daily_max_leads: 100,
+        daily_limit: totalLeads,
+        daily_max_leads: totalLeads,
         stop_on_reply: true,
         stop_on_auto_reply: false,
         text_only: true,
@@ -209,15 +211,21 @@ export const launchCampaign = createServerFn({ method: "POST" })
       throw new Error("Instantly did not return a campaign ID");
 
     try {
-      await instantlyRequest(connection.api_key, "/leads/add", {
-        method: "POST",
-        body: JSON.stringify({
-          campaign_id: instantlyCampaignId,
-          leads,
-          skip_if_in_workspace: false,
-          skip_if_in_campaign: false,
-        }),
-      });
+      // Upload leads in batches to support large campaigns (50K+)
+      let uploaded = 0;
+      for (let i = 0; i < leads.length; i += BATCH_SIZE) {
+        const batch = leads.slice(i, i + BATCH_SIZE);
+        await instantlyRequest(connection.api_key, "/leads/add", {
+          method: "POST",
+          body: JSON.stringify({
+            campaign_id: instantlyCampaignId,
+            leads: batch,
+            skip_if_in_workspace: false,
+            skip_if_in_campaign: false,
+          }),
+        });
+        uploaded += batch.length;
+      }
       await instantlyRequest(connection.api_key, `/campaigns/${instantlyCampaignId}/activate`, {
         method: "POST",
         body: JSON.stringify({}),

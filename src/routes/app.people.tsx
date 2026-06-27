@@ -64,7 +64,11 @@ import {
   cancelScoringJob as cancelScoringJobFn,
   finalizeScoringJob as finalizeScoringJobFn,
 } from "@/lib/scoring-jobs.functions";
-import { fetchMatchingCountBulk, fetchMatchingIdsBulk, searchLeadsPage } from "@/lib/leads-bulk.functions";
+import {
+  fetchMatchingCountBulk,
+  fetchMatchingIdsBulk,
+  searchLeadsPage,
+} from "@/lib/leads-bulk.functions";
 import {
   verifyLeadEmailsBatch as verifyLeadEmailsBatchFn,
   loadLeadVerifications as loadLeadVerificationsFn,
@@ -345,9 +349,6 @@ function PeoplePage() {
     },
   });
 
-
-
-
   const total = data?.count ?? 0;
   const totalIsExact = data?.countExact ?? false;
   const rows = data?.rows ?? [];
@@ -560,12 +561,7 @@ function PeoplePage() {
   const terminalHandledRef = useRef(0);
 
   const syncJobSnapshot = useCallback(
-    async (
-      jobId: string,
-      runId: number,
-      token: { cancelled: boolean },
-      includeResults = false,
-    ) => {
+    async (jobId: string, runId: number, token: { cancelled: boolean }, includeResults = false) => {
       const snap = await getJobSnapshotCall({ data: { jobId, includeResults } });
       if (workerRunIdRef.current !== runId) return snap;
 
@@ -1028,7 +1024,6 @@ function PeoplePage() {
   const gaugePct = avgScore / 100;
   const aboveThreshold = scoreVals.filter((s) => s >= minScore).length;
 
-
   return (
     <div className="flex h-[calc(100vh-2rem)] gap-4 overflow-hidden">
       {/* MAIN COLUMN */}
@@ -1038,7 +1033,8 @@ function PeoplePage() {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">People Search</h1>
             <p className="mt-1 text-sm text-muted-foreground font-mono-num">
-              {matchingCountPrefix}{matchingCountLabel} matching contacts · 25 shown per page
+              {matchingCountPrefix}
+              {matchingCountLabel} matching contacts · 25 shown per page
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1638,15 +1634,11 @@ function PeoplePage() {
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div className="font-mono-num text-2xl font-bold tracking-tight">
                 {avgScore}
-                <span className="text-sm font-normal text-muted-foreground">
-                  {" "}
-                  / {maxScore}
-                </span>
+                <span className="text-sm font-normal text-muted-foreground"> / {maxScore}</span>
               </div>
               <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
                 Avg Score
               </div>
-
             </div>
           </div>
 
@@ -2583,7 +2575,8 @@ function MultiTagSelect({
 
   const suggestions = useMemo(() => {
     const selected = new Set(values.map((v) => v.toLowerCase()));
-    const scored = options.filter((t) => !selected.has(t.toLowerCase()))
+    const scored = options
+      .filter((t) => !selected.has(t.toLowerCase()))
       .map((t) => ({ t, s: fuzzyScore(query.trim(), t) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s)

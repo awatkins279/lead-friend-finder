@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { chatCompletion } from "@/lib/ai-client";
 
 // Deep AI scoring worker.
 //
@@ -57,14 +58,9 @@ export const Route = createFileRoute("/api/public/hooks/deep-scoring-tick")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const lovableKey = process.env.LOVABLE_API_KEY;
-        if (!lovableKey) {
-          return Response.json({ ok: false, error: "Missing LOVABLE_API_KEY" }, { status: 500 });
-        }
-
-        const startedAt = Date.now();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+        const startedAt = Date.now();
         const stats = {
           batches: 0,
           rowsScored: 0,
@@ -98,7 +94,7 @@ export const Route = createFileRoute("/api/public/hooks/deep-scoring-tick")({
 
             for (const [jobId, jobRows] of byJob) {
               try {
-                const scored = await scoreBatchWithAi(jobRows, lovableKey);
+                const scored = await scoreBatchWithAi(jobRows);
                 if (scored.length === 0) {
                   await supabaseAdmin.rpc("fail_deep_scoring_admin", {
                     p_job_id: jobId,
@@ -110,7 +106,8 @@ export const Route = createFileRoute("/api/public/hooks/deep-scoring-tick")({
                 const updates = scored.map((s) => ({
                   job_id: jobId,
                   lead_id: s.leadId,
-                  user_id: jobRows.find((r) => r.lead_id === s.leadId)?.user_id ?? jobRows[0]!.user_id,
+                  user_id:
+                    jobRows.find((r) => r.lead_id === s.leadId)?.user_id ?? jobRows[0]!.user_id,
                   score: s.score,
                   reasoning: s.reasoning,
                   signals: s.signals,
@@ -173,7 +170,7 @@ export const Route = createFileRoute("/api/public/hooks/deep-scoring-tick")({
   },
 });
 
-async function scoreBatchWithAi(rows: ClaimedRow[], apiKey: string): Promise<AiScore[]> {
+async function scoreBatchWithAi(rows: ClaimedRow[]): Promise<AiScore[]> {
   // All rows in a single AI call share the same seller context (job).
   const sellerContext = rows[0]?.context ?? "";
 
@@ -220,33 +217,16 @@ Use only "strong" / "partial" / "weak" / "unknown" for verdicts. Cite evidence f
 PROSPECTS:
 ${JSON.stringify(compact)}`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    signal: AbortSignal.timeout(40_000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 6000,
-    }),
+  const content = await chatCompletion({
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 6000,
   });
 
-  if (res.status === 429) throw new Error("AI rate limit");
-  if (res.status === 402) throw new Error("AI credits exhausted");
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`gateway ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const payload = await res.json();
-  const content: string = payload.choices?.[0]?.message?.content ?? "{}";
   const parsed = extractJson(content) as { scores?: AiScore[] };
 
   const allowed: Verdict[] = ["strong", "partial", "weak", "unknown"];
@@ -278,7 +258,10 @@ ${JSON.stringify(compact)}`;
 
 // Tolerant JSON extractor — mirrors the one in src/lib/score.functions.ts.
 function extractJson(raw: string): unknown {
-  let s = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  let s = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = s.search(/[\{\[]/);
   if (start === -1) throw new Error("No JSON found");
   s = s.slice(start);

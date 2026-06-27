@@ -35,9 +35,7 @@ export type SchedulingPrefs = {
 // ---------- List meetings in range ----------
 export const listMeetings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) =>
-    z.object({ from: z.string(), to: z.string() }).parse(i),
-  )
+  .inputValidator((i: unknown) => z.object({ from: z.string(), to: z.string() }).parse(i))
   .handler(async ({ data, context }): Promise<{ meetings: Meeting[] }> => {
     const { supabase } = context;
     const { data: rows, error } = await supabase
@@ -68,7 +66,9 @@ export const getMeeting = createServerFn({ method: "POST" })
     if (m.lead_id) {
       const { data: l } = await supabase
         .from("leads")
-        .select("id,first_name,last_name,title,org_name,org_industry,org_website,linkedin_url,email,phone,city,state,country")
+        .select(
+          "id,first_name,last_name,title,org_name,org_industry,org_website,linkedin_url,email,phone,city,state,country",
+        )
         .eq("id", m.lead_id)
         .maybeSingle();
       lead = l;
@@ -88,7 +88,9 @@ const upsertSchema = z.object({
   starts_at: z.string(),
   ends_at: z.string(),
   meet_link: z.string().url().optional().nullable().or(z.literal("")),
-  source: z.enum(["manual", "phone_call", "sdr_email", "google_sync", "ai_booked"]).default("manual"),
+  source: z
+    .enum(["manual", "phone_call", "sdr_email", "google_sync", "ai_booked"])
+    .default("manual"),
   notes: z.string().max(5000).optional().nullable(),
 });
 
@@ -128,7 +130,11 @@ export const getSchedulingPrefs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ prefs: SchedulingPrefs }> => {
     const { supabase, userId } = context;
-    const { data } = await supabase.from("scheduling_preferences").select("*").eq("user_id", userId).maybeSingle();
+    const { data } = await supabase
+      .from("scheduling_preferences")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
     if (data) return { prefs: data as SchedulingPrefs };
     // Defaults
     return {
@@ -247,7 +253,9 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
     };
 
     // Walk forward in 30-min increments, starting at next quarter-hour after now+buffer
-    let cursor = new Date(Math.ceil((now.getTime() + 15 * 60 * 1000) / (15 * 60 * 1000)) * (15 * 60 * 1000));
+    let cursor = new Date(
+      Math.ceil((now.getTime() + 15 * 60 * 1000) / (15 * 60 * 1000)) * (15 * 60 * 1000),
+    );
     const step = 15 * 60 * 1000;
     let guard = 0;
     while (slots.length < data.max_slots && cursor < horizon && guard++ < 2000) {
@@ -260,9 +268,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       if (inWorkday && inHours) {
         const start = cursor.getTime();
         const end = start + slotMs;
-        const conflict = busy.some(
-          (b) => start < b.end + bufferMs && end + bufferMs > b.start,
-        );
+        const conflict = busy.some((b) => start < b.end + bufferMs && end + bufferMs > b.start);
         if (!conflict) {
           slots.push({
             start: new Date(start).toISOString(),
@@ -295,7 +301,10 @@ export const disconnectGoogleCalendar = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { error } = await supabase.from("google_calendar_connections").delete().eq("user_id", userId);
+    const { error } = await supabase
+      .from("google_calendar_connections")
+      .delete()
+      .eq("user_id", userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

@@ -1,8 +1,8 @@
 // Twilio recording status webhook. Called once when the recording is ready.
-// We persist the URL + duration on the matching `calls` row. Transcription +
-// AI scorecard happen in Phase 2.
+// Persists the recording URL + duration, then triggers AI call scoring.
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { chatCompletion } from "@/lib/ai-client";
 
 export const Route = createFileRoute("/api/public/twilio/recording")({
   server: {
@@ -16,7 +16,8 @@ export const Route = createFileRoute("/api/public/twilio/recording")({
         const recordingSid = String(form.get("RecordingSid") ?? "");
         const recordingUrl = String(form.get("RecordingUrl") ?? "");
         const recordingStatus = String(form.get("RecordingStatus") ?? "");
-        const recordingDuration = parseInt(String(form.get("RecordingDuration") ?? "0"), 10) || null;
+        const recordingDuration =
+          parseInt(String(form.get("RecordingDuration") ?? "0"), 10) || null;
         const accountSid = String(form.get("AccountSid") ?? "");
 
         // Verify the call exists and the AccountSid matches a known phone
@@ -52,6 +53,51 @@ export const Route = createFileRoute("/api/public/twilio/recording")({
             recording_duration_sec: recordingDuration,
           })
           .eq("id", callId);
+
+        // Trigger AI scoring (best-effort, non-blocking)
+        try {
+          const { data: callData } = await supabaseAdmin
+            .from("calls")
+            .select(
+              "id, duration_sec, outcome, notes, leads(first_name,last_name,title,org_name,org_industry)",
+            )
+            .eq("id", callId)
+            .maybeSingle();
+
+          if (callData && (callData as any).duration_sec > 10) {
+            const lead = (callData as any).leads;
+            const prospect = lead
+              ? `${lead.first_name || ""} ${lead.last_name || ""} — ${lead.title || ""} at ${lead.org_name || ""}`
+              : "unknown prospect";
+
+            const content = await chatCompletion({
+              model: "deepseek/deepseek-chat",
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "Score this cold call. Focus on NEPQ techniques. Output ONLY valid JSON. No markdown.",
+                },
+                {
+                  role: "user",
+                  content: `Prospect: ${prospect}\nDuration: ${(callData as any).duration_sec}s\nOutcome: ${(callData as any).outcome || "unknown"}\n\nReturn JSON:\n{"overall_score":0-100,"opener_rating":0-10,"discovery_rating":0-10,"objection_handling":0-10,"closing_rating":0-10,"talk_listen_ratio":"e.g. 40/60","strengths":["..."],"improvements":["..."],"summary":"...\n}`,
+                },
+              ],
+              max_tokens: 500,
+            });
+
+            const scorecard = JSON.parse(content);
+            await supabaseAdmin
+              .from("calls")
+              .update({
+                scorecard: scorecard,
+                call_score: Math.round(scorecard.overall_score || 50),
+              })
+              .eq("id", callId);
+          }
+        } catch {
+          // Scoring is best-effort — never fail the webhook
+        }
 
         return new Response("ok");
       },

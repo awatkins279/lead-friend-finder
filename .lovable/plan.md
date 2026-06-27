@@ -1,4 +1,3 @@
-
 # People Search Rebuild
 
 ## Why this keeps breaking

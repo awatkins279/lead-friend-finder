@@ -7,7 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Loader2, Mic, Square, Upload, CheckCircle2, Sparkles, Play, Shuffle } from "lucide-react";
@@ -21,11 +25,16 @@ import {
 } from "@/lib/voicemail.functions";
 
 const TEST_SCRIPTS: ((rep: string) => string)[] = [
-  (rep) => `Hey Sarah, this is ${rep}. Saw your team just expanded into the Midwest — congrats on that. The reason I'm calling is we help sales orgs your size cut their outbound prep time by about 80 percent. Figured it might be worth a quick chat. Shoot me a text back or call me when you get a sec.`,
-  (rep) => `Hey it's ${rep}, real quick — I noticed you guys just hired a few more SDRs, so figured the timing might actually be right for this. We're helping teams like yours make their reps productive in week one instead of month three. If that's interesting at all, give me a call back when you get a chance.`,
-  (rep) => `Hi Marcus, ${rep} here. I'll keep this short. Most VPs of sales I talk to are losing 15 to 20 hours a week to manual prospecting work that honestly shouldn't be a human job anymore. If that sounds familiar, I'd love to show you what we built. Grab a slot on my calendar or just call me back.`,
-  (rep) => `Hey, this is ${rep}. I won't waste your time with a pitch — I just had a quick idea I think could save your team a real chunk of time on outbound. If it's worth 10 minutes to hear it out, just text me back and we'll find a time. Talk soon.`,
-  (rep) => `Hey Jen, ${rep} calling. Quick one — we just rolled out something I genuinely think your team would get a lot out of, and I'd rather walk you through it than leave a long voicemail about it. Call me back when you have a sec or shoot me a text. Appreciate it.`,
+  (rep) =>
+    `Hey Sarah, this is ${rep}. Saw your team just expanded into the Midwest — congrats on that. The reason I'm calling is we help sales orgs your size cut their outbound prep time by about 80 percent. Figured it might be worth a quick chat. Shoot me a text back or call me when you get a sec.`,
+  (rep) =>
+    `Hey it's ${rep}, real quick — I noticed you guys just hired a few more SDRs, so figured the timing might actually be right for this. We're helping teams like yours make their reps productive in week one instead of month three. If that's interesting at all, give me a call back when you get a chance.`,
+  (rep) =>
+    `Hi Marcus, ${rep} here. I'll keep this short. Most VPs of sales I talk to are losing 15 to 20 hours a week to manual prospecting work that honestly shouldn't be a human job anymore. If that sounds familiar, I'd love to show you what we built. Grab a slot on my calendar or just call me back.`,
+  (rep) =>
+    `Hey, this is ${rep}. I won't waste your time with a pitch — I just had a quick idea I think could save your team a real chunk of time on outbound. If it's worth 10 minutes to hear it out, just text me back and we'll find a time. Talk soon.`,
+  (rep) =>
+    `Hey Jen, ${rep} calling. Quick one — we just rolled out something I genuinely think your team would get a lot out of, and I'd rather walk you through it than leave a long voicemail about it. Call me back when you have a sec or shoot me a text. Appreciate it.`,
 ];
 
 const SAMPLE_SCRIPT = `Hey this is [name], I was just reaching out because I work with a platform that helps sales teams automate their outbound completely. Everything from personalized emails written for each prospect, to cold calling scripts, to real time coaching on live calls. I know your time is valuable so I will keep this short. If this is something that could be useful for your team I would love to connect. Feel free to call me back or shoot me a text and we can find a time to chat. Looking forward to talking.`;
@@ -125,8 +134,7 @@ export function VoicemailAgent({ userId }: { userId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsKey, loading]);
 
-  const update = (patch: Partial<VoicemailSettings>) =>
-    setSettings((s) => ({ ...s, ...patch }));
+  const update = (patch: Partial<VoicemailSettings>) => setSettings((s) => ({ ...s, ...patch }));
 
   // ---------- Voice cloning ----------
   const uploadAndClone = async (blob: Blob, ext: string, name: string) => {
@@ -153,7 +161,9 @@ export function VoicemailAgent({ userId }: { userId: string }) {
       streamRef.current = stream;
       const rec = new MediaRecorder(stream, { mimeType: "audio/webm" });
       chunksRef.current = [];
-      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach((t) => t.stop());
@@ -174,7 +184,10 @@ export function VoicemailAgent({ userId }: { userId: string }) {
     mediaRecRef.current?.stop();
     mediaRecRef.current = null;
     setRecording(false);
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,7 +215,8 @@ export function VoicemailAgent({ userId }: { userId: string }) {
           {saving && <span className="text-xs text-muted-foreground">Saving…</span>}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Personalized AI voicemails in your cloned voice — generated the moment a call starts, dropped with one tap.
+          Personalized AI voicemails in your cloned voice — generated the moment a call starts,
+          dropped with one tap.
         </p>
       </div>
 
@@ -217,7 +231,9 @@ export function VoicemailAgent({ userId }: { userId: string }) {
                 Voice clone active — ready to drop voicemails
               </p>
             ) : (
-              <p className="mt-0.5 text-xs text-muted-foreground">No voice clone yet. Record or upload a sample below.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                No voice clone yet. Record or upload a sample below.
+              </p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -230,10 +246,18 @@ export function VoicemailAgent({ userId }: { userId: string }) {
                 <Square className="mr-1.5 h-3.5 w-3.5" /> Stop ({seconds}s)
               </Button>
             )}
-            <label className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent ${cloning ? "opacity-50 pointer-events-none" : ""}`}>
+            <label
+              className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent ${cloning ? "opacity-50 pointer-events-none" : ""}`}
+            >
               <Upload className="h-3.5 w-3.5" />
               Upload audio
-              <input type="file" accept="audio/*" className="hidden" onChange={onFile} disabled={cloning} />
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={onFile}
+                disabled={cloning}
+              />
             </label>
             {cloning && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
@@ -243,7 +267,9 @@ export function VoicemailAgent({ userId }: { userId: string }) {
           {INSTRUCTIONS}
         </div>
         <div className="rounded-md border border-dashed bg-card p-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sample script (read loosely)</div>
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Sample script (read loosely)
+          </div>
           <p className="text-sm italic leading-relaxed">{SAMPLE_SCRIPT}</p>
         </div>
       </div>
@@ -254,19 +280,19 @@ export function VoicemailAgent({ userId }: { userId: string }) {
           <div>
             <h4 className="text-sm font-semibold">Hear your AI voice in action</h4>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              We'll pick a random sample voicemail and play it back in your cloned voice — so you know exactly what your prospects will hear.
+              We'll pick a random sample voicemail and play it back in your cloned voice — so you
+              know exactly what your prospects will hear.
             </p>
           </div>
-          <Button
-            size="sm"
-            onClick={playTest}
-            disabled={testing || !voiceId}
-            className="shrink-0"
-          >
+          <Button size="sm" onClick={playTest} disabled={testing || !voiceId} className="shrink-0">
             {testing ? (
-              <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating…</>
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Generating…
+              </>
             ) : (
-              <><Shuffle className="mr-1.5 h-3.5 w-3.5" /> Play random sample</>
+              <>
+                <Shuffle className="mr-1.5 h-3.5 w-3.5" /> Play random sample
+              </>
             )}
           </Button>
         </div>
@@ -285,8 +311,6 @@ export function VoicemailAgent({ userId }: { userId: string }) {
         )}
       </div>
 
-
-
       {/* Settings */}
       <div className="grid grid-cols-1 gap-4 px-6 py-5 md:grid-cols-2">
         <div className="space-y-1.5">
@@ -301,8 +325,13 @@ export function VoicemailAgent({ userId }: { userId: string }) {
 
         <div className="space-y-1.5">
           <Label>Voicemail length</Label>
-          <Select value={settings.length ?? "medium"} onValueChange={(v) => update({ length: v as any })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={settings.length ?? "medium"}
+            onValueChange={(v) => update({ length: v as any })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="short">Short (15–20s)</SelectItem>
               <SelectItem value="medium">Medium (25–30s)</SelectItem>
@@ -324,8 +353,13 @@ export function VoicemailAgent({ userId }: { userId: string }) {
 
         <div className="space-y-1.5">
           <Label>Tone</Label>
-          <Select value={settings.tone ?? "conversational"} onValueChange={(v) => update({ tone: v as any })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={settings.tone ?? "conversational"}
+            onValueChange={(v) => update({ tone: v as any })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="conversational">Conversational</SelectItem>
               <SelectItem value="professional">Professional</SelectItem>
@@ -336,8 +370,13 @@ export function VoicemailAgent({ userId }: { userId: string }) {
 
         <div className="space-y-1.5">
           <Label>CTA type</Label>
-          <Select value={settings.cta_type ?? "callback"} onValueChange={(v) => update({ cta_type: v as any })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={settings.cta_type ?? "callback"}
+            onValueChange={(v) => update({ cta_type: v as any })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="callback">Call me back</SelectItem>
               <SelectItem value="text_back">Reply by text</SelectItem>

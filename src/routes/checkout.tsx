@@ -32,9 +32,7 @@ function CheckoutPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen grid place-items-center text-muted-foreground">
-        Loading…
-      </div>
+      <div className="min-h-screen grid place-items-center text-muted-foreground">Loading…</div>
     );
   }
 
@@ -52,8 +50,9 @@ function CheckoutPage() {
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight mb-2">Complete your subscription</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          You're subscribing to the <span className="font-medium text-foreground">{labelFor(safePriceId)}</span> plan.
-          Credits are granted instantly after payment.
+          You're subscribing to the{" "}
+          <span className="font-medium text-foreground">{labelFor(safePriceId)}</span> plan. Credits
+          are granted instantly after payment.
         </p>
         <div className="glass-panel rounded-2xl overflow-hidden">
           <StripeEmbeddedCheckout priceId={safePriceId} />

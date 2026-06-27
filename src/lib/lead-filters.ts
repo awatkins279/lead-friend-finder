@@ -31,43 +31,77 @@ export const LEAD_FILTERS_SCHEMA = z.object({
 });
 
 export const SIZE_BUCKETS: Record<string, string[]> = {
-  // Keep these buckets literal. The source data also contains broad ranges like
-  // "11 to 50" and "51 to 200"; including those inside narrower filters makes
-  // counts look wildly wrong for users who picked an exact range.
-  "1-10": ["1", "1 to 10", "2 to 10"],
-  "11-25": ["11 to 25"],
-  "26-50": ["26 to 50"],
-  "51-100": ["51 to 100"],
-  "101-250": ["101 to 250"],
-  "251-500": ["251 to 500"],
-  "501-1000": ["501 to 1000", "501 to 1,000"],
-  "1001-5000": ["1001 to 5000", "1,001 to 5,000"],
-  "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+"],
+  // Exact numeric matches
+  "1-10": ["1", "1 to 10", "2 to 10", "1-10"],
+  "11-25": ["11 to 25", "11-25", "11 - 25"],
+  "26-50": ["26 to 50", "26-50", "26 - 50"],
+  "51-100": ["51 to 100", "51-100", "51 - 100"],
+  "101-250": ["101 to 250", "101-250", "101 - 250"],
+  "251-500": ["251 to 500", "251-500", "251 - 500"],
+  "501-1000": ["501 to 1000", "501 to 1,000", "501-1000", "501 - 1000"],
+  "1001-5000": ["1001 to 5000", "1,001 to 5,000", "1001-5000", "1001 - 5000"],
+  "5000+": ["5001 to 10000", "5,001 to 10,000", "10000+", "10001+", "10,001+", "5000+", "10001"],
 };
 
 export function escapeForOr(v: string): string {
   // PostgREST .or() uses commas/parens as syntax; escape them in user input.
   // Backslash must be escaped FIRST or it would double-escape the others.
-  return v
-    .replace(/\\/g, "\\\\")
-    .replace(/,/g, "\\,")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
+  return v.replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
 // Full US state name -> 2-letter abbreviation (+ DC).
 const STATE_NAME_TO_ABBR: Record<string, string> = {
-  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
-  colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
-  hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA", kansas: "KS",
-  kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA",
-  michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT",
-  nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ",
-  "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND",
-  ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI",
-  "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX",
-  utah: "UT", vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV",
-  wisconsin: "WI", wyoming: "WY", "district of columbia": "DC",
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+  "district of columbia": "DC",
 };
 const STATE_ABBR_TO_NAME: Record<string, string> = Object.fromEntries(
   Object.entries(STATE_NAME_TO_ABBR).map(([name, abbr]) => [abbr.toLowerCase(), name]),
@@ -150,8 +184,27 @@ export function buildLeadQuery(q: any, f: Partial<LeadFilters> & { location?: st
 
   const sizes = f.companySize ?? [];
   if (sizes.length > 0) {
-    const raw = Array.from(new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [])));
-    if (raw.length > 0) r = r.in("org_employee_count", raw);
+    // Try exact text match first via SIZE_BUCKETS
+    const raw = Array.from(new Set(sizes.flatMap((s) => SIZE_BUCKETS[s] ?? [s])));
+    if (raw.length > 0) {
+      r = r.in("org_employee_count", raw);
+    }
+    // Also add numeric range fallback for rows with parsed employee_min/max
+    // This catches data that has numeric ranges but text doesn't match
+    for (const s of sizes) {
+      const bucket = SIZE_BUCKETS[s];
+      if (!bucket) continue;
+      // Add an OR for numeric columns as fallback
+      if (s === "1-10") r = r.or("employee_min.gte.1,employee_max.lte.10");
+      else if (s === "11-25") r = r.or("employee_min.gte.11,employee_max.lte.25");
+      else if (s === "26-50") r = r.or("employee_min.gte.26,employee_max.lte.50");
+      else if (s === "51-100") r = r.or("employee_min.gte.51,employee_max.lte.100");
+      else if (s === "101-250") r = r.or("employee_min.gte.101,employee_max.lte.250");
+      else if (s === "251-500") r = r.or("employee_min.gte.251,employee_max.lte.500");
+      else if (s === "501-1000") r = r.or("employee_min.gte.501,employee_max.lte.1000");
+      else if (s === "1001-5000") r = r.or("employee_min.gte.1001,employee_max.lte.5000");
+      else if (s === "5000+") r = r.or("employee_min.gte.5000");
+    }
   }
 
   if (f.hasPhone) r = r.not("phone", "is", null).neq("phone", "");

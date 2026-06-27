@@ -105,10 +105,7 @@ export function CallingConfigDialog({
             />
           </Field>
 
-          <Field
-            label="Call objective"
-            hint="What does a successful call look like?"
-          >
+          <Field label="Call objective" hint="What does a successful call look like?">
             <Input
               value={cfg.objectives ?? ""}
               onChange={(e) => update("objectives", e.target.value)}
@@ -126,13 +123,14 @@ export function CallingConfigDialog({
               onChange={(e) => update("objection_notes", e.target.value)}
               placeholder={`e.g. "Send me info" → don't send anything, ask what made them say that. "Too expensive" → reframe as cost of inaction.`}
             />
-
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Tone">
               <Select value={cfg.tone} onValueChange={(v) => update("tone", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="consultative">Consultative (NEPQ default)</SelectItem>
                   <SelectItem value="direct">Direct / no-fluff</SelectItem>
@@ -145,7 +143,9 @@ export function CallingConfigDialog({
                 value={cfg.personalization_level}
                 onValueChange={(v) => update("personalization_level", v)}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">Low — generic questions</SelectItem>
                   <SelectItem value="medium">Medium — role + industry refs</SelectItem>
@@ -154,9 +154,6 @@ export function CallingConfigDialog({
               </Select>
             </Field>
           </div>
-
-
-
 
           <Field
             label="Extra coaching instructions (optional)"
@@ -172,15 +169,27 @@ export function CallingConfigDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <Label className="text-sm font-medium">{label}</Label>

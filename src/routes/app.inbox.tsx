@@ -50,13 +50,37 @@ export const Route = createFileRoute("/app/inbox")({
 });
 
 const INTENT_OPTIONS = [
-  { value: "interested", label: "Interested", color: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30" },
-  { value: "objection", label: "Objection", color: "bg-amber-500/15 text-amber-700 border-amber-500/30" },
-  { value: "not_interested", label: "Not interested", color: "bg-rose-500/15 text-rose-700 border-rose-500/30" },
+  {
+    value: "interested",
+    label: "Interested",
+    color: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
+  },
+  {
+    value: "objection",
+    label: "Objection",
+    color: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+  },
+  {
+    value: "not_interested",
+    label: "Not interested",
+    color: "bg-rose-500/15 text-rose-700 border-rose-500/30",
+  },
   { value: "question", label: "Question", color: "bg-sky-500/15 text-sky-700 border-sky-500/30" },
-  { value: "meeting_booked", label: "Meeting booked", color: "bg-violet-500/15 text-violet-700 border-violet-500/30" },
-  { value: "ooo", label: "Out of office", color: "bg-zinc-500/15 text-zinc-700 border-zinc-500/30" },
-  { value: "unsubscribe", label: "Unsubscribe", color: "bg-rose-500/15 text-rose-700 border-rose-500/30" },
+  {
+    value: "meeting_booked",
+    label: "Meeting booked",
+    color: "bg-violet-500/15 text-violet-700 border-violet-500/30",
+  },
+  {
+    value: "ooo",
+    label: "Out of office",
+    color: "bg-zinc-500/15 text-zinc-700 border-zinc-500/30",
+  },
+  {
+    value: "unsubscribe",
+    label: "Unsubscribe",
+    color: "bg-rose-500/15 text-rose-700 border-rose-500/30",
+  },
   { value: "other", label: "Other", color: "bg-zinc-500/15 text-zinc-700 border-zinc-500/30" },
 ];
 
@@ -179,7 +203,9 @@ function InboxPage() {
   } | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [thread, setThread] = useState<{ conversation: Conversation; messages: Message[] } | null>(null);
+  const [thread, setThread] = useState<{ conversation: Conversation; messages: Message[] } | null>(
+    null,
+  );
   const [draft, setDraft] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -198,7 +224,8 @@ function InboxPage() {
   const filterPayload = useMemo(() => {
     const range = rangeFor(datePreset);
     return {
-      status: folder === "all" ? ("all" as const) : (folder as "open" | "needs_approval" | "archived"),
+      status:
+        folder === "all" ? ("all" as const) : (folder as "open" | "needs_approval" | "archived"),
       unread_only: unreadOnly,
       campaign_ids: campaign === "all" ? undefined : [campaign],
       account_ids: account === "all" ? undefined : [account],
@@ -247,7 +274,6 @@ function InboxPage() {
     if (demoMode) return;
     loadList();
     loadAnalytics();
-     
   }, [filterPayload, demoMode]);
 
   // Realtime: refresh on changes
@@ -255,16 +281,13 @@ function InboxPage() {
     if (demoMode) return;
     const ch = supabase
       .channel("inbox-conversations")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "sdr_conversations" },
-        () => loadList(),
+      .on("postgres_changes", { event: "*", schema: "public", table: "sdr_conversations" }, () =>
+        loadList(),
       )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
-     
   }, [demoMode, filterPayload]);
 
   const openThread = async (id: string) => {
@@ -353,7 +376,9 @@ function InboxPage() {
           `Draft ready, but the AI is only ${r.confidence}% confident — double-check it before sending.`,
         );
       } else {
-        toast.success(`Draft ready · ${r.confidence}% confident · grounded on ${r.knowledge_used} knowledge chunk(s)`);
+        toast.success(
+          `Draft ready · ${r.confidence}% confident · grounded on ${r.knowledge_used} knowledge chunk(s)`,
+        );
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -391,7 +416,14 @@ function InboxPage() {
             <Sparkles className="mr-1.5 h-3.5 w-3.5" />
             {demoMode ? "Demo on" : "Load sample data"}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => { loadList(); loadAnalytics(); }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              loadList();
+              loadAnalytics();
+            }}
+          >
             <RefreshCcw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
         </div>
@@ -606,16 +638,24 @@ function ConversationRow({
     <button
       onClick={onClick}
       className={`w-full border-b px-3 py-3 text-left transition-colors ${
-        active ? "bg-accent" : unread ? "bg-background hover:bg-accent/40" : "bg-background hover:bg-accent/40"
+        active
+          ? "bg-accent"
+          : unread
+            ? "bg-background hover:bg-accent/40"
+            : "bg-background hover:bg-accent/40"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className={`truncate text-sm ${unread ? "font-semibold" : "font-normal"}`}>
           {c.lead_name || c.lead_email}
         </span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo(c.last_message_at)}</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground">
+          {timeAgo(c.last_message_at)}
+        </span>
       </div>
-      <div className={`mt-0.5 truncate text-xs ${unread ? "font-medium" : "text-muted-foreground"}`}>
+      <div
+        className={`mt-0.5 truncate text-xs ${unread ? "font-medium" : "text-muted-foreground"}`}
+      >
         {c.subject || "(no subject)"}
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -839,13 +879,7 @@ function AnalyticsStrip({
   );
 }
 
-function EmptyList({
-  noAccounts,
-  onTryDemo,
-}: {
-  noAccounts: boolean;
-  onTryDemo: () => void;
-}) {
+function EmptyList({ noAccounts, onTryDemo }: { noAccounts: boolean; onTryDemo: () => void }) {
   return (
     <div className="p-8 text-center">
       <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">

@@ -103,7 +103,11 @@ function ListsPage() {
             <div className="space-y-3">
               <div>
                 <Label className="text-xs">Name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. SaaS CTOs" />
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. SaaS CTOs"
+                />
               </div>
               <div>
                 <Label className="text-xs">Description (campaign context)</Label>
@@ -115,7 +119,9 @@ function ListsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
               <Button onClick={create}>Create</Button>
             </DialogFooter>
           </DialogContent>
@@ -130,7 +136,11 @@ function ListsPage() {
             <ListIcon className="mb-3 h-10 w-10 text-muted-foreground" />
             <h3 className="text-lg font-medium">No lists yet</h3>
             <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Head to <Link to="/app/people" className="underline">People Search</Link>, select leads, and add them to a list.
+              Head to{" "}
+              <Link to="/app/people" className="underline">
+                People Search
+              </Link>
+              , select leads, and add them to a list.
             </p>
           </Card>
         ) : (

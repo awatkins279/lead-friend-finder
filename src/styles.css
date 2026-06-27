@@ -54,47 +54,51 @@
 :root {
   --radius: 0.875rem;
   /* Aurora Glass — midnight indigo base, violet→cyan accents */
-  --background: oklch(0.16 0.04 270);            /* midnight indigo */
-  --foreground: oklch(0.97 0.01 250);            /* near white, cool */
-  --card: oklch(0.22 0.045 268 / 65%);           /* translucent glass */
+  --background: oklch(0.16 0.04 270); /* midnight indigo */
+  --foreground: oklch(0.97 0.01 250); /* near white, cool */
+  --card: oklch(0.22 0.045 268 / 65%); /* translucent glass */
   --card-foreground: oklch(0.97 0.01 250);
-  --popover: oklch(0.20 0.045 268);
+  --popover: oklch(0.2 0.045 268);
   --popover-foreground: oklch(0.97 0.01 250);
-  --primary: oklch(0.70 0.18 290);               /* violet primary */
+  --primary: oklch(0.7 0.18 290); /* violet primary */
   --primary-foreground: oklch(0.99 0.005 250);
   --secondary: oklch(0.26 0.04 268);
   --secondary-foreground: oklch(0.97 0.01 250);
   --muted: oklch(0.24 0.035 268);
   --muted-foreground: oklch(0.72 0.03 260);
-  --accent: oklch(0.78 0.16 210);                /* cyan accent */
+  --accent: oklch(0.78 0.16 210); /* cyan accent */
   --accent-foreground: oklch(0.18 0.04 270);
   --destructive: oklch(0.66 0.22 18);
   --destructive-foreground: oklch(0.99 0.005 250);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 8%);
-  --ring: oklch(0.70 0.18 290);
-  --brand-violet: oklch(0.70 0.18 290);
+  --ring: oklch(0.7 0.18 290);
+  --brand-violet: oklch(0.7 0.18 290);
   --brand-cyan: oklch(0.78 0.16 210);
-  --brand-orange: oklch(0.78 0.16 210);          /* aliased to cyan for legacy */
-  --brand-rose: oklch(0.70 0.18 290);            /* aliased to violet for legacy */
-  --brand-purple: oklch(0.70 0.18 290);
-  --gradient-aurora: linear-gradient(135deg, oklch(0.70 0.18 290), oklch(0.78 0.16 210));
-  --gradient-aurora-soft: linear-gradient(135deg, oklch(0.70 0.18 290 / 0.18), oklch(0.78 0.16 210 / 0.18));
-  --shadow-glow: 0 10px 40px -10px oklch(0.70 0.18 290 / 0.35);
+  --brand-orange: oklch(0.78 0.16 210); /* aliased to cyan for legacy */
+  --brand-rose: oklch(0.7 0.18 290); /* aliased to violet for legacy */
+  --brand-purple: oklch(0.7 0.18 290);
+  --gradient-aurora: linear-gradient(135deg, oklch(0.7 0.18 290), oklch(0.78 0.16 210));
+  --gradient-aurora-soft: linear-gradient(
+    135deg,
+    oklch(0.7 0.18 290 / 0.18),
+    oklch(0.78 0.16 210 / 0.18)
+  );
+  --shadow-glow: 0 10px 40px -10px oklch(0.7 0.18 290 / 0.35);
   --shadow-glass: 0 1px 0 0 oklch(1 0 0 / 0.06) inset, 0 20px 40px -20px oklch(0 0 0 / 0.6);
-  --chart-1: oklch(0.70 0.18 290);
+  --chart-1: oklch(0.7 0.18 290);
   --chart-2: oklch(0.78 0.16 210);
   --chart-3: oklch(0.74 0.17 250);
   --chart-4: oklch(0.66 0.18 320);
   --chart-5: oklch(0.82 0.14 180);
   --sidebar: oklch(0.18 0.04 270 / 70%);
   --sidebar-foreground: oklch(0.97 0.01 250);
-  --sidebar-primary: oklch(0.70 0.18 290);
+  --sidebar-primary: oklch(0.7 0.18 290);
   --sidebar-primary-foreground: oklch(0.99 0.005 250);
   --sidebar-accent: oklch(0.26 0.045 268);
   --sidebar-accent-foreground: oklch(0.97 0.01 250);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.70 0.18 290);
+  --sidebar-ring: oklch(0.7 0.18 290);
 }
 
 .dark {
@@ -102,9 +106,9 @@
   --foreground: oklch(0.97 0.01 250);
   --card: oklch(0.22 0.045 268 / 65%);
   --card-foreground: oklch(0.97 0.01 250);
-  --popover: oklch(0.20 0.045 268);
+  --popover: oklch(0.2 0.045 268);
   --popover-foreground: oklch(0.97 0.01 250);
-  --primary: oklch(0.70 0.18 290);
+  --primary: oklch(0.7 0.18 290);
   --primary-foreground: oklch(0.99 0.005 250);
   --secondary: oklch(0.26 0.04 268);
   --secondary-foreground: oklch(0.97 0.01 250);
@@ -116,15 +120,15 @@
   --destructive-foreground: oklch(0.99 0.005 250);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 8%);
-  --ring: oklch(0.70 0.18 290);
+  --ring: oklch(0.7 0.18 290);
   --sidebar: oklch(0.18 0.04 270 / 70%);
   --sidebar-foreground: oklch(0.97 0.01 250);
-  --sidebar-primary: oklch(0.70 0.18 290);
+  --sidebar-primary: oklch(0.7 0.18 290);
   --sidebar-primary-foreground: oklch(0.99 0.005 250);
   --sidebar-accent: oklch(0.26 0.045 268);
   --sidebar-accent-foreground: oklch(0.97 0.01 250);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.70 0.18 290);
+  --sidebar-ring: oklch(0.7 0.18 290);
 }
 
 @layer base {
@@ -137,7 +141,7 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     background-image:
-      radial-gradient(ellipse 80% 60% at 15% 0%, oklch(0.70 0.18 290 / 0.18), transparent 60%),
+      radial-gradient(ellipse 80% 60% at 15% 0%, oklch(0.7 0.18 290 / 0.18), transparent 60%),
       radial-gradient(ellipse 70% 50% at 85% 10%, oklch(0.78 0.16 210 / 0.14), transparent 60%),
       radial-gradient(ellipse 90% 60% at 50% 100%, oklch(0.66 0.18 320 / 0.12), transparent 60%);
     background-attachment: fixed;
@@ -153,7 +157,7 @@
     box-shadow: var(--shadow-glass);
   }
   .glass-panel-strong {
-    background: linear-gradient(180deg, oklch(0.22 0.045 268 / 0.85), oklch(0.20 0.045 268 / 0.7));
+    background: linear-gradient(180deg, oklch(0.22 0.045 268 / 0.85), oklch(0.2 0.045 268 / 0.7));
     border: 1px solid oklch(1 0 0 / 0.1);
     backdrop-filter: blur(24px) saturate(160%);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
@@ -180,8 +184,13 @@
 .dashboard-font {
   font-family: "Epilogue", ui-sans-serif, system-ui, sans-serif;
 }
-.dashboard-font h1, .dashboard-font h2, .dashboard-font h3, .dashboard-font h4,
-.dashboard-font h5, .dashboard-font h6, .dashboard-font .font-display {
+.dashboard-font h1,
+.dashboard-font h2,
+.dashboard-font h3,
+.dashboard-font h4,
+.dashboard-font h5,
+.dashboard-font h6,
+.dashboard-font .font-display {
   font-family: "Urbanist", ui-sans-serif, system-ui, sans-serif;
   letter-spacing: -0.01em;
 }
@@ -189,7 +198,7 @@
 /* ── Global Glass Aurora Scrollbars ── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: oklch(0.70 0.18 290) transparent;
+  scrollbar-color: oklch(0.7 0.18 290) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -202,7 +211,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, oklch(0.70 0.18 290), oklch(0.78 0.16 210));
+  background: linear-gradient(180deg, oklch(0.7 0.18 290), oklch(0.78 0.16 210));
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -218,5 +227,3 @@
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
-
-

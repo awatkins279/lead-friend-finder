@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chatCompletion } from "@/lib/ai-client";
 import { NEPQ_KNOWLEDGE } from "@/lib/coaching-knowledge/nepq";
-
 
 // ---------------------------------------------------------------------------
 // COACHING STYLES (admin curated)
@@ -25,8 +25,17 @@ export const listCoachingStyles = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<{ styles: CoachingStyle[]; isAdmin: boolean }> => {
     const { supabase, userId } = context;
     const [{ data, error }, { data: roleRow }] = await Promise.all([
-      supabase.from("coaching_styles").select("*").order("is_default", { ascending: false }).order("name"),
-      supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
+      supabase
+        .from("coaching_styles")
+        .select("*")
+        .order("is_default", { ascending: false })
+        .order("name"),
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle(),
     ]);
     if (error) throw new Error(error.message);
     return {
@@ -42,7 +51,9 @@ const upsertStyleSchema = z.object({
   system_prompt: z.string().min(20).max(20000),
   hard_rules: z.string().max(5000).nullish(),
   example_objection_handlers: z
-    .array(z.object({ objection: z.string().min(1).max(200), response: z.string().min(1).max(2000) }))
+    .array(
+      z.object({ objection: z.string().min(1).max(200), response: z.string().min(1).max(2000) }),
+    )
     .max(20)
     .default([]),
   is_default: z.boolean().default(false),
@@ -55,7 +66,10 @@ export const upsertCoachingStyle = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
 
     if (data.is_default) {
-      await supabase.from("coaching_styles").update({ is_default: false }).neq("id", data.id ?? "00000000-0000-0000-0000-000000000000");
+      await supabase
+        .from("coaching_styles")
+        .update({ is_default: false })
+        .neq("id", data.id ?? "00000000-0000-0000-0000-000000000000");
     }
 
     if (data.id) {
@@ -174,7 +188,11 @@ export const addCampaignKnowledge = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
 
     // Ensure list belongs to this user
-    const { data: list } = await supabase.from("lists").select("id").eq("id", data.list_id).maybeSingle();
+    const { data: list } = await supabase
+      .from("lists")
+      .select("id")
+      .eq("id", data.list_id)
+      .maybeSingle();
     if (!list) throw new Error("Campaign not found");
 
     const chunks = chunkText(data.content);
@@ -184,10 +202,12 @@ export const addCampaignKnowledge = createServerFn({ method: "POST" })
 
     // Save raw text to storage (for retrieval / re-chunking later)
     const blob = new Blob([data.content], { type: data.mime_type || "text/plain" });
-    const { error: upErr } = await supabase.storage.from("coaching-knowledge").upload(storagePath, blob, {
-      contentType: data.mime_type || "text/plain",
-      upsert: false,
-    });
+    const { error: upErr } = await supabase.storage
+      .from("coaching-knowledge")
+      .upload(storagePath, blob, {
+        contentType: data.mime_type || "text/plain",
+        upsert: false,
+      });
     if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
     const { data: doc, error: docErr } = await supabase
@@ -249,9 +269,7 @@ export const getDeepgramToken = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("Missing DEEPGRAM_API_KEY");
 
     // Get the project id, then mint a short-lived member key.
-    const projRes = await fetch("https://api.deepgram.com/v1/projects", {
-      headers: { Authorization: `Token ${apiKey}` },
-    });
+    const projRes = await fetch("https://api.deepgram.com/v1/projects", {});
     if (!projRes.ok) throw new Error(`Deepgram projects ${projRes.status}`);
     const projJson = await projRes.json();
     const projectId: string | undefined = projJson?.projects?.[0]?.project_id;
@@ -308,7 +326,9 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
     const [{ data: list }, { data: lead }, { data: profile }] = await Promise.all([
       supabase
         .from("lists")
-        .select("what_selling, key_selling_points, sender_name, sender_company, coaching_style_id, ai_copilot_enabled")
+        .select(
+          "what_selling, key_selling_points, sender_name, sender_company, coaching_style_id, ai_copilot_enabled",
+        )
         .eq("id", data.list_id)
         .maybeSingle(),
       supabase
@@ -318,7 +338,9 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
         .maybeSingle(),
       supabase
         .from("profiles")
-        .select("company_name,product_name,product_description,product_value_props,ideal_customer,common_objections,proof_points,pricing_notes,competitors,call_to_action")
+        .select(
+          "company_name,product_name,product_description,product_value_props,ideal_customer,common_objections,proof_points,pricing_notes,competitors,call_to_action",
+        )
         .eq("id", userId)
         .maybeSingle(),
     ]);
@@ -343,7 +365,8 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
       style = (s ?? null) as unknown as CoachingStyle | null;
     }
 
-    const lastProspect = [...data.transcript].reverse().find((t) => t.role === "prospect")?.text ?? "";
+    const lastProspect =
+      [...data.transcript].reverse().find((t) => t.role === "prospect")?.text ?? "";
 
     // Fetch the rep's next 3 available meeting slots so the AI can pitch real times
     // (used on closes when the prospect agrees to a meeting).
@@ -442,9 +465,6 @@ export const generateLiveSuggestion = createServerFn({ method: "POST" })
       knowledge = (chunks ?? []).map((c: any) => c.content as string);
     }
 
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
-
     const isNEPQ = /nepq|jeremy\s*miner/i.test(style?.name ?? "");
     const knowledgeBlock = isNEPQ
       ? `\n\n=== METHODOLOGY TRAINING (NEPQ — Jeremy Miner) ===\nThis is the full training the rep is being coached on. Every suggestion you produce MUST be consistent with these rules, tones, question types, and banned phrases.\n\n${NEPQ_KNOWLEDGE}\n=== END METHODOLOGY TRAINING ===\n`
@@ -469,7 +489,9 @@ You are listening to a LIVE cold call. Output JSON only:
       p.pricing_notes && `Pricing guidance: ${p.pricing_notes}`,
       p.competitors && `Competitors: ${p.competitors}`,
       p.call_to_action && `Default CTA: ${p.call_to_action}`,
-    ].filter(Boolean).join("\n\n");
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const userPrompt = `PRODUCT BRAIN (always-on context)
 ${productBlock || "(none configured — tell the user to fill in /app/product-info)"}
@@ -494,28 +516,18 @@ ${
 }
 LIVE TRANSCRIPT (oldest → newest):
 ${data.transcript.map((t) => `${t.role.toUpperCase()}: ${t.text}`).join("\n")}
-
 Return the JSON now.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 600,
-      }),
+    const content = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 400,
     });
-    if (res.status === 429) throw new Error("AI rate limit");
-    if (res.status === 402) throw new Error("AI credits exhausted");
-    if (!res.ok) throw new Error(`AI error ${res.status}`);
 
-    const payload = await res.json();
-    const content: string = payload.choices?.[0]?.message?.content ?? "{}";
     let parsed: any = {};
     try {
       parsed = JSON.parse(content);

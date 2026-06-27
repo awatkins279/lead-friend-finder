@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { chatCompletion } from "@/lib/ai-client";
 
 type Signal = {
   label: string;
@@ -34,10 +35,51 @@ const createInput = z.object({
 function buildFastRubric(context: string) {
   const normalized = context.toLowerCase();
   const words = normalized.match(/[a-z][a-z0-9+.-]{2,}/g) ?? [];
-  const ignored = new Set(["the", "and", "for", "with", "that", "this", "from", "into", "sell", "selling", "want", "need", "company", "companies", "business", "leads"]);
+  const ignored = new Set([
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "into",
+    "sell",
+    "selling",
+    "want",
+    "need",
+    "company",
+    "companies",
+    "business",
+    "leads",
+  ]);
   const keywords = Array.from(new Set(words.filter((word) => !ignored.has(word)))).slice(0, 24);
-  const titleCatalog = ["owner", "founder", "ceo", "president", "chief", "vp", "vice president", "director", "head", "manager"];
-  const industryCatalog = ["software", "saas", "healthcare", "financial", "insurance", "construction", "manufacturing", "real estate", "marketing", "technology", "retail", "logistics"];
+  const titleCatalog = [
+    "owner",
+    "founder",
+    "ceo",
+    "president",
+    "chief",
+    "vp",
+    "vice president",
+    "director",
+    "head",
+    "manager",
+  ];
+  const industryCatalog = [
+    "software",
+    "saas",
+    "healthcare",
+    "financial",
+    "insurance",
+    "construction",
+    "manufacturing",
+    "real estate",
+    "marketing",
+    "technology",
+    "retail",
+    "logistics",
+  ];
   return {
     titles: titleCatalog.filter((value) => normalized.includes(value)),
     industries: industryCatalog.filter((value) => normalized.includes(value)),
@@ -109,19 +151,47 @@ export const processNextBatch = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => processInput.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: ownedJob } = await supabase.from("scoring_jobs").select("id,status").eq("id", data.jobId).eq("user_id", userId).maybeSingle();
+    const { data: ownedJob } = await supabase
+      .from("scoring_jobs")
+      .select("id,status")
+      .eq("id", data.jobId)
+      .eq("user_id", userId)
+      .maybeSingle();
     if (!ownedJob) throw new Error("Scoring job not found");
     if (ownedJob.status !== "running") return { claimed: false, results: [], job: ownedJob };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: processed, error } = await supabaseAdmin.rpc("process_fast_scoring_batch_admin", { p_job_id: data.jobId, p_limit: 1000 });
+    const { data: processed, error } = await supabaseAdmin.rpc("process_fast_scoring_batch_admin", {
+      p_job_id: data.jobId,
+      p_limit: 1000,
+    });
     if (error) throw new Error(error.message);
     const count = Number(processed?.[0]?.processed ?? 0);
-    const { data: recentRows, error: recentError } = count > 0
-      ? await supabase.from("scoring_results").select("lead_id,score,reasoning,signals,strengths,gaps").eq("job_id", data.jobId).eq("user_id", userId).order("updated_at", { ascending: false }).limit(count)
-      : { data: [], error: null };
+    const { data: recentRows, error: recentError } =
+      count > 0
+        ? await supabase
+            .from("scoring_results")
+            .select("lead_id,score,reasoning,signals,strengths,gaps")
+            .eq("job_id", data.jobId)
+            .eq("user_id", userId)
+            .order("updated_at", { ascending: false })
+            .limit(count)
+        : { data: [], error: null };
     if (recentError) throw new Error(recentError.message);
-    const results = (recentRows ?? []).map((row: any) => ({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: row.signals ?? [], strengths: row.strengths ?? [], gaps: row.gaps ?? [] })) as ScoreRow[];
-    return { claimed: count > 0, results, job: null, processed: count, error: undefined as string | undefined };
+    const results = (recentRows ?? []).map((row: any) => ({
+      leadId: row.lead_id,
+      score: row.score,
+      reasoning: row.reasoning,
+      signals: row.signals ?? [],
+      strengths: row.strengths ?? [],
+      gaps: row.gaps ?? [],
+    })) as ScoreRow[];
+    return {
+      claimed: count > 0,
+      results,
+      job: null,
+      processed: count,
+      error: undefined as string | undefined,
+    };
   });
 
 // Shared core: claim a single batch, score it, update bookkeeping.
@@ -284,7 +354,15 @@ export const getJobSnapshot = createServerFn({ method: "POST" })
           .eq("job_id", data.jobId)
           .range(offset, offset + 999);
         if (batchErr) throw new Error(batchErr.message);
-        for (const row of scoreRows ?? []) results.push({ leadId: row.lead_id, score: row.score, reasoning: row.reasoning, signals: Array.isArray(row.signals) ? row.signals as Signal[] : [], strengths: Array.isArray(row.strengths) ? row.strengths as string[] : [], gaps: Array.isArray(row.gaps) ? row.gaps as string[] : [] });
+        for (const row of scoreRows ?? [])
+          results.push({
+            leadId: row.lead_id,
+            score: row.score,
+            reasoning: row.reasoning,
+            signals: Array.isArray(row.signals) ? (row.signals as Signal[]) : [],
+            strengths: Array.isArray(row.strengths) ? (row.strengths as string[]) : [],
+            gaps: Array.isArray(row.gaps) ? (row.gaps as string[]) : [],
+          });
         if ((scoreRows?.length ?? 0) < 1000) break;
       }
     }
@@ -439,33 +517,16 @@ Use only "strong" / "partial" / "weak" / "unknown" for verdicts. Cite evidence. 
 PROSPECTS:
 ${JSON.stringify(compact)}`;
 
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    signal: AbortSignal.timeout(40_000),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash-lite",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 16000,
-    }),
+  const content = await chatCompletion({
+    model: "google/gemini-2.5-flash-lite",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 16000,
   });
 
-  if (res.status === 429) throw new Error("AI rate limit");
-  if (res.status === 402) throw new Error("AI credits exhausted");
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`AI gateway error ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const payload = await res.json();
-  const content: string = payload.choices?.[0]?.message?.content ?? "{}";
   let parsed: { scores?: any[] };
   try {
     parsed = extractJson(content) as { scores?: any[] };

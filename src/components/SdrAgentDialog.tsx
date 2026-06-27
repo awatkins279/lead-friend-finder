@@ -62,7 +62,6 @@ type KnowledgeDoc = {
   chunk_count: number;
 };
 
-
 const EMPTY: AgentForm = {
   name: "",
   sdr_display_name: "",
@@ -239,9 +238,7 @@ export function SdrAgentDialog({
       const r = await processDoc({ data: { id } });
       setDocs((d) =>
         d.map((x) =>
-          x.id === id
-            ? { ...x, status: "processed", chunk_count: r.chunk_count, error: null }
-            : x,
+          x.id === id ? { ...x, status: "processed", chunk_count: r.chunk_count, error: null } : x,
         ),
       );
       toast.success(`Re-read — ${r.chunk_count} chunks ready`);
@@ -303,13 +300,16 @@ export function SdrAgentDialog({
               <TabsTrigger value="offer">Offer</TabsTrigger>
               <TabsTrigger value="behavior">Behavior</TabsTrigger>
               <TabsTrigger value="knowledge" disabled={!savedId}>
-                Knowledge {docs.length > 0 && (
+                Knowledge{" "}
+                {docs.length > 0 && (
                   <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
                     {docs.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="test" disabled={!savedId}>Test</TabsTrigger>
+              <TabsTrigger value="test" disabled={!savedId}>
+                Test
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="identity" className="space-y-4 pt-4">
@@ -372,11 +372,10 @@ export function SdrAgentDialog({
               </div>
               <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
                 Mailboxes are assigned per <strong>campaign</strong> now (in the campaign's
-                settings), so one agent can run across many inboxes. Replies go out from
-                the inbox the prospect was originally contacted on.
+                settings), so one agent can run across many inboxes. Replies go out from the inbox
+                the prospect was originally contacted on.
               </div>
             </TabsContent>
-
 
             <TabsContent value="offer" className="space-y-4 pt-4">
               <div className="space-y-2">
@@ -475,7 +474,9 @@ export function SdrAgentDialog({
                   rows={3}
                   value={form.hard_rules}
                   onChange={(e) => update("hard_rules", e.target.value)}
-                  placeholder={"Never quote pricing.\nAlways offer a demo.\nNever promise specific delivery dates."}
+                  placeholder={
+                    "Never quote pricing.\nAlways offer a demo.\nNever promise specific delivery dates."
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -486,7 +487,8 @@ export function SdrAgentDialog({
                   onChange={(e) => update("handoff_triggers", e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  If a reply mentions these, the AI saves a draft and notifies you instead of auto-sending.
+                  If a reply mentions these, the AI saves a draft and notifies you instead of
+                  auto-sending.
                 </p>
               </div>
             </TabsContent>
@@ -500,7 +502,9 @@ export function SdrAgentDialog({
                 <>
                   <div className="rounded-md border border-dashed p-6 text-center">
                     <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
-                    <p className="text-sm font-medium">Upload case studies, pricing, FAQs, product docs</p>
+                    <p className="text-sm font-medium">
+                      Upload case studies, pricing, FAQs, product docs
+                    </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       PDF · DOCX · TXT · MD · 25 MB max each
                     </p>
@@ -534,15 +538,13 @@ export function SdrAgentDialog({
 
                   <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
                     <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
-                    The AI only states facts it can find here or in the agent's Offer
-                    tab. The more accurate your pricing, FAQs, and product docs, the
-                    less it has to guess — which is how you prevent made-up answers.
+                    The AI only states facts it can find here or in the agent's Offer tab. The more
+                    accurate your pricing, FAQs, and product docs, the less it has to guess — which
+                    is how you prevent made-up answers.
                   </div>
 
                   {docs.length === 0 ? (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
-                      No files yet.
-                    </p>
+                    <p className="py-4 text-center text-xs text-muted-foreground">No files yet.</p>
                   ) : (
                     <div className="space-y-2">
                       {docs.map((d) => (
@@ -587,11 +589,7 @@ export function SdrAgentDialog({
                               Retry
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDeleteDoc(d.id)}
-                          >
+                          <Button size="sm" variant="ghost" onClick={() => handleDeleteDoc(d.id)}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
@@ -609,7 +607,8 @@ export function SdrAgentDialog({
                   <h3 className="text-sm font-medium">Test this agent</h3>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Paste a fake prospect email to preview the exact reply this agent would draft. Nothing is sent or saved.
+                  Paste a fake prospect email to preview the exact reply this agent would draft.
+                  Nothing is sent or saved.
                 </p>
               </div>
               <div className="space-y-2">
@@ -642,7 +641,8 @@ export function SdrAgentDialog({
                       {testResult.needs_handoff ? "Human handoff" : "No handoff"}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      Used {testResult.knowledge_chunks} knowledge chunk{testResult.knowledge_chunks === 1 ? "" : "s"}
+                      Used {testResult.knowledge_chunks} knowledge chunk
+                      {testResult.knowledge_chunks === 1 ? "" : "s"}
                     </span>
                   </div>
                   {testResult.needs_handoff && testResult.handoff_reason && (

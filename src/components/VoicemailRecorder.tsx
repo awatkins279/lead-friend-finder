@@ -33,13 +33,18 @@ export function VoicemailRecorder({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!currentPath) { setPreviewUrl(null); return; }
+      if (!currentPath) {
+        setPreviewUrl(null);
+        return;
+      }
       const { data } = await supabase.storage
         .from("voicemail-drops")
         .createSignedUrl(currentPath, 60 * 10);
       if (!cancelled) setPreviewUrl(data?.signedUrl ?? null);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [currentPath]);
 
   const startRec = async () => {
@@ -48,7 +53,9 @@ export function VoicemailRecorder({
       streamRef.current = stream;
       const rec = new MediaRecorder(stream, { mimeType: "audio/webm" });
       chunksRef.current = [];
-      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       rec.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         stream.getTracks().forEach((t) => t.stop());
@@ -69,7 +76,10 @@ export function VoicemailRecorder({
     mediaRecRef.current?.stop();
     mediaRecRef.current = null;
     setRecording(false);
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   };
 
   const uploadBlob = async (blob: Blob) => {
@@ -120,9 +130,7 @@ export function VoicemailRecorder({
     <div className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-3 py-2 text-xs">
       <span className="font-semibold text-muted-foreground">Prerecorded voicemail:</span>
 
-      {currentPath && previewUrl && (
-        <audio src={previewUrl} controls className="h-8" />
-      )}
+      {currentPath && previewUrl && <audio src={previewUrl} controls className="h-8" />}
       {currentPath && !previewUrl && <span className="text-muted-foreground">Loading…</span>}
       {!currentPath && !recording && (
         <span className="text-muted-foreground">none — record one to enable drop-and-go</span>
@@ -145,7 +153,13 @@ export function VoicemailRecorder({
       </label>
 
       {currentPath && (
-        <Button size="sm" variant="ghost" onClick={clear} disabled={busy} className="h-8 text-destructive">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={clear}
+          disabled={busy}
+          className="h-8 text-destructive"
+        >
           <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Clear
         </Button>
       )}

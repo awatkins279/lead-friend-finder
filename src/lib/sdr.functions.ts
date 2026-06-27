@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { SDR_REPLY_SYSTEM_PROMPT, buildKnowledgeBlock } from "./sdr-reply-prompt";
+import { chatCompletion } from "@/lib/ai-client";
 
 // ============== Schemas ==============
 
@@ -50,7 +51,7 @@ export const listSdrAgents = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("sdr_agents")
       .select(
-        "id, name, sdr_display_name, tone, mode, response_speed, email_account_id, sdr_knowledge_docs(count), lists(count), email_accounts(email_address, provider, status)"
+        "id, name, sdr_display_name, tone, mode, response_speed, email_account_id, sdr_knowledge_docs(count), lists(count), email_accounts(email_address, provider, status)",
       )
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -115,10 +116,7 @@ export const upsertSdrAgent = createServerFn({ method: "POST" })
       user_id: userId,
     };
     if (data.id) {
-      const { error } = await supabase
-        .from("sdr_agents")
-        .update(payload)
-        .eq("id", data.id);
+      const { error } = await supabase.from("sdr_agents").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
       return { id: data.id };
     } else {
@@ -149,7 +147,11 @@ const recordDocSchema = z.object({
   filename: z.string().min(1).max(255),
   storage_path: z.string().min(1),
   mime_type: z.string().max(120).nullish(),
-  size_bytes: z.number().int().min(0).max(50 * 1024 * 1024),
+  size_bytes: z
+    .number()
+    .int()
+    .min(0)
+    .max(50 * 1024 * 1024),
 });
 
 export const recordKnowledgeDoc = createServerFn({ method: "POST" })
@@ -196,10 +198,7 @@ export const deleteKnowledgeDoc = createServerFn({ method: "POST" })
     if (doc?.storage_path) {
       await supabase.storage.from("sdr-knowledge").remove([doc.storage_path]);
     }
-    const { error } = await supabase
-      .from("sdr_knowledge_docs")
-      .delete()
-      .eq("id", data.id);
+    const { error } = await supabase.from("sdr_knowledge_docs").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -235,7 +234,10 @@ const CHUNK_CHARS = 2800; // ~700 tokens per chunk
 const CHUNK_OVERLAP = 300; // carry-over context between chunks
 
 function chunkText(text: string, size = CHUNK_CHARS, overlap = CHUNK_OVERLAP): string[] {
-  const clean = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const clean = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   if (clean.length <= size) return clean ? [clean] : [];
   // Split on paragraph boundaries first, then pack into ~size windows.
   const paras = clean.split(/\n\n+/);
@@ -244,7 +246,10 @@ function chunkText(text: string, size = CHUNK_CHARS, overlap = CHUNK_OVERLAP): s
   for (const p of paras) {
     if (p.length > size) {
       // A single huge paragraph — hard-split it.
-      if (cur) { chunks.push(cur); cur = ""; }
+      if (cur) {
+        chunks.push(cur);
+        cur = "";
+      }
       for (let i = 0; i < p.length; i += size - overlap) {
         chunks.push(p.slice(i, i + size));
       }
@@ -358,7 +363,10 @@ type AgentTestResult = {
 };
 
 function parseAgentTestResult(raw: string): Record<string, unknown> | null {
-  const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+  const cleaned = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
@@ -422,29 +430,17 @@ export const testSdrAgent = createServerFn({ method: "POST" })
         : ""
     }\n\nWrite the reply now as JSON.`;
 
-    const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("AI is not configured");
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 2000,
-      }),
+    const content = await chatCompletion({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: SDR_REPLY_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 2000,
     });
-    if (response.status === 429) throw new Error("AI rate limit — try again in a moment");
-    if (response.status === 402) throw new Error("AI credits exhausted");
-    if (!response.ok) throw new Error(`AI error ${response.status}`);
 
-    const payload = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const parsed = parseAgentTestResult(payload.choices?.[0]?.message?.content ?? "");
+    const parsed = parseAgentTestResult(content);
     if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
       throw new Error("The AI returned an unreadable reply — try again");
     }

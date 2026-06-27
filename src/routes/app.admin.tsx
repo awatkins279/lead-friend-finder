@@ -62,9 +62,7 @@ function AdminDashboard() {
   }, [fetchOverview, fetchCustomers, nav]);
 
   if (error) {
-    return (
-      <div className="p-8 text-sm text-destructive">Failed to load admin: {error}</div>
-    );
+    return <div className="p-8 text-sm text-destructive">Failed to load admin: {error}</div>;
   }
   if (!overview || !customers) {
     return <div className="p-8 text-sm text-muted-foreground">Loading admin dashboard…</div>;
@@ -104,9 +102,7 @@ function AdminDashboard() {
           value={overview.totalCreditsSpent.toLocaleString()}
           sub={`${
             overview.totalCreditsGranted > 0
-              ? Math.round(
-                  (overview.totalCreditsSpent / overview.totalCreditsGranted) * 100,
-                )
+              ? Math.round((overview.totalCreditsSpent / overview.totalCreditsGranted) * 100)
               : 0
           }% utilization`}
         />
@@ -178,7 +174,9 @@ function AdminDashboard() {
                       <div className="text-xs text-muted-foreground">{c.fullName}</div>
                     )}
                   </TableCell>
-                  <TableCell>{c.planName ?? <span className="text-muted-foreground">Free</span>}</TableCell>
+                  <TableCell>
+                    {c.planName ?? <span className="text-muted-foreground">Free</span>}
+                  </TableCell>
                   <TableCell>
                     {c.status ? (
                       <Badge
@@ -192,13 +190,9 @@ function AdminDashboard() {
                     )}
                   </TableCell>
                   <TableCell className="capitalize">{c.billingCycle ?? "—"}</TableCell>
-                  <TableCell className="text-right">
-                    {c.creditsSpent.toLocaleString()}
-                  </TableCell>
+                  <TableCell className="text-right">{c.creditsSpent.toLocaleString()}</TableCell>
                   <TableCell>
-                    {c.currentPeriodEnd
-                      ? new Date(c.currentPeriodEnd).toLocaleDateString()
-                      : "—"}
+                    {c.currentPeriodEnd ? new Date(c.currentPeriodEnd).toLocaleDateString() : "—"}
                   </TableCell>
                   <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
                 </TableRow>
@@ -225,9 +219,7 @@ function Kpi({
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
-        <span className="grid h-7 w-7 place-items-center rounded-md bg-white/5">
-          {icon}
-        </span>
+        <span className="grid h-7 w-7 place-items-center rounded-md bg-white/5">{icon}</span>
         {label}
       </div>
       <div className="mt-3 text-2xl font-semibold tracking-tight">{value}</div>

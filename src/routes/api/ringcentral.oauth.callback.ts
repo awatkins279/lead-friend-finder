@@ -20,7 +20,7 @@ function htmlResponse(title: string, body: string, status = 200): Response {
 <body><div class="box">${body}</div>
 <script>try{setTimeout(function(){window.close();if(window.opener)window.opener.postMessage({type:'ringcentral-oauth-done'},'*')},800)}catch(e){}</script>
 </body></html>`,
-    { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }
 
@@ -38,11 +38,15 @@ export const Route = createFileRoute("/api/ringcentral/oauth/callback")({
           return htmlResponse(
             "Sign in failed",
             `<div class="h err">Sign in failed</div><div class="p">${desc}</div>`,
-            400
+            400,
           );
         }
         if (!code || !state) {
-          return htmlResponse("Missing code", `<div class="h err">Missing authorization code</div>`, 400);
+          return htmlResponse(
+            "Missing code",
+            `<div class="h err">Missing authorization code</div>`,
+            400,
+          );
         }
 
         const phoneAccountId = state.split(".")[0];
@@ -59,7 +63,11 @@ export const Route = createFileRoute("/api/ringcentral/oauth/callback")({
           .eq("id", phoneAccountId)
           .maybeSingle();
         if (error || !acc) {
-          return htmlResponse("Account not found", `<div class="h err">Phone account not found</div>`, 404);
+          return htmlResponse(
+            "Account not found",
+            `<div class="h err">Phone account not found</div>`,
+            404,
+          );
         }
 
         const creds = (acc.credentials ?? {}) as Record<string, any>;
@@ -69,7 +77,7 @@ export const Route = createFileRoute("/api/ringcentral/oauth/callback")({
           return htmlResponse(
             "Missing credentials",
             `<div class="h err">Save your Client ID and Secret first</div>`,
-            400
+            400,
           );
         }
 
@@ -95,7 +103,7 @@ export const Route = createFileRoute("/api/ringcentral/oauth/callback")({
           return htmlResponse(
             "Token exchange failed",
             `<div class="h err">RingCentral rejected the login</div><div class="p">${t.slice(0, 400)}</div>`,
-            400
+            400,
           );
         }
 
@@ -119,13 +127,13 @@ export const Route = createFileRoute("/api/ringcentral/oauth/callback")({
           return htmlResponse(
             "Save failed",
             `<div class="h err">Could not save tokens</div><div class="p">${upErr.message}</div>`,
-            500
+            500,
           );
         }
 
         return htmlResponse(
           "Signed in",
-          `<div class="h ok">✓ RingCentral connected</div><div class="p">You can close this window and start making calls from your browser.</div>`
+          `<div class="h ok">✓ RingCentral connected</div><div class="p">You can close this window and start making calls from your browser.</div>`,
         );
       },
     },

@@ -111,7 +111,9 @@ export function InstantlyConnectCard({ onChanged }: { onChanged: () => void }) {
                   <CheckCircle2 className="h-3 w-3" /> Connected
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-[10px]">Not connected</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  Not connected
+                </Badge>
               )}
             </div>
             <p className="mt-1 max-w-md text-xs text-muted-foreground">
@@ -166,9 +168,8 @@ export function InstantlyConnectCard({ onChanged }: { onChanged: () => void }) {
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Find it in Instantly under{" "}
-            <strong>Settings → Integrations → API Keys</strong>. It's stored securely and
-            only used to import your mailboxes and send replies.{" "}
+            Find it in Instantly under <strong>Settings → Integrations → API Keys</strong>. It's
+            stored securely and only used to import your mailboxes and send replies.{" "}
             <a
               href="https://app.instantly.ai/app/settings/integrations"
               target="_blank"

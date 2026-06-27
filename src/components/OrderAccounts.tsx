@@ -63,7 +63,10 @@ export function OrderAccounts({ showHeader = true }: { showHeader?: boolean }) {
 
   const domainCount = domains.filter((d) => d.mailboxes.length > 0).length;
   const mailboxCount = domains.reduce((n, d) => n + d.mailboxes.length, 0);
-  const totals = useMemo(() => computeOrderTotals(domainCount, mailboxCount), [domainCount, mailboxCount]);
+  const totals = useMemo(
+    () => computeOrderTotals(domainCount, mailboxCount),
+    [domainCount, mailboxCount],
+  );
   const dueToday = totals.oneTimeCents + totals.monthlyCents;
 
   const setDomain = (i: number, patch: Partial<DomainEntry>) =>
@@ -157,16 +160,22 @@ export function OrderAccounts({ showHeader = true }: { showHeader?: boolean }) {
             {orders.map((o) => {
               const s = STATUS_LABEL[o.status] ?? { label: o.status, cls: "" };
               return (
-                <div key={o.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                <div
+                  key={o.id}
+                  className="flex items-center justify-between rounded-md border p-3 text-sm"
+                >
                   <div>
-                    {o.domain_count} domain{o.domain_count === 1 ? "" : "s"} · {o.mailbox_count} mailbox
+                    {o.domain_count} domain{o.domain_count === 1 ? "" : "s"} · {o.mailbox_count}{" "}
+                    mailbox
                     {o.mailbox_count === 1 ? "" : "es"}
                     <span className="ml-2 text-xs text-muted-foreground">
                       {new Date(o.created_at).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground">{formatUsd(o.monthly_cents)}/mo</span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatUsd(o.monthly_cents)}/mo
+                    </span>
                     <Badge variant="outline" className={`text-[10px] ${s.cls}`}>
                       {o.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
                       {s.label}
@@ -209,10 +218,14 @@ export function OrderAccounts({ showHeader = true }: { showHeader?: boolean }) {
                 <div className="w-28 space-y-1.5">
                   <Label className="text-xs">TLD</Label>
                   <Select value={d.tld} onValueChange={(v) => setDomain(di, { tld: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {TLDS.map((t) => (
-                        <SelectItem key={t} value={t}>.{t}</SelectItem>
+                        <SelectItem key={t} value={t}>
+                          .{t}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -233,7 +246,9 @@ export function OrderAccounts({ showHeader = true }: { showHeader?: boolean }) {
                       placeholder="john"
                       className="w-32"
                     />
-                    <span className="text-xs text-muted-foreground">@{d.name || "domain"}.{d.tld}</span>
+                    <span className="text-xs text-muted-foreground">
+                      @{d.name || "domain"}.{d.tld}
+                    </span>
                     <Input
                       value={m.display_name}
                       onChange={(e) => setMailbox(di, mi, { display_name: e.target.value })}
@@ -273,20 +288,31 @@ export function OrderAccounts({ showHeader = true }: { showHeader?: boolean }) {
           <Card className="p-4">
             <div className="mb-3 text-sm font-semibold">Order summary</div>
             <div className="space-y-2 text-sm">
-              <Row label={`Domains (${totals.domainCount} × ${formatUsd(ORDER_PRICING.domainCents)})`} value={formatUsd(totals.domainsCents)} />
-              <Row label={`Mailboxes (${totals.mailboxCount} × ${formatUsd(ORDER_PRICING.mailboxMonthlyCents)}/mo)`} value={`${formatUsd(totals.monthlyCents)}/mo`} />
+              <Row
+                label={`Domains (${totals.domainCount} × ${formatUsd(ORDER_PRICING.domainCents)})`}
+                value={formatUsd(totals.domainsCents)}
+              />
+              <Row
+                label={`Mailboxes (${totals.mailboxCount} × ${formatUsd(ORDER_PRICING.mailboxMonthlyCents)}/mo)`}
+                value={`${formatUsd(totals.monthlyCents)}/mo`}
+              />
               {ORDER_PRICING.setupFeeCents > 0 && (
                 <Row label="One-time setup" value={formatUsd(totals.setupCents)} />
               )}
               <div className="my-2 border-t" />
               <Row label="Due today" value={formatUsd(dueToday)} bold />
               <p className="text-[11px] text-muted-foreground">
-                Includes domains + setup + first month of mailboxes. Then {formatUsd(totals.monthlyCents)}/month for the mailboxes.
+                Includes domains + setup + first month of mailboxes. Then{" "}
+                {formatUsd(totals.monthlyCents)}/month for the mailboxes.
               </p>
             </div>
 
             <label className="mt-4 flex items-start gap-2 text-xs">
-              <Checkbox checked={terms} onCheckedChange={(c) => setTerms(c === true)} className="mt-0.5" />
+              <Checkbox
+                checked={terms}
+                onCheckedChange={(c) => setTerms(c === true)}
+                className="mt-0.5"
+              />
               <span className="text-muted-foreground">
                 I agree to the terms. Domains and mailboxes are managed for me and{" "}
                 <strong>stay with the company if I cancel.</strong>
@@ -295,9 +321,13 @@ export function OrderAccounts({ showHeader = true }: { showHeader?: boolean }) {
 
             <Button className="mt-4 w-full" disabled={!valid || submitting} onClick={startCheckout}>
               {submitting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting checkout…</>
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting checkout…
+                </>
               ) : (
-                <><ShoppingCart className="mr-2 h-4 w-4" /> Continue to payment</>
+                <>
+                  <ShoppingCart className="mr-2 h-4 w-4" /> Continue to payment
+                </>
               )}
             </Button>
           </Card>
