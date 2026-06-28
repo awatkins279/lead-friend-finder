@@ -47,8 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      call_practice_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duration_sec: number | null
+          id: string
+          product_context: string | null
+          prospect_persona: string | null
+          scenario: string
+          score: number | null
+          scorecard: Json | null
+          title: string
+          transcript: Json | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duration_sec?: number | null
+          id?: string
+          product_context?: string | null
+          prospect_persona?: string | null
+          scenario?: string
+          score?: number | null
+          scorecard?: Json | null
+          title?: string
+          transcript?: Json | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duration_sec?: number | null
+          id?: string
+          product_context?: string | null
+          prospect_persona?: string | null
+          scenario?: string
+          score?: number | null
+          scorecard?: Json | null
+          title?: string
+          transcript?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       calls: {
         Row: {
+          call_score: number | null
           created_at: string
           duration_sec: number | null
           ended_at: string | null
@@ -72,6 +118,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          call_score?: number | null
           created_at?: string
           duration_sec?: number | null
           ended_at?: string | null
@@ -95,6 +142,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          call_score?: number | null
           created_at?: string
           duration_sec?: number | null
           ended_at?: string | null
