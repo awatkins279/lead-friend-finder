@@ -207,7 +207,7 @@ Make sure there are exactly ${leads.length} results, one per lead. Use the leadS
     // 7. Process results, bulk update + charge
     const results: BatchEnrichRow[] = [];
     let successCount = 0;
-    const updates: Promise<any>[] = [];
+    const updates: PromiseLike<unknown>[] = [];
 
     for (const r of parsed.results) {
       const leadId = leadBySuffix.get(String(r.leadSuffix ?? ""));

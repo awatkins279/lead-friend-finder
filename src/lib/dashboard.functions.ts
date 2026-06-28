@@ -45,12 +45,21 @@ export const getDashboardStats = createServerFn({ method: "GET" })
     const meetingsBooked = convos.filter((c: any) => c.intent === "meeting_booked").length;
     const conversationsOpen = convos.filter((c: any) => c.status !== "closed").length;
 
-    // Count emails sent and calls from list_leads
-    const { count: emailsSent } = await supabase
-      .from("list_leads")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .not("emails", "is", null);
+    // Count emails sent (list_leads has no user_id — scope by the user's lists)
+    const { data: userLists } = await supabase
+      .from("lists")
+      .select("id")
+      .eq("user_id", userId);
+    const listIds = (userLists ?? []).map((l: { id: string }) => l.id);
+    let emailsSent = 0;
+    if (listIds.length > 0) {
+      const { count } = await supabase
+        .from("list_leads")
+        .select("*", { count: "exact", head: true })
+        .in("list_id", listIds)
+        .not("emails", "is", null);
+      emailsSent = count ?? 0;
+    }
 
     const { count: callsMade } = await supabase
       .from("calls")
