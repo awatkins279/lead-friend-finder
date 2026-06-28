@@ -243,7 +243,7 @@ function ListDetailPage() {
   const [open, setOpen] = useState<Row | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const [callConfigOpen, setCallConfigOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "email" | "calling">("email");
+  const [activeTab, setActiveTab] = useState<"overview" | "email" | "calling" | "reports">("email");
   const [pendingCallLeadId, setPendingCallLeadId] = useState<string | null>(null);
   const [confirmScripts, setConfirmScripts] = useState(false);
   const [confirmEmails, setConfirmEmails] = useState(false);
