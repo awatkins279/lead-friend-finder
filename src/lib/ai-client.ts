@@ -1,8 +1,8 @@
-// Centralized AI client — swap provider by changing OPENROUTER_API_KEY or OPENROUTER_BASE_URL
-// All calls go through this module instead of ai.gateway.lovable.dev
+// Centralized AI client — routes through Lovable AI Gateway.
+// Server-side only. LOVABLE_API_KEY is auto-provisioned by Lovable.
 
-const BASE_URL = process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
-const API_KEY = process.env.OPENROUTER_API_KEY || "";
+const BASE_URL = "https://ai.gateway.lovable.dev/v1";
+const API_KEY = process.env.LOVABLE_API_KEY || "";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -19,21 +19,17 @@ export type ChatOptions = {
 
 export async function chatCompletion(opts: ChatOptions): Promise<string> {
   if (!API_KEY) {
-    throw new Error("Missing OPENROUTER_API_KEY — set it in .env");
+    throw new Error("Missing LOVABLE_API_KEY — AI gateway is not configured");
   }
 
   const body: Record<string, unknown> = {
-    model: opts.model || "deepseek/deepseek-chat",
+    model: opts.model || "google/gemini-2.5-flash",
     messages: opts.messages,
     max_tokens: opts.max_tokens ?? 4000,
   };
 
-  if (opts.response_format) {
-    body.response_format = opts.response_format;
-  }
-  if (opts.temperature !== undefined) {
-    body.temperature = opts.temperature;
-  }
+  if (opts.response_format) body.response_format = opts.response_format;
+  if (opts.temperature !== undefined) body.temperature = opts.temperature;
 
   const res = await fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
@@ -45,7 +41,8 @@ export async function chatCompletion(opts: ChatOptions): Promise<string> {
   });
 
   if (res.status === 429) throw new Error("AI rate limit — try again in a moment");
-  if (res.status === 402) throw new Error("AI credits exhausted — add credits to OpenRouter");
+  if (res.status === 402)
+    throw new Error("AI credits exhausted — add credits in Settings → Plans & credits");
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`AI error ${res.status}: ${text.slice(0, 200)}`);
